@@ -13,11 +13,33 @@
 
 # Milestone 1 — Project Foundation
 
+## [P0] Create initial README
+
+**Labels:** `documentation`
+
+- [x] Add project title
+- [x] Add project description
+- [x] Add project status
+- [x] Add table of contents
+- [x] Add overview
+- [x] Add data source
+- [x] Add roadmap
+- [x] Add contributing section
+- [x] Add license
+
+**Acceptance criteria**
+
+- [x] A visitor understands the project's purpose
+- [x] The data source is documented
+- [x] Repository structure is easy to navigate
+
+---
+
 ## [P0] Define project scope
 
 **Labels:** `planning`, `documentation`
 
-- [ ] Define target users
+- [x] Define target users
 - [ ] Define supported questions
 - [ ] Define unsupported questions
 - [ ] Define supported languages
@@ -25,7 +47,7 @@
 
 **Acceptance criteria**
 
-- [ ] Scope is documented in `README.md`
+- [x] Scope is documented in `README.md`
 - [ ] Limitations are explicit
 - [ ] Five example use cases are included
 
@@ -537,13 +559,16 @@
 
 **Labels:** `documentation`
 
-- [ ] Explain the problem
-- [ ] Document the data source
+- [x] Explain the problem
+- [x] Document the data source
 - [ ] Add architecture diagram
 - [ ] Explain ingestion and retrieval
 - [ ] Include evaluation results
 - [ ] Include screenshots
 - [ ] Add setup and usage instructions
+- [ ] Add configuration guide
+- [ ] Add ingestion command examples
+- [ ] Add chat usage examples
 - [ ] Document limitations
 
 **Acceptance criteria**
