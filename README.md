@@ -26,7 +26,9 @@ This project demonstrates how to build an end-to-end RAG application following m
 The project covers document ingestion, chunking, embeddings, vector search, retrieval evaluation, prompt engineering, monitoring, and a Streamlit user interface.
 
 ## Data source
-This project uses the freely available *[Discovering Brittany](https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf)* guide published by [Ibanista](https://www.ibanista.com/). The guide is used solely for educational purposes and remains the property of its respective copyright holder. It is not redistributed as part of this repository.
+This project uses the freely available *[Discovering Brittany](https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf)* guide published by [Ibanista](https://www.ibanista.com/).
+
+The guide is used solely for educational purposes and remains the property of its respective copyright holder. It is not redistributed as part of this repository.
 
 ## Roadmap
 
