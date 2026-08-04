@@ -10,6 +10,7 @@ import click
 from pydantic import Field, HttpUrl, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ai_tour_guide.ingestion.pdf.markdown import write_markdown
 from ai_tour_guide.ingestion.pdf.parser import (
     PdfDownloadError,
     PdfParseError,
@@ -32,6 +33,7 @@ class IngestionSettings(BaseSettings):
 
     pdf_url: HttpUrl
     pdf_output: Path = Path("output/guide.pdf")
+    markdown_output: Path = Path("output/guide.md")
     text_output: Path = Path("output/guide.txt")
     excluded_leading_pages: int = 3
     excluded_trailing_pages: int = 2
@@ -165,6 +167,8 @@ def main(
             parsed.text,
             encoding="utf-8",
         )
+
+        write_markdown(parsed, settings.markdown_output)
 
     except (PdfDownloadError, PdfParseError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc

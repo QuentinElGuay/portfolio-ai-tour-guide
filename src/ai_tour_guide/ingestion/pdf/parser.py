@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import httpx
 import pymupdf
@@ -46,17 +47,26 @@ class TextLine:
 
 @dataclass(frozen=True, slots=True)
 class ParsedSection:
-    """A section inferred from the PDF typography."""
+    """A section inferred from PDF typography.
+
+    ``title`` and ``level`` describe the Markdown heading. ``paragraphs``
+    preserves the section body without encoding an output format in the parser.
+    """
 
     title: str | None
     level: int | None
     page_start: int
     page_end: int
-    text: str
+    paragraphs: tuple[str, ...]
+
+    @property
+    def text(self) -> str:
+        """Return the section body as plain text."""
+        return "\n\n".join(self.paragraphs)
 
     @property
     def content(self) -> str:
-        """Return the section title and body as embedding-ready text."""
+        """Return the title and body as embedding-ready text."""
         if self.title and self.text:
             return f"{self.title}\n\n{self.text}"
 
@@ -506,7 +516,6 @@ def _normalise_inline_text(text: str) -> str:
     """Remove unwanted content and normalize inline whitespace."""
     text = _remove_ignored_text(text)
     return re.sub(r"\s+", " ", text).strip()
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def _normalise_bbox(
@@ -603,10 +612,87 @@ def _span_is_bold(flags: int, font_name: str) -> bool:
 
 
 def _lines_to_text(lines: Sequence[TextLine]) -> str:
-    """Convert ordered lines into normalized page text."""
-    return _normalise_page_text(
-        "\n".join(line.text for line in lines)
+    """Convert visual PDF lines into paragraph-oriented plain text."""
+    return "\n\n".join(_lines_to_paragraphs(lines))
+
+
+def _lines_to_paragraphs(
+    lines: Sequence[TextLine],
+) -> tuple[str, ...]:
+    """Group visual lines into logical paragraphs."""
+    if not lines:
+        return ()
+
+    paragraph_lines: list[list[TextLine]] = [[lines[0]]]
+
+    for line in lines[1:]:
+        previous = paragraph_lines[-1][-1]
+
+        if _starts_new_paragraph(previous, line):
+            paragraph_lines.append([line])
+        else:
+            paragraph_lines[-1].append(line)
+
+    paragraphs = tuple(
+        paragraph
+        for group in paragraph_lines
+        if (paragraph := _join_paragraph_lines(group))
     )
+
+    return paragraphs
+
+
+def _starts_new_paragraph(
+    previous: TextLine,
+    current: TextLine,
+) -> bool:
+    """Return whether *current* starts a new logical paragraph."""
+    if current.page_number != previous.page_number:
+        return True
+
+    if current.block_number != previous.block_number:
+        return True
+
+    if current.font != previous.font:
+        return True
+
+    if abs(current.font_size - previous.font_size) >= 1.0:
+        return True
+
+    if current.is_bold != previous.is_bold:
+        return True
+
+    if re.match(r"^(?:[-*•]|\d+[.)])\s+", current.text):
+        return True
+
+    vertical_gap = current.bbox[1] - previous.bbox[3]
+    expected_line_height = max(
+        previous.bbox[3] - previous.bbox[1],
+        current.bbox[3] - current.bbox[1],
+        previous.font_size,
+        current.font_size,
+        1.0,
+    )
+
+    return vertical_gap > expected_line_height * 0.75
+
+
+def _join_paragraph_lines(lines: Sequence[TextLine]) -> str:
+    """Join wrapped visual lines into one normalized paragraph."""
+    if not lines:
+        return ""
+
+    result = lines[0].text
+
+    for line in lines[1:]:
+        if result.endswith("-") and line.text[:1].islower():
+            result = result[:-1] + line.text
+        elif _should_insert_space(result, line.text):
+            result += f" {line.text}"
+        else:
+            result += line.text
+
+    return _normalise_inline_text(result)
 
 
 def _estimate_body_font_size(
@@ -779,7 +865,7 @@ def _build_sections(
     heading_levels: dict[float, int],
     page_count: int,
 ) -> tuple[ParsedSection, ...]:
-    """Build sequential sections from inferred heading lines."""
+    """Build sequential, Markdown-ready sections from inferred headings."""
     if not lines:
         return ()
 
@@ -793,12 +879,12 @@ def _build_sections(
     current_level: int | None = None
     current_page_start = lines[0].page_number
     current_page_end = current_page_start
-    current_body: list[str] = []
+    current_body: list[TextLine] = []
 
     def flush_current_section() -> None:
-        body = _normalise_page_text("\n".join(current_body))
+        paragraphs = _lines_to_paragraphs(current_body)
 
-        if current_title is None and not body:
+        if current_title is None and not paragraphs:
             return
 
         sections.append(
@@ -807,7 +893,7 @@ def _build_sections(
                 level=current_level,
                 page_start=current_page_start,
                 page_end=current_page_end,
-                text=body,
+                paragraphs=paragraphs,
             )
         )
 
@@ -827,7 +913,7 @@ def _build_sections(
             current_body = []
             continue
 
-        current_body.append(line.text)
+        current_body.append(line)
         current_page_end = line.page_number
 
     flush_current_section()
@@ -840,11 +926,9 @@ def _build_sections(
         ParsedSection(
             title=None,
             level=None,
-            page_start=1,
-            page_end=page_count,
-            text=_normalise_page_text(
-                "\n".join(line.text for line in lines)
-            ),
+            page_start=lines[0].page_number,
+            page_end=lines[-1].page_number if lines else page_count,
+            paragraphs=_lines_to_paragraphs(lines),
         ),
     )
 

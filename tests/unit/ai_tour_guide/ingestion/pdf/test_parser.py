@@ -159,17 +159,22 @@ def test_parse_pdf_sorts_text_by_page_coordinates(
 
     with pymupdf.open() as document:
         page = document.new_page(width=200, height=200)
-
-        # Insert the lower text first to verify that sort=True uses
-        # page coordinates rather than insertion order.
         page.insert_text((20, 100), "Second section")
         page.insert_text((20, 50), "First section")
-
         document.save(path)
 
     result = parse_pdf(path)
 
-    assert result.pages == ("First section\nSecond section",)
+    non_empty_lines = [
+        line
+        for line in result.pages[0].splitlines()
+        if line
+    ]
+
+    assert non_empty_lines == [
+        "First section",
+        "Second section",
+    ]
 
 
 def test_parse_pdf_raises_error_when_file_does_not_exist(
