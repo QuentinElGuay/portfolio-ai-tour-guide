@@ -1,29 +1,38 @@
-"""Markdown exporter for parsed PDF tourism guides."""
+"""Markdown exporter for structured tourism-guide PDFs."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ai_tour_guide.ingestion.pdf.parser import ParsedPdf
+from ai_tour_guide.ingestion.pdf.parser import ParsedPdf, ParsedSection
 
 
 def render_markdown(parsed: ParsedPdf) -> str:
-    """Render a parsed PDF as Markdown with inferred heading levels."""
     blocks: list[str] = []
 
     for section in parsed.sections:
-        if section.title:
-            level = min(max(section.level or 1, 1), 6)
-            blocks.append(f"{'#' * level} {section.title.strip()}")
-
-        blocks.extend(
-            paragraph.strip()
-            for paragraph in section.paragraphs
-            if paragraph.strip()
-        )
+        _append_section_markdown(section, blocks)
 
     markdown = "\n\n".join(blocks).strip()
     return f"{markdown}\n" if markdown else ""
+
+
+def _append_section_markdown(
+    section: ParsedSection,
+    blocks: list[str],
+) -> None:
+    if section.title:
+        level = min(max(section.level or 1, 1), 6)
+        blocks.append(f"{'#' * level} {section.title.strip()}")
+
+    blocks.extend(
+        paragraph.text.strip()
+        for paragraph in section.paragraphs
+        if paragraph.text.strip()
+    )
+
+    for subsection in section.subsections:
+        _append_section_markdown(subsection, blocks)
 
 
 def write_markdown(parsed: ParsedPdf, destination: Path) -> Path:

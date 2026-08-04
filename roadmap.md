@@ -63,17 +63,17 @@
 
 **Labels:** `setup`, `developer-experience`
 
-- [ ] Create Python project
-- [ ] Add dependency management
-- [ ] Add environment configuration
-- [ ] Add basic logging
-- [ ] Add test structure
+- [x] Create Python project
+- [x] Add dependency management
+- [x] Add environment configuration
+- [x] Add basic logging
+- [x] Add test structure
 
 **Acceptance criteria**
 
-- [ ] Project installs with one command
-- [ ] Application starts locally
-- [ ] Tests can be executed
+- [x] Project installs with one command
+- [x] Application starts locally
+- [x] Tests can be executed
 
 **Tools**
 
@@ -90,16 +90,15 @@
 
 **Labels:** `data`, `research`
 
-- [ ] Verify text is selectable
-- [ ] Inspect pages, columns, maps, and tables
-- [ ] Check repeated headers and footers
-- [ ] Verify source and redistribution rights
-- [ ] Record document metadata
+- [x] Verify text is selectable
+- [x] Inspect pages, columns, maps, and tables
+- [x] Check repeated headers and footers
+- [x] Verify source and redistribution rights
 
 **Acceptance criteria**
 
-- [ ] Extraction risks are documented
-- [ ] Source URL and license notes are recorded
+- [x] Extraction risks are documented
+- [x] Source URL and license notes are recorded
 
 **Tools**
 
@@ -108,27 +107,52 @@
 
 ---
 
-## [P0] Extract PDF content
+## [P0] Extract structured PDF content
 
 **Labels:** `ingestion`, `pdf`
 
-- [ ] Extract text page by page
-- [ ] Preserve page numbers
-- [ ] Preserve document title and source
-- [ ] Remove repeated headers and footers
-- [ ] Export records to JSONL
+- [x] Extract text page by page
+- [x] Preserve original page numbers
+<!-- - [ ] Preserve document title and author -->
+- [x] Reconstruct logical paragraphs
+- [x] Detect section titles from typography
+- [x] Infer heading levels
+- [x] Record page ranges for every paragraph
+- [x] Actually remove repeated headers and footers from content
+- [ ] Export the parsed document as structured JSON
 
 **Acceptance criteria**
 
-- [ ] Each record contains text and page metadata
+- [ ] Each paragraph contains text, `page_start`, and `page_end`
+- [ ] Each section contains title, heading level, page range, and paragraphs
 - [ ] French characters are preserved
-- [ ] Sample pages match the original document
+- [ ] Header/footer text is absent from exported content
+- [ ] Sample paragraphs and headings match the original document
+- [ ] Parsing the same PDF twice produces identical output
 
-**Tools**
+---
 
-- PyMuPDF
-- Pydantic
-- JSONL
+## [P0] Build normalized document hierarchy
+
+**Labels:** `ingestion`, `document-model`
+
+- [ ] Derive parent sections from heading levels
+- [ ] Build heading paths
+- [ ] Assign deterministic section and paragraph identifiers
+- [ ] Preserve section and paragraph ordering
+- [ ] Convert parsed sections into content-node records
+
+**Acceptance criteria**
+
+- [ ] Every section has a stable identifier
+- [ ] Every child section references its parent
+- [ ] Every paragraph references its section
+- [ ] Every node has a deterministic position
+- [ ] Heading paths are correct
+
+**Example heading path**
+
+`["Brittany", "Family life", "Schools"]`
 
 ---
 
@@ -136,22 +160,24 @@
 
 **Labels:** `ingestion`, `rag`
 
-- [ ] Implement page-aware chunks
-- [ ] Preserve section titles
-- [ ] Add chunk identifiers
-- [ ] Add configurable chunk size and overlap
-- [ ] Store document metadata with each chunk
+- [ ] Chunk paragraphs within section boundaries
+- [ ] Preserve heading paths and section identifiers
+- [ ] Preserve page ranges
+- [ ] Add deterministic chunk identifiers
+- [ ] Add configurable target size, maximum size, and overlap
+- [ ] Avoid overlap across unrelated sections
+- [ ] Store document and source-node metadata with each chunk
+- [ ] Record chunk position and token count
+- [ ] Build separate embedding input from title, heading path, and body
 
 **Acceptance criteria**
 
-- [ ] Every chunk can be traced to a page
+- [ ] Every chunk can be traced to its source paragraph or section
+- [ ] Every chunk has `page_start` and `page_end`
+- [ ] Chunks never cross unrelated section boundaries
 - [ ] Chunking parameters are configurable
-- [ ] Chunk output is reproducible
-
-**Tools**
-
-- Python
-- tiktoken or Hugging Face tokenizers
+- [ ] Chunk identifiers and output are reproducible
+- [ ] Stored chunk text does not contain synthetic heading enrichment
 
 ---
 
