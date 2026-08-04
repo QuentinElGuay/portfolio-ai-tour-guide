@@ -119,16 +119,16 @@
 - [x] Infer heading levels
 - [x] Record page ranges for every paragraph
 - [x] Actually remove repeated headers and footers from content
-- [ ] Export the parsed document as structured JSON
+- [x] Export the parsed document as structured JSON
 
 **Acceptance criteria**
 
-- [ ] Each paragraph contains text, `page_start`, and `page_end`
-- [ ] Each section contains title, heading level, page range, and paragraphs
-- [ ] French characters are preserved
-- [ ] Header/footer text is absent from exported content
-- [ ] Sample paragraphs and headings match the original document
-- [ ] Parsing the same PDF twice produces identical output
+- [x] Each paragraph contains text, `page_start`, and `page_end`
+- [x] Each section contains title, heading level, page range, and paragraphs
+- [x] French characters are preserved
+- [x] Header/footer text is absent from exported content
+- [x] Sample paragraphs and headings match the original document
+- [x] Parsing the same PDF twice produces identical output
 
 ---
 
@@ -136,19 +136,19 @@
 
 **Labels:** `ingestion`, `document-model`
 
-- [ ] Derive parent sections from heading levels
-- [ ] Build heading paths
-- [ ] Assign deterministic section and paragraph identifiers
-- [ ] Preserve section and paragraph ordering
-- [ ] Convert parsed sections into content-node records
+- [x] Derive parent sections from heading levels
+- [x] Build heading paths
+- [x] Assign deterministic section and paragraph identifiers
+- [x] Preserve section and paragraph ordering
+- [x] Convert parsed sections into content-node records
 
 **Acceptance criteria**
 
-- [ ] Every section has a stable identifier
-- [ ] Every child section references its parent
-- [ ] Every paragraph references its section
-- [ ] Every node has a deterministic position
-- [ ] Heading paths are correct
+- [x] Every section has a stable identifier
+- [x] Every child section references its parent
+- [x] Every paragraph references its section
+- [x] Every node has a deterministic position
+- [x] Heading paths are correct
 
 **Example heading path**
 
