@@ -43,11 +43,7 @@ class IngestionSettings(BaseSettings):
 
 def load_settings(**cli_values: Any) -> IngestionSettings:
     """Load settings, applying only explicitly supplied CLI options."""
-    overrides = {
-        name: value
-        for name, value in cli_values.items()
-        if value is not None
-    }
+    overrides = {name: value for name, value in cli_values.items() if value is not None}
 
     return IngestionSettings(**overrides)
 
@@ -58,10 +54,7 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
     "pdf_url",
     type=str,
     default=None,
-    help=(
-        "PDF URL. Overrides "
-        "INGESTION_PDF_URL environment variable."
-    ),
+    help=("PDF URL. Overrides INGESTION_PDF_URL environment variable."),
 )
 @click.option(
     "--pdf-output",
@@ -70,10 +63,7 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
         dir_okay=False,
     ),
     default=None,
-    help=(
-        "Downloaded PDF path. Overrides "
-        "AI_TOUR_GUIDE_INGESTION_PDF_OUTPUT."
-    ),
+    help=("Downloaded PDF path. Overrides AI_TOUR_GUIDE_INGESTION_PDF_OUTPUT."),
 )
 @click.option(
     "--text-output",
@@ -82,10 +72,7 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
         dir_okay=False,
     ),
     default=None,
-    help=(
-        "Extracted text path. Overrides "
-        "AI_TOUR_GUIDE_INGESTION_TEXT_OUTPUT."
-    ),
+    help=("Extracted text path. Overrides AI_TOUR_GUIDE_INGESTION_TEXT_OUTPUT."),
 )
 @click.option(
     "--excluded-leading-pages",
@@ -103,17 +90,13 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
     "--timeout",
     type=click.FloatRange(min=0.1),
     default=None,
-    help=(
-        "HTTP timeout in seconds. Overrides "
-        "AI_TOUR_GUIDE_INGESTION_TIMEOUT."
-    ),
+    help=("HTTP timeout in seconds. Overrides AI_TOUR_GUIDE_INGESTION_TIMEOUT."),
 )
 @click.option(
     "--verbose/--no-verbose",
     default=None,
     help=(
-        "Enable or disable debug logging. Overrides "
-        "AI_TOUR_GUIDE_INGESTION_VERBOSE."
+        "Enable or disable debug logging. Overrides AI_TOUR_GUIDE_INGESTION_VERBOSE."
     ),
 )
 def main(
@@ -137,9 +120,7 @@ def main(
             verbose=verbose,
         )
     except ValidationError as exc:
-        raise click.ClickException(
-            f"Invalid ingestion configuration:\n{exc}"
-        ) from exc
+        raise click.ClickException(f"Invalid ingestion configuration:\n{exc}") from exc
 
     logging.basicConfig(
         level=logging.DEBUG if settings.verbose else logging.INFO,
@@ -152,7 +133,7 @@ def main(
             settings.pdf_output,
             timeout_seconds=settings.timeout,
         )
-        parsed = parse_pdf(
+        parsed_pdf = parse_pdf(
             pdf_path,
             excluded_leading_pages=settings.excluded_leading_pages,
             excluded_trailing_pages=settings.excluded_trailing_pages,
@@ -164,19 +145,21 @@ def main(
         )
 
         settings.text_output.write_text(
-            parsed.text,
+            parsed_pdf.text,
             encoding="utf-8",
         )
 
-        write_markdown(parsed, settings.markdown_output)
+        write_markdown(parsed_pdf, settings.markdown_output)
+
+        parsed_pdf.write_json(Path("output/guide.json"))
 
     except (PdfDownloadError, PdfParseError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
 
-    LOGGER.info("Downloaded PDF to %s", parsed.source)
+    LOGGER.info("Downloaded PDF to %s", parsed_pdf.source)
     LOGGER.info(
         "Extracted %d pages to %s",
-        parsed.page_count,
+        parsed_pdf.page_count,
         settings.text_output,
     )
 
