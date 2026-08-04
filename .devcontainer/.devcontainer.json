@@ -1,0 +1,23 @@
+{
+  "name": "portfolio-ai-tour-guide",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml",
+        "GitHub.vscode-github-actions",
+        "ms-vscode.makefile-tools"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python"
+      }
+    }
+  },
+
+  "onCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh",
+
+  "postCreateCommand": "uv sync"
+}

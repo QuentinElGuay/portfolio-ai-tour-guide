@@ -1,0 +1,33 @@
+[project]
+name = "portfolio-ai-tour-guide"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Quentin Leguay", email = "33553005+QuentinElGuay@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.4.2",
+    "httpx>=0.28.1",
+    "openai>=2.52.1",
+    "pydantic-settings>=2.14.2",
+    "pymupdf>=1.28.0",
+]
+
+[project.scripts]
+portfolio-ai-tour-guide-agent = "ai_tour_guide.agent.cli:main"
+portfolio-ai-tour-guide-ingestion = "ai_tour_guide.ingestion.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ai_tour_guide"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.1",
+]
