@@ -219,3 +219,4 @@ def test_parse_pdf_removes_ibanista_domain(tmp_path: Path) -> None:
         "ibanista.com" not in line.text.casefold()
         for line in result.lines
     )
+    
