@@ -24,12 +24,6 @@ CHAPTER_PAGE_MAX_BODY_CHARACTERS = 180
 
 MAX_HORIZONTAL_GAP_FACTOR = 3.0
 MIN_VERTICAL_OVERLAP_RATIO = 0.6
-IGNORED_TEXT_PATTERNS = (
-    re.compile(
-        r"(?:https?://)?(?:www\.)?ibanista\s*\.\s*com/?",
-        flags=re.IGNORECASE,
-    ),
-)
 
 
 class PdfDownloadError(RuntimeError):
@@ -48,6 +42,7 @@ class _TextLine:
     needed while reconstructing paragraphs and detecting headings, but they are
     extraction details rather than part of the parser's public domain model.
     """
+
     page_number: int
     block_number: int
     line_number: int
@@ -68,9 +63,9 @@ class ParsedParagraph:
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible paragraph data."""
         return {
-            "text": self.text,
-            "page_start": self.page_start,
-            "page_end": self.page_end,
+            'text': self.text,
+            'page_start': self.page_start,
+            'page_end': self.page_end,
         }
 
 
@@ -88,26 +83,17 @@ class ParsedSection:
     @property
     def text(self) -> str:
         """Return only paragraphs directly attached to this section."""
-        return "\n\n".join(
-            paragraph.text
-            for paragraph in self.paragraphs
-        )
+        return '\n\n'.join(paragraph.text for paragraph in self.paragraphs)
 
     def to_dict(self) -> dict[str, object]:
         """Return JSON-compatible section data, including descendants."""
         return {
-            "title": self.title,
-            "level": self.level,
-            "page_start": self.page_start,
-            "page_end": self.page_end,
-            "paragraphs": [
-                paragraph.to_dict()
-                for paragraph in self.paragraphs
-            ],
-            "subsections": [
-                subsection.to_dict()
-                for subsection in self.subsections
-            ],
+            'title': self.title,
+            'level': self.level,
+            'page_start': self.page_start,
+            'page_end': self.page_end,
+            'paragraphs': [paragraph.to_dict() for paragraph in self.paragraphs],
+            'subsections': [subsection.to_dict() for subsection in self.subsections],
         }
 
     def iter_sections(self) -> Iterable[ParsedSection]:
@@ -126,6 +112,7 @@ class ParsedPdf:
     contains only document metadata plus section and paragraph structures used
     by Markdown visualization and downstream RAG chunking.
     """
+
     source: Path
     source_page_count: int
     page_count: int
@@ -135,7 +122,7 @@ class ParsedPdf:
     @property
     def title(self) -> str | None:
         """Return the document title from PDF metadata when available."""
-        return self.metadata.get("Title") or None
+        return self.metadata.get('Title') or None
 
     @property
     def text(self) -> str:
@@ -148,17 +135,17 @@ class ParsedPdf:
             if paragraph.text
         )
 
-        return "\n\n".join(paragraphs)
+        return '\n\n'.join(paragraphs)
 
     def to_dict(self) -> dict[str, object]:
         """Return the parsed document as JSON-compatible data."""
         return {
-            "source": str(self.source),
-            "title": self.title,
-            "source_page_count": self.source_page_count,
-            "page_count": self.page_count,
-            "metadata": dict(self.metadata),
-            "sections": [section.to_dict() for section in self.sections],
+            'source': str(self.source),
+            'title': self.title,
+            'source_page_count': self.source_page_count,
+            'page_count': self.page_count,
+            'metadata': dict(self.metadata),
+            'sections': [section.to_dict() for section in self.sections],
         }
 
     def to_json(
@@ -185,8 +172,8 @@ class ParsedPdf:
         destination = destination.expanduser().resolve()
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            self.to_json(indent=indent, ensure_ascii=ensure_ascii) + "\n",
-            encoding="utf-8",
+            self.to_json(indent=indent, ensure_ascii=ensure_ascii) + '\n',
+            encoding='utf-8',
         )
         return destination
 
@@ -210,26 +197,26 @@ def download_pdf(
     http_client = client or httpx.Client(
         follow_redirects=True,
         timeout=httpx.Timeout(timeout_seconds),
-        headers={"User-Agent": "portfolio-ai-tour-guide/0.1"},
+        headers={'User-Agent': 'portfolio-ai-tour-guide/0.1'},
     )
 
     temp_path: Path | None = None
 
     try:
-        with http_client.stream("GET", url) as response:
+        with http_client.stream('GET', url) as response:
             response.raise_for_status()
 
-            content_type = response.headers.get("content-type", "").lower()
-            if content_type and "pdf" not in content_type:
+            content_type = response.headers.get('content-type', '').lower()
+            if content_type and 'pdf' not in content_type:
                 raise PdfDownloadError(
-                    f"Expected a PDF response, received {content_type!r}."
+                    f'Expected a PDF response, received {content_type!r}.'
                 )
 
             with NamedTemporaryFile(
-                mode="wb",
+                mode='wb',
                 delete=False,
                 dir=destination.parent,
-                suffix=".part",
+                suffix='.part',
             ) as temp_file:
                 temp_path = Path(temp_file.name)
 
@@ -237,17 +224,17 @@ def download_pdf(
                     temp_file.write(chunk)
 
         if temp_path.stat().st_size == 0:
-            raise PdfDownloadError("The downloaded file is empty.")
+            raise PdfDownloadError('The downloaded file is empty.')
 
-        with temp_path.open("rb") as file_handle:
-            if file_handle.read(5) != b"%PDF-":
-                raise PdfDownloadError("The downloaded file is not a valid PDF.")
+        with temp_path.open('rb') as file_handle:
+            if file_handle.read(5) != b'%PDF-':
+                raise PdfDownloadError('The downloaded file is not a valid PDF.')
 
         temp_path.replace(destination)
         return destination
 
     except (httpx.HTTPError, OSError) as exc:
-        raise PdfDownloadError(f"Could not download PDF from {url}: {exc}") from exc
+        raise PdfDownloadError(f'Could not download PDF from {url}: {exc}') from exc
 
     finally:
         if temp_path is not None and temp_path.exists():
@@ -262,6 +249,7 @@ def parse_pdf(
     *,
     excluded_leading_pages: int = 0,
     excluded_trailing_pages: int = 0,
+    ignored_text_patterns: tuple[str, ...] = ()
 ) -> ParsedPdf:
     """Extract structured, page-aware sections from a PDF.
 
@@ -272,18 +260,18 @@ def parse_pdf(
     path = path.expanduser().resolve()
 
     if not path.is_file():
-        raise PdfParseError(f"PDF file does not exist: {path}")
+        raise PdfParseError(f'PDF file does not exist: {path}')
 
     if excluded_leading_pages < 0:
-        raise ValueError("excluded_leading_pages cannot be negative")
+        raise ValueError('excluded_leading_pages cannot be negative')
 
     if excluded_trailing_pages < 0:
-        raise ValueError("excluded_trailing_pages cannot be negative")
+        raise ValueError('excluded_trailing_pages cannot be negative')
 
     try:
         with pymupdf.open(path) as document:
-            if document.needs_pass and document.authenticate("") <= 0:
-                raise PdfParseError("The PDF is encrypted and cannot be opened.")
+            if document.needs_pass and document.authenticate('') <= 0:
+                raise PdfParseError('The PDF is encrypted and cannot be opened.')
 
             source_page_count = document.page_count
             first_page_index = excluded_leading_pages
@@ -291,15 +279,15 @@ def parse_pdf(
 
             if first_page_index >= last_page_index:
                 raise PdfParseError(
-                    "The excluded leading and trailing pages would remove "
-                    "the entire PDF."
+                    'The excluded leading and trailing pages would remove '
+                    'the entire PDF.'
                 )
 
             retained_page_count = last_page_index - first_page_index
             raw_lines = tuple(
                 line
                 for page_index in range(first_page_index, last_page_index)
-                for line in _extract_page_lines(document.load_page(page_index))
+                for line in _extract_page_lines(document.load_page(page_index), ignored_text_patterns)
             )
 
             repeated_marginal_text = _find_repeated_marginal_text(
@@ -329,6 +317,7 @@ def parse_pdf(
                 lines,
                 heading_lines=heading_lines,
                 heading_levels=heading_levels,
+                ignored_text_patterns=ignored_text_patterns
             )
 
             sections = _nest_sections(flat_sections)
@@ -342,7 +331,7 @@ def parse_pdf(
         RuntimeError,
         ValueError,
     ) as exc:
-        raise PdfParseError(f"Could not parse PDF {path}: {exc}") from exc
+        raise PdfParseError(f'Could not parse PDF {path}: {exc}') from exc
 
     return ParsedPdf(
         source=path,
@@ -353,18 +342,18 @@ def parse_pdf(
     )
 
 
-def _extract_page_lines(page: pymupdf.Page) -> list[_TextLine]:
+def _extract_page_lines(page: pymupdf.Page, ignored_text_patterns: tuple[str, ...],) -> list[_TextLine]:
     """Extract and reconstruct visual text lines from one PDF page."""
-    page_data: dict[str, Any] = page.get_text("dict", sort=False)
+    page_data: dict[str, Any] = page.get_text('dict', sort=False)
     fragments: list[_TextLine] = []
 
-    for block_number, block in enumerate(page_data.get("blocks", [])):
-        if block.get("type") != 0:
+    for block_number, block in enumerate(page_data.get('blocks', [])):
+        if block.get('type') != 0:
             continue
 
-        for line_number, line in enumerate(block.get("lines", [])):
-            spans = line.get("spans", [])
-            text = _join_span_text(spans)
+        for line_number, line in enumerate(block.get('lines', [])):
+            spans = line.get('spans', [])
+            text = _join_span_text(spans, ignored_text_patterns)
 
             if not text:
                 continue
@@ -378,16 +367,17 @@ def _extract_page_lines(page: pymupdf.Page) -> list[_TextLine]:
                     font=_dominant_font(spans),
                     font_size=_dominant_font_size(spans),
                     is_bold=_line_is_bold(spans),
-                    bbox=_normalise_bbox(line.get("bbox")),
+                    bbox=_normalise_bbox(line.get('bbox')),
                     page_height=float(page.rect.height),
                 )
             )
 
-    return _merge_visual_lines(fragments)
+    return _merge_visual_lines(fragments, ignored_text_patterns)
 
 
 def _merge_visual_lines(
     fragments: Sequence[_TextLine],
+    ignored_text_patterns: tuple[str, ...],
 ) -> list[_TextLine]:
     """Merge positioned fragments that visually belong to the same row."""
     if not fragments:
@@ -422,6 +412,7 @@ def _merge_visual_lines(
             merged_line = _merge_fragment_group(
                 group,
                 line_number=len(merged_lines),
+                ignored_text_patterns=ignored_text_patterns
             )
 
             if merged_line.text:
@@ -483,9 +474,10 @@ def _merge_fragment_group(
     fragments: Sequence[_TextLine],
     *,
     line_number: int,
+    ignored_text_patterns: tuple[str, ...],
 ) -> _TextLine:
     """Combine adjacent visual fragments into one internal line."""
-    text = _join_text_fragments(fragments)
+    text = _join_text_fragments(fragments, ignored_text_patterns,)
     x0 = min(fragment.bbox[0] for fragment in fragments)
     y0 = min(fragment.bbox[1] for fragment in fragments)
     x1 = max(fragment.bbox[2] for fragment in fragments)
@@ -520,54 +512,54 @@ def _merge_fragment_group(
     )
 
 
-def _join_text_fragments(fragments: Sequence[_TextLine]) -> str:
+def _join_text_fragments(fragments: Sequence[_TextLine], ignored_text_patterns: tuple[str, ...],) -> str:
     """Join positioned fragments using normal textual spacing."""
     if not fragments:
-        return ""
+        return ''
 
     result = fragments[0].text
 
     for previous, current in zip(fragments, fragments[1:], strict=False):
         if _should_insert_space(previous.text, current.text):
-            result += " "
+            result += ' '
         result += current.text
 
-    return _normalise_inline_text(result)
+    return _normalise_inline_text(result, ignored_text_patterns,)
 
 
 def _should_insert_space(previous: str, current: str) -> bool:
     """Determine whether adjacent text fragments need a space."""
-    no_space_before = ",.;:!?%)]}»"
-    no_space_after = "([{«"
+    no_space_before = ',.;:!?%)]}»'
+    no_space_after = '([{«'
 
     if current.startswith(tuple(no_space_before)):
         return False
     if previous.endswith(tuple(no_space_after)):
         return False
-    if previous.endswith(("-", "–", "—", "/", "'", "’")):
+    if previous.endswith(('-', '–', '—', '/', "'", '’')):
         return False
 
     return True
 
 
-def _join_span_text(spans: Sequence[dict[str, Any]]) -> str:
+def _join_span_text(spans: Sequence[dict[str, Any]], ignored_text_patterns: tuple[str, ...],) -> str:
     """Join all text spans belonging to the same visual line."""
-    text = "".join(str(span.get("text", "")) for span in spans)
-    return _normalise_inline_text(text)
+    text = ''.join(str(span.get('text', '')) for span in spans)
+    return _normalise_inline_text(text, ignored_text_patterns)
 
 
-def _remove_ignored_text(text: str) -> str:
+def _remove_ignored_text(text: str, ignored_text_patterns: tuple[str, ...],) -> str:
     """Remove known unwanted text from extracted PDF content."""
-    for pattern in IGNORED_TEXT_PATTERNS:
-        text = pattern.sub("", text)
+    for pattern in ignored_text_patterns:
+        text = pattern.sub('', text)
 
     return text
 
 
-def _normalise_inline_text(text: str) -> str:
+def _normalise_inline_text(text: str, ignored_text_patterns: tuple[str, ...],) -> str:
     """Remove unwanted content and normalize inline whitespace."""
-    text = _remove_ignored_text(text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = _remove_ignored_text(text, ignored_text_patterns)
+    return re.sub(r'\s+', ' ', text).strip()
 
 
 def _normalise_bbox(
@@ -585,11 +577,11 @@ def _dominant_font(spans: Sequence[dict[str, Any]]) -> str:
     character_counts: Counter[str] = Counter()
 
     for span in spans:
-        text = str(span.get("text", ""))
-        font = str(span.get("font", ""))
+        text = str(span.get('text', ''))
+        font = str(span.get('font', ''))
         character_counts[font] += max(len(text.strip()), 1)
 
-    return character_counts.most_common(1)[0][0] if character_counts else ""
+    return character_counts.most_common(1)[0][0] if character_counts else ''
 
 
 def _dominant_font_size(spans: Sequence[dict[str, Any]]) -> float:
@@ -597,8 +589,8 @@ def _dominant_font_size(spans: Sequence[dict[str, Any]]) -> float:
     character_counts: Counter[float] = Counter()
 
     for span in spans:
-        text = str(span.get("text", ""))
-        size = round(float(span.get("size", 0.0)), 1)
+        text = str(span.get('text', ''))
+        size = round(float(span.get('size', 0.0)), 1)
         character_counts[size] += max(len(text.strip()), 1)
 
     return character_counts.most_common(1)[0][0] if character_counts else 0.0
@@ -610,14 +602,14 @@ def _line_is_bold(spans: Sequence[dict[str, Any]]) -> bool:
     total_characters = 0
 
     for span in spans:
-        text = str(span.get("text", "")).strip()
+        text = str(span.get('text', '')).strip()
         if not text:
             continue
 
         character_count = len(text)
         total_characters += character_count
-        flags = int(span.get("flags", 0))
-        font_name = str(span.get("font", ""))
+        flags = int(span.get('flags', 0))
+        font_name = str(span.get('font', ''))
 
         if _span_is_bold(flags, font_name):
             bold_characters += character_count
@@ -630,14 +622,14 @@ def _span_is_bold(flags: int, font_name: str) -> bool:
     if flags & pymupdf.TEXT_FONT_BOLD:
         return True
 
-    normalised_font_name = re.sub(r"[^a-z]", "", font_name.casefold())
+    normalised_font_name = re.sub(r'[^a-z]', '', font_name.casefold())
     bold_markers = (
-        "bold",
-        "semibold",
-        "demibold",
-        "heavy",
-        "black",
-        "extrabold",
+        'bold',
+        'semibold',
+        'demibold',
+        'heavy',
+        'black',
+        'extrabold',
     )
 
     return any(marker in normalised_font_name for marker in bold_markers)
@@ -645,6 +637,7 @@ def _span_is_bold(flags: int, font_name: str) -> bool:
 
 def _lines_to_paragraphs(
     lines: Sequence[_TextLine],
+    ignored_text_patterns: tuple[str, ...],
 ) -> tuple[ParsedParagraph, ...]:
     """Group internal visual lines into logical, page-aware paragraphs."""
     if not lines:
@@ -655,7 +648,7 @@ def _lines_to_paragraphs(
     for line in lines[1:]:
         previous = paragraph_lines[-1][-1]
 
-        if _starts_new_paragraph(previous, line):
+        if _starts_new_paragraph(previous, line, ignored_text_patterns,):
             paragraph_lines.append([line])
         else:
             paragraph_lines[-1].append(line)
@@ -667,11 +660,11 @@ def _lines_to_paragraphs(
             page_end=max(line.page_number for line in group),
         )
         for group in paragraph_lines
-        if (text := _join_paragraph_lines(group))
+        if (text := _join_paragraph_lines(group, ignored_text_patterns))
     )
 
 
-def _starts_new_paragraph(previous: _TextLine, current: _TextLine) -> bool:
+def _starts_new_paragraph(previous: _TextLine, current: _TextLine, ignored_text_patterns: tuple[str, ...],) -> bool:
     """Return whether *current* starts a new logical paragraph."""
     if current.page_number != previous.page_number:
         return True
@@ -683,7 +676,7 @@ def _starts_new_paragraph(previous: _TextLine, current: _TextLine) -> bool:
         return True
     if current.is_bold != previous.is_bold:
         return True
-    if re.match(r"^(?:[-*•]|\d+[.)])\s+", current.text):
+    if re.match(r'^(?:[-*•]|\d+[.)])\s+', current.text):
         return True
 
     vertical_gap = current.bbox[1] - previous.bbox[3]
@@ -698,22 +691,22 @@ def _starts_new_paragraph(previous: _TextLine, current: _TextLine) -> bool:
     return vertical_gap > expected_line_height * 0.75
 
 
-def _join_paragraph_lines(lines: Sequence[_TextLine]) -> str:
+def _join_paragraph_lines(lines: Sequence[_TextLine], ignored_text_patterns: tuple[str, ...],) -> str:
     """Join wrapped visual lines into one normalized paragraph."""
     if not lines:
-        return ""
+        return ''
 
     result = lines[0].text
 
     for line in lines[1:]:
-        if result.endswith("-") and line.text[:1].islower():
+        if result.endswith('-') and line.text[:1].islower():
             result = result[:-1] + line.text
         elif _should_insert_space(result, line.text):
-            result += f" {line.text}"
+            result += f' {line.text}'
         else:
             result += line.text
 
-    return _normalise_inline_text(result)
+    return _normalise_inline_text(result, ignored_text_patterns)
 
 
 def _estimate_body_font_size(lines: Iterable[_TextLine]) -> float | None:
@@ -810,15 +803,12 @@ def _is_probable_heading(
     if word_count > 16:
         return False
 
-    ends_like_sentence = text.endswith((".", ";", "!", "?"))
+    ends_like_sentence = text.endswith(('.', ';', '!', '?'))
     size_ratio = line.font_size / body_font_size
 
     significantly_larger = size_ratio >= 1.25
 
-    moderately_larger_and_bold = (
-        size_ratio >= 1.08
-        and line.is_bold
-    )
+    moderately_larger_and_bold = size_ratio >= 1.08 and line.is_bold
 
     body_sized_short_bold_heading = (
         size_ratio >= 0.98
@@ -836,7 +826,7 @@ def _is_probable_heading(
 
 def _heading_key(text: str) -> str:
     """Create a normalized key for heading comparisons."""
-    return re.sub(r"\s+", " ", text.casefold()).strip()
+    return re.sub(r'\s+', ' ', text.casefold()).strip()
 
 
 def _build_heading_level_map(
@@ -846,10 +836,7 @@ def _build_heading_level_map(
     body_font_size: float,
 ) -> dict[tuple[int, int, int], int]:
     """Assign heading levels using page layout and relative font size."""
-    heading_ids = {
-        _line_identity(line)
-        for line in heading_lines
-    }
+    heading_ids = {_line_identity(line) for line in heading_lines}
 
     body_characters_by_page: Counter[int] = Counter()
 
@@ -868,21 +855,12 @@ def _build_heading_level_map(
             page_body_characters <= CHAPTER_PAGE_MAX_BODY_CHARACTERS
         )
 
-        is_near_page_top = (
-            line.bbox[1]
-            <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
-        )
+        is_near_page_top = line.bbox[1] <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
 
-        if (
-            size_ratio >= CHAPTER_TITLE_SIZE_RATIO
-            and is_sparse_chapter_page
-        ):
+        if size_ratio >= CHAPTER_TITLE_SIZE_RATIO and is_sparse_chapter_page:
             level = 1
 
-        elif (
-            size_ratio >= PAGE_TITLE_SIZE_RATIO
-            and is_near_page_top
-        ):
+        elif size_ratio >= PAGE_TITLE_SIZE_RATIO and is_near_page_top:
             level = 2
 
         else:
@@ -917,7 +895,7 @@ def _is_heading_continuation(
     if abs(previous.font_size - current.font_size) > 0.5:
         return False
 
-    if previous.text.endswith((".", ";", "!", "?")):
+    if previous.text.endswith(('.', ';', '!', '?')):
         return False
 
     if len(combined_title.split()) > 20:
@@ -932,19 +910,15 @@ def _is_heading_continuation(
         1.0,
     )
 
-    return (
-        -line_height * 0.25
-        <= vertical_gap
-        <= line_height * 1.5
-    )
+    return -line_height * 0.25 <= vertical_gap <= line_height * 1.5
 
 
 def _join_heading_lines(previous: str, current: str) -> str:
     """Join consecutive visual lines belonging to one heading."""
-    if previous.endswith("-") and current[:1].islower():
+    if previous.endswith('-') and current[:1].islower():
         return previous[:-1] + current
 
-    return f"{previous} {current}".strip()
+    return f'{previous} {current}'.strip()
 
 
 def _build_sections(
@@ -952,15 +926,13 @@ def _build_sections(
     *,
     heading_lines: Sequence[_TextLine],
     heading_levels: dict[tuple[int, int, int], int],
+    ignored_text_patterns: tuple[str, ...],
 ) -> tuple[ParsedSection, ...]:
     """Build sections while merging multiline visual headings."""
     if not lines:
         return ()
 
-    heading_ids = {
-        _line_identity(line)
-        for line in heading_lines
-    }
+    heading_ids = {_line_identity(line) for line in heading_lines}
 
     sections: list[ParsedSection] = []
 
@@ -972,8 +944,8 @@ def _build_sections(
     current_page_end = current_page_start
     current_body: list[_TextLine] = []
 
-    def flush_current_section() -> None:
-        paragraphs = _lines_to_paragraphs(current_body)
+    def flush_current_section(ignored_text_patterns: tuple[str, ...]) -> None:
+        paragraphs = _lines_to_paragraphs(current_body, ignored_text_patterns)
 
         if current_title is None and not paragraphs:
             return
@@ -993,12 +965,12 @@ def _build_sections(
 
         if identity in heading_ids:
             candidate_level = heading_levels.get(
-            identity,
-            3,
-        )
+                identity,
+                3,
+            )
 
             combined_title = _join_heading_lines(
-                current_title or "",
+                current_title or '',
                 line.text,
             )
 
@@ -1021,7 +993,7 @@ def _build_sections(
                 current_heading_line = line
                 continue
 
-            flush_current_section()
+            flush_current_section(ignored_text_patterns)
 
             current_title = line.text
             current_level = candidate_level
@@ -1034,7 +1006,7 @@ def _build_sections(
         current_body.append(line)
         current_page_end = line.page_number
 
-    flush_current_section()
+    flush_current_section(ignored_text_patterns)
 
     if sections:
         return tuple(sections)
@@ -1067,10 +1039,11 @@ def _normalise_metadata(
         return {}
 
     return {
-        key.replace("_", " ").title().replace(" ", ""): str(value)
+        key.replace('_', ' ').title().replace(' ', ''): str(value)
         for key, value in metadata.items()
-        if value not in (None, "")
+        if value not in (None, '')
     }
+
 
 @dataclass(slots=True)
 class _SectionBuilder:
@@ -1080,6 +1053,7 @@ class _SectionBuilder:
     own_page_end: int
     paragraphs: tuple[ParsedParagraph, ...]
     children: list[_SectionBuilder] = field(default_factory=list)
+
 
 def _nest_sections(
     flat_sections: tuple[ParsedSection, ...],
@@ -1102,9 +1076,7 @@ def _nest_sections(
             continue
 
         while (
-            stack
-            and stack[-1].level is not None
-            and stack[-1].level >= section.level
+            stack and stack[-1].level is not None and stack[-1].level >= section.level
         ):
             stack.pop()
 
@@ -1121,10 +1093,7 @@ def _nest_sections(
 def _freeze_section(
     builder: _SectionBuilder,
 ) -> ParsedSection:
-    subsections = tuple(
-        _freeze_section(child)
-        for child in builder.children
-    )
+    subsections = tuple(_freeze_section(child) for child in builder.children)
 
     page_end = max(
         (
