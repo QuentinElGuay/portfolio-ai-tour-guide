@@ -6,13 +6,23 @@ import json
 import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+from datetime import date
+from hashlib import sha256
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+import unicodedata
+from urllib.parse import urlparse
+from xml.etree import ElementTree
 
 import httpx
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import pymupdf
+
+TMP_FOLDER = Path('tmp')
+OUTPUT_SUFFIXES = {'.pdf', '.md', '.txt', '.json'}
 
 MIN_SECTION_HEADING_SIZE_RATIO = 1.25
 PAGE_TITLE_SIZE_RATIO = 1.50
@@ -25,6 +35,8 @@ CHAPTER_PAGE_MAX_BODY_CHARACTERS = 180
 MAX_HORIZONTAL_GAP_FACTOR = 3.0
 MIN_VERTICAL_OVERLAP_RATIO = 0.6
 
+DEFAULT_DOWNLOAD_DIRECTORY = Path('.cache/pdf-ingestion')
+
 
 class PdfDownloadError(RuntimeError):
     """Raised when a PDF cannot be downloaded or validated."""
@@ -32,6 +44,151 @@ class PdfDownloadError(RuntimeError):
 
 class PdfParseError(RuntimeError):
     """Raised when a downloaded file cannot be parsed as a PDF."""
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionDocument:
+    """Input document accepted by the ingestion pipeline.
+
+    Add new document-level metadata here as the ingestion format evolves.
+    """
+
+    title: str
+    pdf_url: str
+    excluded_leading_pages: int = 3
+    excluded_trailing_pages: int = 2
+    authors: list[str] | None = None
+    keywords: list[str] | None = None
+    publisher: str | None = None
+    publication_date: date | None = None
+    ignored_text_patterns: tuple[re.Pattern[str], ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.title, str):
+            raise ValueError('title must be a string')
+        if not self.title.strip():
+            raise ValueError('title must not be empty')
+
+        normalize_filename_stem(self.title)
+
+        parsed_url = urlparse(self.pdf_url)
+        if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
+            raise ValueError('pdf_url must be a valid HTTP or HTTPS URL')
+
+        if self.excluded_leading_pages < 0:
+            raise ValueError(
+                'excluded_leading_pages must be greater than or equal to 0'
+            )
+        if self.excluded_trailing_pages < 0:
+            raise ValueError(
+                'excluded_trailing_pages must be greater than or equal to 0'
+            )
+
+        _validate_optional_string_list(self.authors, field_name='authors')
+        _validate_optional_string_list(self.keywords, field_name='keywords')
+
+    @property
+    def filename_stem(self) -> str:
+        """Return the normalized stem used by downloaded and generated files."""
+        return normalize_filename_stem(self.title)
+
+    @classmethod
+    def from_dict(cls, values: dict[str, Any]) -> IngestionDocument:
+        """Build and validate a document from its JSON representation."""
+        accepted_fields = {field.name for field in fields(cls)}
+        unknown_fields = sorted(set(values) - accepted_fields)
+        if unknown_fields:
+            raise ValueError('Unknown document field(s): ' + ', '.join(unknown_fields))
+
+        normalized = dict(values)
+
+        publication_date = normalized.get('publication_date')
+        if publication_date is not None:
+            if not isinstance(publication_date, str):
+                raise ValueError('publication_date must be an ISO-8601 date string')
+            try:
+                normalized['publication_date'] = date.fromisoformat(publication_date)
+            except ValueError as exc:
+                raise ValueError(
+                    'publication_date must use the YYYY-MM-DD format'
+                ) from exc
+
+        ignored_patterns = normalized.get('ignored_text_patterns')
+
+        if ignored_patterns is not None:
+            if not isinstance(ignored_patterns, list) or not all(
+                isinstance(pattern, str) for pattern in ignored_patterns
+            ):
+                raise ValueError('ignored_text_patterns must be an array of strings')
+
+            compiled_patterns: list[re.Pattern[str]] = []
+
+            for index, pattern in enumerate(ignored_patterns, start=1):
+                try:
+                    compiled_patterns.append(re.compile(pattern, flags=re.IGNORECASE))
+                except re.error as exc:
+                    raise ValueError(
+                        f'Invalid ignored_text_patterns regex '
+                        f'at position {index}: {exc}'
+                    ) from exc
+
+            normalized['ignored_text_patterns'] = tuple(compiled_patterns)
+
+        try:
+            return cls(**normalized)
+        except TypeError as exc:
+            raise ValueError(f'Invalid ingestion document: {exc}') from exc
+
+
+def _validate_optional_string_list(
+    value: list[str] | None,
+    *,
+    field_name: str,
+) -> None:
+    """Validate an optional list of non-empty strings."""
+    if value is None:
+        return
+
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
+        raise ValueError(f'{field_name} must be an array of non-empty strings')
+
+
+def normalize_filename_stem(title: str) -> str:
+    """Convert a document title into a safe, extension-free filename stem."""
+    candidate = title.strip()
+    suffix = Path(candidate).suffix.lower()
+    if suffix in OUTPUT_SUFFIXES:
+        candidate = candidate[: -len(suffix)]
+
+    candidate = unicodedata.normalize('NFKD', candidate)
+    candidate = candidate.encode('ascii', 'ignore').decode('ascii')
+    candidate = re.sub(r'[^A-Za-z0-9]+', '-', candidate)
+    candidate = candidate.strip('-').lower()
+
+    if not candidate:
+        raise ValueError(
+            'title must contain at least one letter or number that can be used '
+            'in a filename'
+        )
+
+    return candidate
+
+
+class IngestionSettings(BaseSettings):
+    """Operational configuration for PDF ingestion."""
+
+    model_config = SettingsConfigDict(
+        env_prefix='INGESTION_',
+        env_file='.env',
+        env_file_encoding='utf-8',
+        extra='ignore',
+    )
+
+    tmp_folder: Path = TMP_FOLDER
+    timeout: float = Field(default=30.0, gt=0)
+    verbose: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +213,8 @@ class _TextLine:
 
 @dataclass(frozen=True, slots=True)
 class ParsedParagraph:
+    """One page-aware paragraph extracted from the PDF."""
+
     text: str
     page_start: int
     page_end: int
@@ -105,24 +264,68 @@ class ParsedSection:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedPdfMetadata:
+    """Resolved metadata attached to a parsed ingestion document.
+
+    Explicit values from :class:`IngestionDocument` take precedence. Missing
+    values are populated from the PDF metadata when possible.
+    """
+
+    title: str | None
+    pdf_url: str
+    publisher: str | None
+    publication_date: date | None
+    authors: list[str]
+    subject: str | None
+    keywords: list[str]
+    creator: str | None
+    producer: str | None
+    pdf_format: str | None
+    creation_date: str | None
+    modification_date: str | None
+    source_page_count: int
+    page_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-compatible resolved metadata."""
+        return {
+            'title': self.title,
+            'pdf_url': self.pdf_url,
+            'publisher': self.publisher,
+            'publication_date': (
+                self.publication_date.isoformat()
+                if self.publication_date is not None
+                else None
+            ),
+            'authors': list(self.authors),
+            'subject': self.subject,
+            'keywords': list(self.keywords),
+            'creator': self.creator,
+            'producer': self.producer,
+            'format': self.pdf_format,
+            'creation_date': self.creation_date,
+            'modification_date': self.modification_date,
+            'source_page_count': self.source_page_count,
+            'page_count': self.page_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedPdf:
     """Canonical structured result returned by :func:`parse_pdf`.
 
     Page-level text and typography diagnostics stay internal. The public model
-    contains only document metadata plus section and paragraph structures used
-    by Markdown visualization and downstream RAG chunking.
+    contains resolved metadata plus section and paragraph structures used by
+    Markdown visualization and downstream RAG chunking.
     """
 
-    source: Path
-    source_page_count: int
-    page_count: int
-    metadata: dict[str, str]
+    metadata: ParsedPdfMetadata
     sections: tuple[ParsedSection, ...]
 
     @property
     def title(self) -> str | None:
-        """Return the document title from PDF metadata when available."""
-        return self.metadata.get('Title') or None
+        """Return the resolved document title."""
+        return self.metadata.title
 
     @property
     def text(self) -> str:
@@ -140,11 +343,7 @@ class ParsedPdf:
     def to_dict(self) -> dict[str, object]:
         """Return the parsed document as JSON-compatible data."""
         return {
-            'source': str(self.source),
-            'title': self.title,
-            'source_page_count': self.source_page_count,
-            'page_count': self.page_count,
-            'metadata': dict(self.metadata),
+            'metadata': self.metadata.to_dict(),
             'sections': [section.to_dict() for section in self.sections],
         }
 
@@ -245,37 +444,90 @@ def download_pdf(
 
 
 def parse_pdf(
+    document: IngestionDocument,
+    *,
+    download_directory: Path = DEFAULT_DOWNLOAD_DIRECTORY,
+    timeout_seconds: float = 30.0,
+    client: httpx.Client | None = None,
+) -> ParsedPdf:
+    """Download and parse an ingestion document.
+
+    ``IngestionDocument`` supplies explicit metadata overrides, page
+    exclusions, and ignored-text rules. Missing metadata is populated from the
+    PDF metadata when available.
+    """
+    _validate_ingestion_document(document)
+
+    destination = _build_pdf_destination(
+        document,
+        download_directory=download_directory,
+    )
+    downloaded_path = download_pdf(
+        document.pdf_url,
+        destination,
+        timeout_seconds=timeout_seconds,
+        client=client,
+    )
+
+    return _parse_downloaded_pdf(downloaded_path, document=document)
+
+
+def _validate_ingestion_document(document: IngestionDocument) -> None:
+    """Validate ingestion metadata and parser configuration."""
+    if not document.pdf_url.strip():
+        raise ValueError('document.pdf_url cannot be empty')
+
+    if document.excluded_leading_pages < 0:
+        raise ValueError('document.excluded_leading_pages cannot be negative')
+
+    if document.excluded_trailing_pages < 0:
+        raise ValueError('document.excluded_trailing_pages cannot be negative')
+
+    for pattern in document.ignored_text_patterns:
+        if not isinstance(pattern, re.Pattern):
+            raise TypeError(
+                'document.ignored_text_patterns must contain compiled regex patterns'
+            )
+
+
+def _build_pdf_destination(
+    document: IngestionDocument,
+    *,
+    download_directory: Path,
+) -> Path:
+    """Build a stable, collision-resistant local destination for a PDF."""
+    download_directory = download_directory.expanduser().resolve()
+    download_directory.mkdir(parents=True, exist_ok=True)
+
+    title_for_filename = _clean_optional_text(document.title) or 'document'
+    safe_title = re.sub(r'[^\w.-]+', '-', title_for_filename, flags=re.UNICODE)
+    safe_title = safe_title.strip('-_.')[:80] or 'document'
+    url_digest = sha256(document.pdf_url.encode('utf-8')).hexdigest()[:12]
+
+    return download_directory / f'{safe_title}-{url_digest}.pdf'
+
+
+def _parse_downloaded_pdf(
     path: Path,
     *,
-    excluded_leading_pages: int = 0,
-    excluded_trailing_pages: int = 0,
-    ignored_text_patterns: tuple[str, ...] = ()
+    document: IngestionDocument,
 ) -> ParsedPdf:
-    """Extract structured, page-aware sections from a PDF.
-
-    Typography-aware lines remain internal and are used only to reconstruct
-    paragraphs, detect headings, and remove repeated marginal text. Original
-    page numbers remain attached to each public paragraph.
-    """
+    """Parse a downloaded PDF using its ingestion configuration."""
     path = path.expanduser().resolve()
 
     if not path.is_file():
         raise PdfParseError(f'PDF file does not exist: {path}')
 
-    if excluded_leading_pages < 0:
-        raise ValueError('excluded_leading_pages cannot be negative')
-
-    if excluded_trailing_pages < 0:
-        raise ValueError('excluded_trailing_pages cannot be negative')
-
     try:
-        with pymupdf.open(path) as document:
-            if document.needs_pass and document.authenticate('') <= 0:
+        with pymupdf.open(path) as pdf:
+            if pdf.needs_pass and pdf.authenticate('') <= 0:
                 raise PdfParseError('The PDF is encrypted and cannot be opened.')
 
-            source_page_count = document.page_count
-            first_page_index = excluded_leading_pages
-            last_page_index = source_page_count - excluded_trailing_pages
+            source_page_count = pdf.page_count
+            first_page_index = document.excluded_leading_pages
+            last_page_index = (
+                source_page_count - document.excluded_trailing_pages
+            )
 
             if first_page_index >= last_page_index:
                 raise PdfParseError(
@@ -287,7 +539,10 @@ def parse_pdf(
             raw_lines = tuple(
                 line
                 for page_index in range(first_page_index, last_page_index)
-                for line in _extract_page_lines(document.load_page(page_index), ignored_text_patterns)
+                for line in _extract_page_lines(
+                    pdf.load_page(page_index),
+                    document=document,
+                )
             )
 
             repeated_marginal_text = _find_repeated_marginal_text(
@@ -317,11 +572,19 @@ def parse_pdf(
                 lines,
                 heading_lines=heading_lines,
                 heading_levels=heading_levels,
-                ignored_text_patterns=ignored_text_patterns
+                document=document,
             )
 
             sections = _nest_sections(flat_sections)
-            metadata = _normalise_metadata(document.metadata)
+            pdf_metadata = _normalise_metadata(pdf.metadata)
+            xmp_authors = _extract_xmp_authors(pdf)
+            metadata = _resolve_pdf_metadata(
+                document,
+                pdf_metadata=pdf_metadata,
+                xmp_authors=xmp_authors,
+                source_page_count=source_page_count,
+                page_count=retained_page_count,
+            )
 
     except PdfParseError:
         raise
@@ -334,15 +597,16 @@ def parse_pdf(
         raise PdfParseError(f'Could not parse PDF {path}: {exc}') from exc
 
     return ParsedPdf(
-        source=path,
-        source_page_count=source_page_count,
-        page_count=retained_page_count,
         metadata=metadata,
         sections=sections,
     )
 
 
-def _extract_page_lines(page: pymupdf.Page, ignored_text_patterns: tuple[str, ...],) -> list[_TextLine]:
+def _extract_page_lines(
+    page: pymupdf.Page,
+    *,
+    document: IngestionDocument,
+) -> list[_TextLine]:
     """Extract and reconstruct visual text lines from one PDF page."""
     page_data: dict[str, Any] = page.get_text('dict', sort=False)
     fragments: list[_TextLine] = []
@@ -353,7 +617,7 @@ def _extract_page_lines(page: pymupdf.Page, ignored_text_patterns: tuple[str, ..
 
         for line_number, line in enumerate(block.get('lines', [])):
             spans = line.get('spans', [])
-            text = _join_span_text(spans, ignored_text_patterns)
+            text = _join_span_text(spans, document=document)
 
             if not text:
                 continue
@@ -372,12 +636,13 @@ def _extract_page_lines(page: pymupdf.Page, ignored_text_patterns: tuple[str, ..
                 )
             )
 
-    return _merge_visual_lines(fragments, ignored_text_patterns)
+    return _merge_visual_lines(fragments, document=document)
 
 
 def _merge_visual_lines(
     fragments: Sequence[_TextLine],
-    ignored_text_patterns: tuple[str, ...],
+    *,
+    document: IngestionDocument,
 ) -> list[_TextLine]:
     """Merge positioned fragments that visually belong to the same row."""
     if not fragments:
@@ -412,7 +677,7 @@ def _merge_visual_lines(
             merged_line = _merge_fragment_group(
                 group,
                 line_number=len(merged_lines),
-                ignored_text_patterns=ignored_text_patterns
+                document=document,
             )
 
             if merged_line.text:
@@ -459,7 +724,8 @@ def _split_row_on_large_gaps(
         previous = groups[-1][-1]
         horizontal_gap = fragment.bbox[0] - previous.bbox[2]
         maximum_gap = (
-            max(previous.font_size, fragment.font_size, 1.0) * MAX_HORIZONTAL_GAP_FACTOR
+            max(previous.font_size, fragment.font_size, 1.0)
+            * MAX_HORIZONTAL_GAP_FACTOR
         )
 
         if horizontal_gap > maximum_gap:
@@ -474,17 +740,20 @@ def _merge_fragment_group(
     fragments: Sequence[_TextLine],
     *,
     line_number: int,
-    ignored_text_patterns: tuple[str, ...],
+    document: IngestionDocument,
 ) -> _TextLine:
     """Combine adjacent visual fragments into one internal line."""
-    text = _join_text_fragments(fragments, ignored_text_patterns,)
+    text = _join_text_fragments(fragments, document=document)
     x0 = min(fragment.bbox[0] for fragment in fragments)
     y0 = min(fragment.bbox[1] for fragment in fragments)
     x1 = max(fragment.bbox[2] for fragment in fragments)
     y1 = max(fragment.bbox[3] for fragment in fragments)
     total_characters = sum(max(len(fragment.text), 1) for fragment in fragments)
     weighted_font_size = (
-        sum(fragment.font_size * max(len(fragment.text), 1) for fragment in fragments)
+        sum(
+            fragment.font_size * max(len(fragment.text), 1)
+            for fragment in fragments
+        )
         / total_characters
     )
     bold_characters = sum(
@@ -512,7 +781,11 @@ def _merge_fragment_group(
     )
 
 
-def _join_text_fragments(fragments: Sequence[_TextLine], ignored_text_patterns: tuple[str, ...],) -> str:
+def _join_text_fragments(
+    fragments: Sequence[_TextLine],
+    *,
+    document: IngestionDocument,
+) -> str:
     """Join positioned fragments using normal textual spacing."""
     if not fragments:
         return ''
@@ -524,7 +797,7 @@ def _join_text_fragments(fragments: Sequence[_TextLine], ignored_text_patterns: 
             result += ' '
         result += current.text
 
-    return _normalise_inline_text(result, ignored_text_patterns,)
+    return _normalise_inline_text(result, document=document)
 
 
 def _should_insert_space(previous: str, current: str) -> bool:
@@ -542,23 +815,31 @@ def _should_insert_space(previous: str, current: str) -> bool:
     return True
 
 
-def _join_span_text(spans: Sequence[dict[str, Any]], ignored_text_patterns: tuple[str, ...],) -> str:
+def _join_span_text(
+    spans: Sequence[dict[str, Any]],
+    *,
+    document: IngestionDocument,
+) -> str:
     """Join all text spans belonging to the same visual line."""
     text = ''.join(str(span.get('text', '')) for span in spans)
-    return _normalise_inline_text(text, ignored_text_patterns)
+    return _normalise_inline_text(text, document=document)
 
 
-def _remove_ignored_text(text: str, ignored_text_patterns: tuple[str, ...],) -> str:
-    """Remove known unwanted text from extracted PDF content."""
-    for pattern in ignored_text_patterns:
+def _remove_ignored_text(text: str, *, document: IngestionDocument) -> str:
+    """Remove text matched by the ingestion document's ignore rules."""
+    for pattern in document.ignored_text_patterns:
         text = pattern.sub('', text)
 
     return text
 
 
-def _normalise_inline_text(text: str, ignored_text_patterns: tuple[str, ...],) -> str:
+def _normalise_inline_text(
+    text: str,
+    *,
+    document: IngestionDocument,
+) -> str:
     """Remove unwanted content and normalize inline whitespace."""
-    text = _remove_ignored_text(text, ignored_text_patterns)
+    text = _remove_ignored_text(text, document=document)
     return re.sub(r'\s+', ' ', text).strip()
 
 
@@ -637,7 +918,8 @@ def _span_is_bold(flags: int, font_name: str) -> bool:
 
 def _lines_to_paragraphs(
     lines: Sequence[_TextLine],
-    ignored_text_patterns: tuple[str, ...],
+    *,
+    document: IngestionDocument,
 ) -> tuple[ParsedParagraph, ...]:
     """Group internal visual lines into logical, page-aware paragraphs."""
     if not lines:
@@ -648,7 +930,7 @@ def _lines_to_paragraphs(
     for line in lines[1:]:
         previous = paragraph_lines[-1][-1]
 
-        if _starts_new_paragraph(previous, line, ignored_text_patterns,):
+        if _starts_new_paragraph(previous, line):
             paragraph_lines.append([line])
         else:
             paragraph_lines[-1].append(line)
@@ -660,11 +942,11 @@ def _lines_to_paragraphs(
             page_end=max(line.page_number for line in group),
         )
         for group in paragraph_lines
-        if (text := _join_paragraph_lines(group, ignored_text_patterns))
+        if (text := _join_paragraph_lines(group, document=document))
     )
 
 
-def _starts_new_paragraph(previous: _TextLine, current: _TextLine, ignored_text_patterns: tuple[str, ...],) -> bool:
+def _starts_new_paragraph(previous: _TextLine, current: _TextLine) -> bool:
     """Return whether *current* starts a new logical paragraph."""
     if current.page_number != previous.page_number:
         return True
@@ -691,7 +973,11 @@ def _starts_new_paragraph(previous: _TextLine, current: _TextLine, ignored_text_
     return vertical_gap > expected_line_height * 0.75
 
 
-def _join_paragraph_lines(lines: Sequence[_TextLine], ignored_text_patterns: tuple[str, ...],) -> str:
+def _join_paragraph_lines(
+    lines: Sequence[_TextLine],
+    *,
+    document: IngestionDocument,
+) -> str:
     """Join wrapped visual lines into one normalized paragraph."""
     if not lines:
         return ''
@@ -706,7 +992,7 @@ def _join_paragraph_lines(lines: Sequence[_TextLine], ignored_text_patterns: tup
         else:
             result += line.text
 
-    return _normalise_inline_text(result, ignored_text_patterns)
+    return _normalise_inline_text(result, document=document)
 
 
 def _estimate_body_font_size(lines: Iterable[_TextLine]) -> float | None:
@@ -806,10 +1092,8 @@ def _is_probable_heading(
     ends_like_sentence = text.endswith(('.', ';', '!', '?'))
     size_ratio = line.font_size / body_font_size
 
-    significantly_larger = size_ratio >= 1.25
-
+    significantly_larger = size_ratio >= MIN_SECTION_HEADING_SIZE_RATIO
     moderately_larger_and_bold = size_ratio >= 1.08 and line.is_bold
-
     body_sized_short_bold_heading = (
         size_ratio >= 0.98
         and line.is_bold
@@ -833,11 +1117,13 @@ def _build_heading_level_map(
     lines: Sequence[_TextLine],
     heading_lines: Sequence[_TextLine],
     *,
-    body_font_size: float,
+    body_font_size: float | None,
 ) -> dict[tuple[int, int, int], int]:
     """Assign heading levels using page layout and relative font size."""
-    heading_ids = {_line_identity(line) for line in heading_lines}
+    if body_font_size is None or body_font_size <= 0:
+        return {}
 
+    heading_ids = {_line_identity(line) for line in heading_lines}
     body_characters_by_page: Counter[int] = Counter()
 
     for line in lines:
@@ -854,15 +1140,14 @@ def _build_heading_level_map(
         is_sparse_chapter_page = (
             page_body_characters <= CHAPTER_PAGE_MAX_BODY_CHARACTERS
         )
-
-        is_near_page_top = line.bbox[1] <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
+        is_near_page_top = (
+            line.bbox[1] <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
+        )
 
         if size_ratio >= CHAPTER_TITLE_SIZE_RATIO and is_sparse_chapter_page:
             level = 1
-
         elif size_ratio >= PAGE_TITLE_SIZE_RATIO and is_near_page_top:
             level = 2
-
         else:
             level = 3
 
@@ -926,14 +1211,13 @@ def _build_sections(
     *,
     heading_lines: Sequence[_TextLine],
     heading_levels: dict[tuple[int, int, int], int],
-    ignored_text_patterns: tuple[str, ...],
+    document: IngestionDocument,
 ) -> tuple[ParsedSection, ...]:
     """Build sections while merging multiline visual headings."""
     if not lines:
         return ()
 
     heading_ids = {_line_identity(line) for line in heading_lines}
-
     sections: list[ParsedSection] = []
 
     current_title: str | None = None
@@ -944,8 +1228,8 @@ def _build_sections(
     current_page_end = current_page_start
     current_body: list[_TextLine] = []
 
-    def flush_current_section(ignored_text_patterns: tuple[str, ...]) -> None:
-        paragraphs = _lines_to_paragraphs(current_body, ignored_text_patterns)
+    def flush_current_section() -> None:
+        paragraphs = _lines_to_paragraphs(current_body, document=document)
 
         if current_title is None and not paragraphs:
             return
@@ -964,18 +1248,12 @@ def _build_sections(
         identity = _line_identity(line)
 
         if identity in heading_ids:
-            candidate_level = heading_levels.get(
-                identity,
-                3,
-            )
-
+            candidate_level = heading_levels.get(identity, 3)
             combined_title = _join_heading_lines(
                 current_title or '',
                 line.text,
             )
 
-            # A multiline chapter title has no body text between its
-            # visual lines and uses compatible typography.
             if (
                 current_title is not None
                 and not current_body
@@ -993,7 +1271,7 @@ def _build_sections(
                 current_heading_line = line
                 continue
 
-            flush_current_section(ignored_text_patterns)
+            flush_current_section()
 
             current_title = line.text
             current_level = candidate_level
@@ -1006,7 +1284,7 @@ def _build_sections(
         current_body.append(line)
         current_page_end = line.page_number
 
-    flush_current_section(ignored_text_patterns)
+    flush_current_section()
 
     if sections:
         return tuple(sections)
@@ -1017,7 +1295,7 @@ def _build_sections(
             level=None,
             page_start=lines[0].page_number,
             page_end=lines[-1].page_number,
-            paragraphs=_lines_to_paragraphs(lines),
+            paragraphs=_lines_to_paragraphs(lines, document=document),
         ),
     )
 
@@ -1029,6 +1307,227 @@ def _line_identity(line: _TextLine) -> tuple[int, int, int]:
         line.block_number,
         line.line_number,
     )
+
+
+def _resolve_pdf_metadata(
+    document: IngestionDocument,
+    *,
+    pdf_metadata: dict[str, str],
+    xmp_authors: Sequence[str],
+    source_page_count: int,
+    page_count: int,
+) -> ParsedPdfMetadata:
+    """Merge ingestion overrides with metadata extracted from the PDF.
+
+    Author precedence is: explicit ingestion authors, XMP ``dc:creator``,
+    then the legacy PDF ``Author`` information field.
+    """
+    embedded_title = _metadata_value(pdf_metadata, 'Title')
+    embedded_publisher = _metadata_value(pdf_metadata, 'Publisher')
+    embedded_creation_date = _metadata_value(
+        pdf_metadata,
+        'Creationdate',
+    )
+    ingestion_authors = _normalise_authors(document.authors)
+    xmp_resolved_authors = _normalise_authors(xmp_authors)
+    legacy_authors = _parse_legacy_authors(
+        _metadata_value(pdf_metadata, 'Author')
+    )
+    ingestion_keywords = _normalise_keywords(document.keywords)
+    embedded_keywords = _normalise_keywords(
+        _metadata_value(pdf_metadata, 'Keywords')
+    )
+
+    return ParsedPdfMetadata(
+        title=_clean_optional_text(document.title) or embedded_title,
+        pdf_url=document.pdf_url.strip(),
+        publisher=(
+            _clean_optional_text(document.publisher)
+            or embedded_publisher
+        ),
+        publication_date=(
+            document.publication_date
+            or _parse_pdf_metadata_date(embedded_creation_date)
+        ),
+        authors=(
+            ingestion_authors
+            or xmp_resolved_authors
+            or legacy_authors
+        ),
+        subject=_metadata_value(pdf_metadata, 'Subject'),
+        keywords=ingestion_keywords or embedded_keywords,
+        creator=_metadata_value(pdf_metadata, 'Creator'),
+        producer=_metadata_value(pdf_metadata, 'Producer'),
+        pdf_format=_metadata_value(pdf_metadata, 'Format'),
+        creation_date=embedded_creation_date,
+        modification_date=_metadata_value(pdf_metadata, 'Moddate'),
+        source_page_count=source_page_count,
+        page_count=page_count,
+    )
+
+
+def _extract_xmp_authors(pdf: pymupdf.Document) -> list[str]:
+    """Extract ordered authors from the XMP ``dc:creator`` sequence.
+
+    Malformed or unavailable XMP metadata is ignored so the parser can fall
+    back to the legacy document-information ``Author`` field.
+    """
+    try:
+        xref_method = getattr(pdf, 'xref_xml_metadata', None)
+        if xref_method is None:
+            xref_method = getattr(pdf, 'xml_metadata_xref', None)
+        if xref_method is None:
+            return []
+
+        metadata_xref = int(xref_method())
+        if metadata_xref <= 0:
+            return []
+
+        xml_data = pdf.xref_stream(metadata_xref)
+        if not xml_data:
+            return []
+
+        root = ElementTree.fromstring(xml_data)
+    except (
+        AttributeError,
+        ElementTree.ParseError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
+        return []
+
+    dc_namespace = 'http://purl.org/dc/elements/1.1/'
+    rdf_namespace = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+    authors: list[str] = []
+
+    for creator in root.findall(f'.//{{{dc_namespace}}}creator'):
+        list_items = creator.findall(f'.//{{{rdf_namespace}}}li')
+
+        if list_items:
+            candidates = (''.join(item.itertext()) for item in list_items)
+        else:
+            candidates = (''.join(creator.itertext()),)
+
+        authors.extend(candidates)
+
+    return _normalise_authors(authors)
+
+
+def _normalise_authors(value: object) -> list[str]:
+    """Return de-duplicated author names without guessing separators."""
+    if value is None:
+        return []
+
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, Sequence):
+        candidates = [str(item) for item in value if item is not None]
+    else:
+        candidates = [str(value)]
+
+    authors: list[str] = []
+    seen: set[str] = set()
+
+    for candidate in candidates:
+        author = candidate.strip()
+        normalized = author.casefold()
+
+        if not author or normalized in seen:
+            continue
+
+        seen.add(normalized)
+        authors.append(author)
+
+    return authors
+
+
+def _parse_legacy_authors(value: str | None) -> list[str]:
+    """Parse multiple authors from the legacy single-string field.
+
+    Only semicolons and line breaks are treated as separators. Commas are
+    preserved because they commonly occur inside names such as
+    ``"Lhomond, Alexandra"``.
+    """
+    if value is None:
+        return []
+
+    return _normalise_authors(re.split(r'[;\n]+', value))
+
+def _normalise_keywords(value: object) -> list[str]:
+    """Return normalized, de-duplicated keyword strings."""
+    if value is None:
+        return []
+
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, Sequence):
+        candidates = [str(item) for item in value if item is not None]
+    else:
+        candidates = [str(value)]
+
+    keywords: list[str] = []
+    seen: set[str] = set()
+
+    for candidate in candidates:
+        for part in re.split(r'[,;\n]+', candidate):
+            keyword = part.strip()
+            normalized = keyword.casefold()
+
+            if not keyword or normalized in seen:
+                continue
+
+            seen.add(normalized)
+            keywords.append(keyword)
+
+    return keywords
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    """Return stripped non-empty text, otherwise ``None``."""
+    if value is None:
+        return None
+
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _metadata_value(
+    metadata: dict[str, str],
+    key: str,
+) -> str | None:
+    """Read a metadata value while ignoring key spelling and punctuation."""
+    expected_key = re.sub(r'[^a-z0-9]', '', key.casefold())
+
+    for candidate_key, candidate_value in metadata.items():
+        normalized_key = re.sub(
+            r'[^a-z0-9]',
+            '',
+            candidate_key.casefold(),
+        )
+        if normalized_key == expected_key:
+            return _clean_optional_text(candidate_value)
+
+    return None
+
+
+def _parse_pdf_metadata_date(value: str | None) -> date | None:
+    """Parse the calendar date portion of a standard PDF date string."""
+    if value is None:
+        return None
+
+    match = re.search(r'(?:D:)?(\d{4})(\d{2})?(\d{2})?', value)
+    if match is None:
+        return None
+
+    year = int(match.group(1))
+    month = int(match.group(2) or 1)
+    day = int(match.group(3) or 1)
+
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 
 def _normalise_metadata(
@@ -1058,6 +1557,7 @@ class _SectionBuilder:
 def _nest_sections(
     flat_sections: tuple[ParsedSection, ...],
 ) -> tuple[ParsedSection, ...]:
+    """Nest flat sections according to their inferred heading levels."""
     roots: list[_SectionBuilder] = []
     stack: list[_SectionBuilder] = []
 
@@ -1090,9 +1590,8 @@ def _nest_sections(
     return tuple(_freeze_section(root) for root in roots)
 
 
-def _freeze_section(
-    builder: _SectionBuilder,
-) -> ParsedSection:
+def _freeze_section(builder: _SectionBuilder) -> ParsedSection:
+    """Convert a mutable section builder into an immutable parsed section."""
     subsections = tuple(_freeze_section(child) for child in builder.children)
 
     page_end = max(
