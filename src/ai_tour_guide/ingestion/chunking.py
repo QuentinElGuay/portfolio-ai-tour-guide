@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import json
-
-import click
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
+import click
+
 
 _SENTENCE_BOUNDARY_RE = re.compile(r'(?<=[.!?])\s+')
 _WHITESPACE_RE = re.compile(r'\s+')
+_LABELED_ENTRY_RE = re.compile(r'^[^:\n]{1,80}:\s+\S')
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +21,7 @@ class Paragraph:
     text: str
     page_start: int | None = None
     page_end: int | None = None
+    is_labeled_entry: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +64,22 @@ def _safe_int(value: Any) -> int | None:
 def _document_slug(title: str) -> str:
     slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
     return slug or 'document'
+
+
+def _document_title(document: dict[str, Any]) -> str:
+    """Read the title from parser metadata, with root-level fallback."""
+    metadata = document.get('metadata')
+    if isinstance(metadata, dict):
+        title = _normalize_text(metadata.get('title'))
+        if title:
+            return title
+
+    return _normalize_text(document.get('title')) or 'Untitled document'
+
+
+def _is_labeled_entry(text: str) -> bool:
+    """Return whether text starts with a short ``Label: value`` pattern."""
+    return bool(_LABELED_ENTRY_RE.match(text))
 
 
 def _join_parts(parts: Sequence[str]) -> str:
@@ -159,10 +177,12 @@ def _paragraph_from_dict(data: dict[str, Any]) -> Paragraph | None:
     text = _normalize_text(data.get('text'))
     if not text:
         return None
+
     return Paragraph(
         text=text,
         page_start=_safe_int(data.get('page_start')),
         page_end=_safe_int(data.get('page_end')),
+        is_labeled_entry=_is_labeled_entry(text),
     )
 
 
@@ -175,11 +195,13 @@ def _expanded_paragraphs(
         paragraph = _paragraph_from_dict(raw_paragraph)
         if paragraph is None:
             continue
+
         for piece in split_oversized_paragraph(paragraph.text, max_chars):
             yield Paragraph(
                 text=piece,
                 page_start=paragraph.page_start,
                 page_end=paragraph.page_end,
+                is_labeled_entry=paragraph.is_labeled_entry,
             )
 
 
@@ -193,33 +215,50 @@ def _max_page(values: Iterable[int | None]) -> int | None:
     return max(pages) if pages else None
 
 
+def _packed_chunk(
+    paragraphs: Sequence[Paragraph],
+) -> tuple[str, int | None, int | None]:
+    return (
+        _join_parts([paragraph.text for paragraph in paragraphs]),
+        _min_page(paragraph.page_start for paragraph in paragraphs),
+        _max_page(paragraph.page_end for paragraph in paragraphs),
+    )
+
+
 def _pack_section_paragraphs(
     paragraphs: Iterable[dict[str, Any]],
+    target_chars: int,
     max_chars: int,
 ) -> Iterator[tuple[str, int | None, int | None]]:
     """
-    Greedily pack consecutive paragraphs from one section.
+    Pack adjacent unlabeled paragraphs from one section up to a soft target.
 
-    Paragraph boundaries are represented by a blank line. No output text exceeds
-    max_chars. Content from different sections is never mixed.
+    Paragraphs starting with a short ``Label: value`` pattern remain isolated.
+    Oversized paragraphs are split before packing. Section boundaries are never
+    crossed, and no output text exceeds max_chars.
     """
     current: list[Paragraph] = []
     current_length = 0
     separator_length = len('\n\n')
 
     for paragraph in _expanded_paragraphs(paragraphs, max_chars):
+        if paragraph.is_labeled_entry:
+            if current:
+                yield _packed_chunk(current)
+                current = []
+                current_length = 0
+
+            yield _packed_chunk([paragraph])
+            continue
+
         candidate_length = (
             len(paragraph.text)
             if not current
             else current_length + separator_length + len(paragraph.text)
         )
 
-        if current and candidate_length > max_chars:
-            yield (
-                _join_parts([item.text for item in current]),
-                _min_page(item.page_start for item in current),
-                _max_page(item.page_end for item in current),
-            )
+        if current and candidate_length > target_chars:
+            yield _packed_chunk(current)
             current = [paragraph]
             current_length = len(paragraph.text)
         else:
@@ -227,11 +266,7 @@ def _pack_section_paragraphs(
             current_length = candidate_length
 
     if current:
-        yield (
-            _join_parts([item.text for item in current]),
-            _min_page(item.page_start for item in current),
-            _max_page(item.page_end for item in current),
-        )
+        yield _packed_chunk(current)
 
 
 def _embedding_text(section_path: Sequence[str], text: str) -> str:
@@ -239,24 +274,57 @@ def _embedding_text(section_path: Sequence[str], text: str) -> str:
     return f'{heading_text}\n\n{text}' if heading_text else text
 
 
-def chunk_document(document: dict[str, Any], max_chars: int = 1_000) -> list[Chunk]:
+def _text_limits(
+    section_path: Sequence[str],
+    target_chars: int,
+    max_chars: int,
+) -> tuple[int, int]:
+    """Reserve space for the breadcrumb included in embedding_text."""
+    heading_text = '\n'.join(title for title in section_path if title)
+    prefix_length = len(f'{heading_text}\n\n') if heading_text else 0
+    text_max_chars = max_chars - prefix_length
+
+    if text_max_chars <= 0:
+        raise ValueError(
+            'max_chars is too small for the document title and section path'
+        )
+
+    text_target_chars = min(max(1, target_chars - prefix_length), text_max_chars)
+    return text_target_chars, text_max_chars
+
+
+def chunk_document(
+    document: dict[str, Any],
+    target_chars: int = 750,
+    max_chars: int = 1_000,
+) -> list[Chunk]:
     """
     Convert parser JSON into structure-aware chunks.
 
-    Each section's own paragraphs are packed independently. The function then
-    recursively processes its subsections, so section boundaries are never
-    crossed. The size limit applies to Chunk.text, not embedding_text.
+    Adjacent unlabeled paragraphs from the same section are joined up to a soft
+    target. Labeled entries such as ``Finistère: ...`` remain separate. Long
+    paragraphs are split at sentence or word boundaries. The hard limit applies
+    to embedding_text, including the document title and section breadcrumb.
     """
+    if target_chars <= 0:
+        raise ValueError('target_chars must be greater than zero')
     if max_chars <= 0:
         raise ValueError('max_chars must be greater than zero')
+    if target_chars > max_chars:
+        raise ValueError('target_chars must be less than or equal to max_chars')
 
-    document_title = _normalize_text(document.get('title')) or 'Untitled document'
+    document_title = _document_title(document)
     slug = _document_slug(document_title)
     chunks: list[Chunk] = []
 
     def visit(section: dict[str, Any], parent_path: tuple[str, ...]) -> None:
         title = _normalize_text(section.get('title'))
         section_path = parent_path + ((title,) if title else ())
+        text_target_chars, text_max_chars = _text_limits(
+            section_path,
+            target_chars,
+            max_chars,
+        )
 
         raw_paragraphs = section.get('paragraphs') or []
         if not isinstance(raw_paragraphs, list):
@@ -264,7 +332,8 @@ def chunk_document(document: dict[str, Any], max_chars: int = 1_000) -> list[Chu
 
         for text, page_start, page_end in _pack_section_paragraphs(
             raw_paragraphs,
-            max_chars=max_chars,
+            target_chars=text_target_chars,
+            max_chars=text_max_chars,
         ):
             chunk_index = len(chunks)
             chunks.append(
@@ -284,6 +353,7 @@ def chunk_document(document: dict[str, Any], max_chars: int = 1_000) -> list[Chu
         subsections = section.get('subsections') or []
         if not isinstance(subsections, list):
             raise TypeError('section.subsections must be a list')
+
         for subsection in subsections:
             if not isinstance(subsection, dict):
                 raise TypeError('Each subsection must be an object')
@@ -296,12 +366,16 @@ def chunk_document(document: dict[str, Any], max_chars: int = 1_000) -> list[Chu
     for section in sections:
         if not isinstance(section, dict):
             raise TypeError('Each section must be an object')
-        visit(section, ())
+        visit(section, (document_title,))
 
     return chunks
 
 
-def load_chunks(path: str | Path, max_chars: int = 1_000) -> list[Chunk]:
+def load_chunks(
+    path: str | Path,
+    target_chars: int = 750,
+    max_chars: int = 1_000,
+) -> list[Chunk]:
     """Load a parser JSON file and return its chunks."""
     input_path = Path(path)
     with input_path.open('r', encoding='utf-8') as file:
@@ -310,7 +384,11 @@ def load_chunks(path: str | Path, max_chars: int = 1_000) -> list[Chunk]:
     if not isinstance(document, dict):
         raise TypeError('The JSON root must be an object')
 
-    return chunk_document(document, max_chars=max_chars)
+    return chunk_document(
+        document,
+        target_chars=target_chars,
+        max_chars=max_chars,
+    )
 
 
 def write_chunks(chunks: Sequence[Chunk], path: str | Path) -> None:
@@ -344,19 +422,35 @@ def write_chunks(chunks: Sequence[Chunk], path: str | Path) -> None:
     help='Optional output JSON file. When omitted, only a summary is printed.',
 )
 @click.option(
+    '--target-chars',
+    type=click.IntRange(min=1),
+    default=750,
+    show_default=True,
+    help='Preferred maximum size of embedding_text when packing paragraphs.',
+)
+@click.option(
     '--max-chars',
     type=click.IntRange(min=1),
     default=1_000,
     show_default=True,
-    help='Maximum characters in Chunk.text.',
+    help='Hard maximum size of embedding_text.',
 )
-def main(input_path: Path, output_path: Path | None, max_chars: int) -> None:
+def main(
+    input_path: Path,
+    output_path: Path | None,
+    target_chars: int,
+    max_chars: int,
+) -> None:
     """Convert parser JSON into structure-aware retrieval chunks.
 
     INPUT_PATH is the JSON document generated by the PDF parser.
     """
     try:
-        chunks = load_chunks(input_path, max_chars=max_chars)
+        chunks = load_chunks(
+            input_path,
+            target_chars=target_chars,
+            max_chars=max_chars,
+        )
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -366,9 +460,9 @@ def main(input_path: Path, output_path: Path | None, max_chars: int) -> None:
         except OSError as exc:
             raise click.ClickException(str(exc)) from exc
 
-    largest = max((chunk.character_count for chunk in chunks), default=0)
+    largest = max((len(chunk.embedding_text) for chunk in chunks), default=0)
     click.echo(f'Generated {len(chunks)} chunks')
-    click.echo(f'Largest chunk: {largest} characters')
+    click.echo(f'Largest embedding text: {largest} characters')
     if output_path is not None:
         click.echo(f'Wrote: {output_path}')
 
