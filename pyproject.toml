@@ -26,6 +26,11 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "ai_tour_guide"
 
+[tool.ruff.format]
+# Configure code formatting style
+quote-style = "single"
+indent-style = "space"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
