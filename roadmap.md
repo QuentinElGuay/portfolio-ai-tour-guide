@@ -160,15 +160,15 @@
 
 **Labels:** `ingestion`, `rag`
 
-- [ ] Chunk paragraphs within section boundaries
-- [ ] Preserve heading paths and section identifiers
-- [ ] Preserve page ranges
-- [ ] Add deterministic chunk identifiers
-- [ ] Add configurable target size, maximum size, and overlap
-- [ ] Avoid overlap across unrelated sections
-- [ ] Store document and source-node metadata with each chunk
-- [ ] Record chunk position and token count
-- [ ] Build separate embedding input from title, heading path, and body
+- [x] Chunk paragraphs within section boundaries
+- [x] Preserve heading paths and section identifiers
+- [x] Preserve page ranges
+- [x] Add deterministic chunk identifiers
+- [x] Add configurable target size, maximum size, and overlap
+- [x] Avoid overlap across unrelated sections
+- [x] Store document and source-node metadata with each chunk
+- [x] Record chunk position and token count
+- [x] Build separate embedding input from title, heading path, and body
 
 **Acceptance criteria**
 

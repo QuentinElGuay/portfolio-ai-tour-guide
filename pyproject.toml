@@ -2,7 +2,6 @@
 name = "portfolio-ai-tour-guide"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 authors = [
     { name = "Quentin Leguay", email = "33553005+QuentinElGuay@users.noreply.github.com" }
 ]
@@ -11,8 +10,11 @@ dependencies = [
     "click>=8.4.2",
     "httpx>=0.28.1",
     "openai>=2.52.1",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "pymupdf>=1.28.0",
+    "sqlalchemy>=2.0.51",
 ]
 
 [project.scripts]

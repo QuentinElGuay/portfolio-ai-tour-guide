@@ -10,6 +10,7 @@ x-app-environment: &app-environment
 services:
   database:
     image: pgvector/pgvector:pg17
+
     environment:
       POSTGRES_DB: "${POSTGRES_DB}"
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -37,13 +38,12 @@ services:
     networks:
       - ai-tour-guide
 
-
   ingestion:
     image: ai-tour-guide-ingestion:local
 
     build:
-      context: ./ingestion
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/ingestion.Dockerfile
 
     profiles:
       - ingestion
@@ -51,9 +51,7 @@ services:
     environment:
       <<: *app-environment
 
-      # Application-specific configuration
-      DOCUMENTS_PATH: "${DOCUMENTS_PATH:-/app/data/documents}"
-      CHUNKS_PATH: "${CHUNKS_PATH:-/app/data/chunks}"
+      EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS}"
 
     volumes:
       - ./data:/app/data
@@ -67,13 +65,12 @@ services:
     networks:
       - ai-tour-guide
 
-
   agent:
     image: ai-tour-guide-agent:local
 
     build:
-      context: ./agent
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/agent.Dockerfile
 
     environment:
       <<: *app-environment
@@ -90,11 +87,9 @@ services:
     networks:
       - ai-tour-guide
 
-
 volumes:
   postgres_data:
 
-
 networks:
- ai-tour-guide:
+  ai-tour-guide:
     driver: bridge
