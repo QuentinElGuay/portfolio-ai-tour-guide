@@ -15,7 +15,6 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "pymupdf>=1.28.0",
-    "sentence-transformers>=5.7.0",
     "sqlalchemy>=2.0.51",
     "tqdm>=4.70.0",
 ]
