@@ -21,6 +21,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import pymupdf
 
+from ai_tour_guide.domain.documents import DocumentMetadata
+
 OUTPUT_SUFFIXES = {'.pdf', '.md', '.txt', '.json'}
 
 MIN_SECTION_HEADING_SIZE_RATIO = 1.25
@@ -248,53 +250,6 @@ class ParsedSection:
 
 
 @dataclass(frozen=True, slots=True)
-class ParsedPdfMetadata:
-    """Resolved metadata attached to a parsed ingestion document.
-
-    Explicit values from :class:`IngestionDocument` take precedence. Missing
-    values are populated from the PDF metadata when possible.
-    """
-
-    title: str | None
-    pdf_url: str
-    publisher: str | None
-    publication_date: date | None
-    authors: list[str]
-    subject: str | None
-    keywords: list[str]
-    creator: str | None
-    producer: str | None
-    pdf_format: str | None
-    creation_date: str | None
-    modification_date: str | None
-    source_page_count: int
-    page_count: int
-
-    def to_dict(self) -> dict[str, object]:
-        """Return JSON-compatible resolved metadata."""
-        return {
-            'title': self.title,
-            'pdf_url': self.pdf_url,
-            'publisher': self.publisher,
-            'publication_date': (
-                self.publication_date.isoformat()
-                if self.publication_date is not None
-                else None
-            ),
-            'authors': list(self.authors),
-            'subject': self.subject,
-            'keywords': list(self.keywords),
-            'creator': self.creator,
-            'producer': self.producer,
-            'format': self.pdf_format,
-            'creation_date': self.creation_date,
-            'modification_date': self.modification_date,
-            'source_page_count': self.source_page_count,
-            'page_count': self.page_count,
-        }
-
-
-@dataclass(frozen=True, slots=True)
 class ParsedPdf:
     """Canonical structured result returned by :func:`parse_pdf`.
 
@@ -303,7 +258,7 @@ class ParsedPdf:
     Markdown visualization and downstream RAG chunking.
     """
 
-    metadata: ParsedPdfMetadata
+    metadata: DocumentMetadata
     sections: tuple[ParsedSection, ...]
 
     @property
@@ -1292,7 +1247,7 @@ def _resolve_pdf_metadata(
     xmp_authors: Sequence[str],
     source_page_count: int,
     page_count: int,
-) -> ParsedPdfMetadata:
+) -> DocumentMetadata:
     """Merge ingestion overrides with metadata extracted from the PDF.
 
     Author precedence is: explicit ingestion authors, XMP ``dc:creator``,
@@ -1310,7 +1265,7 @@ def _resolve_pdf_metadata(
     ingestion_keywords = _normalise_keywords(document.keywords)
     embedded_keywords = _normalise_keywords(_metadata_value(pdf_metadata, 'Keywords'))
 
-    return ParsedPdfMetadata(
+    return DocumentMetadata(
         title=_clean_optional_text(document.title) or embedded_title,
         pdf_url=document.pdf_url.strip(),
         publisher=(_clean_optional_text(document.publisher) or embedded_publisher),

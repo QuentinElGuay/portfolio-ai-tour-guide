@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,23 +26,46 @@ import click
 import numpy as np
 from tqdm import tqdm
 
+from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.embedding import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_MODEL_NAME,
     Embedder,
     EmbeddingError,
-    FastEmbedder,
 )
+from ai_tour_guide.embedding.fastembed import FastEmbedder
 
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingResult:
     """Embedded chunk records plus the effective model configuration."""
 
-    chunks: list[dict[str, Any]]
+    chunks: Sequence[EmbeddedChunk]
     model_name: str
     dimensions: int
     normalized: bool
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingResult:
+    chunks: tuple[EmbeddedChunk, ...]
+    model_name: str
+    dimensions: int
+    normalized: bool
+
+    def to_records(self) -> list[dict[str, Any]]:
+        """Return database-ready embedded chunk records."""
+        return [
+            {
+                **embedded_chunk.chunk.to_dict(),
+                'embedding': list(embedded_chunk.embedding),
+                'embedding_model': self.model_name,
+                'embedding_dimensions': self.dimensions,
+                'embedding_normalized': self.normalized,
+                'embedding_input_sha256': (embedded_chunk.embedding_input_sha256),
+            }
+            for embedded_chunk in self.chunks
+        ]
 
 
 def _sha256_text(text: str) -> str:
@@ -50,45 +73,36 @@ def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 
-def _validate_chunk_records(
-    chunks: Sequence[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    """Validate and copy chunk records before model inference."""
-    validated: list[dict[str, Any]] = []
+def _validate_chunks(
+    chunks: Sequence[Chunk],
+) -> tuple[Chunk, ...]:
+    """Validate constraints involving multiple chunks."""
     seen_chunk_ids: set[str] = set()
 
-    for index, raw_chunk in enumerate(chunks):
-        if not isinstance(raw_chunk, Mapping):
-            raise TypeError(f'Chunk {index} must be a JSON object')
+    for index, chunk in enumerate(chunks):
+        if not isinstance(chunk, Chunk):
+            raise TypeError(f'Chunk {index} must be a Chunk instance')
 
-        chunk = dict(raw_chunk)
-        chunk_id = chunk.get('chunk_id')
-        if not isinstance(chunk_id, str) or not chunk_id.strip():
-            raise ValueError(f'Chunk {index} must contain a non-empty chunk_id')
+        if chunk.chunk_id in seen_chunk_ids:
+            raise ValueError(f'Duplicate chunk_id: {chunk.chunk_id}')
 
-        if chunk_id in seen_chunk_ids:
-            raise ValueError(f'Duplicate chunk_id: {chunk_id}')
-        seen_chunk_ids.add(chunk_id)
+        seen_chunk_ids.add(chunk.chunk_id)
 
-        embedding_text = chunk.get('embedding_text')
-        if not isinstance(embedding_text, str) or not embedding_text.strip():
-            raise ValueError(f'Chunk {chunk_id} must contain non-empty embedding_text')
-
-        validated.append(chunk)
-
-    return validated
+    return tuple(chunks)
 
 
-def load_chunks(path: str | Path) -> list[dict[str, Any]]:
-    """Load and validate a JSON array of retrieval chunks."""
+def load_chunks(path: str | Path) -> tuple[Chunk, ...]:
     input_path = Path(path)
+
     with input_path.open('r', encoding='utf-8') as file:
         payload = json.load(file)
 
     if not isinstance(payload, list):
         raise TypeError('The chunks JSON root must be an array')
 
-    return _validate_chunk_records(payload)
+    chunks = tuple(Chunk.from_dict(item) for item in payload)
+
+    return _validate_chunks(chunks)
 
 
 def _validate_embedding_batch(
@@ -120,7 +134,7 @@ def _validate_embedding_batch(
 
 
 def embed_chunks(
-    chunks: Sequence[Mapping[str, Any]],
+    chunks: Sequence[Chunk],
     *,
     model_name: str = DEFAULT_MODEL_NAME,
     batch_size: int = DEFAULT_BATCH_SIZE,
@@ -139,7 +153,7 @@ def embed_chunks(
     if not model_name.strip():
         raise ValueError('model_name must not be empty')
 
-    validated_chunks = _validate_chunk_records(chunks)
+    validated_chunks: tuple[Chunk] = _validate_chunks(chunks)
 
     initial_metadata = embedder.metadata
     if embedder is not None and initial_metadata.normalized != normalize:
@@ -166,10 +180,10 @@ def embed_chunks(
             unit='batch',
         ):
             batch = validated_chunks[start : start + batch_size]
-            texts = [str(chunk['embedding_text']) for chunk in batch]
+            texts = [chunk.embedding_text for chunk in batch]
 
             matrix = _validate_embedding_batch(
-                embedding_model.embed_documents(
+                embedder.embed_documents(
                     texts,
                     batch_size=batch_size,
                 ),
@@ -204,7 +218,7 @@ def embed_chunks(
         )
 
     dimensions = int(embedding_matrix.shape[1])
-    metadata = embedding_model.metadata
+    metadata = embedder.metadata
 
     if metadata.dimensions not in (0, dimensions):
         raise EmbeddingError(
@@ -219,16 +233,12 @@ def embed_chunks(
         embedding_matrix,
         strict=True,
     ):
-        embedding_text = str(chunk['embedding_text'])
         embedded_chunks.append(
-            {
-                **chunk,
-                'embedding': vector.tolist(),
-                'embedding_model': metadata.model_name,
-                'embedding_dimensions': dimensions,
-                'embedding_normalized': metadata.normalized,
-                'embedding_input_sha256': _sha256_text(embedding_text),
-            }
+            EmbeddedChunk(
+                chunk,
+                vector.tolist(),
+                _sha256_text(chunk.embedding_text),
+            )
         )
 
     return EmbeddingResult(
@@ -240,10 +250,12 @@ def embed_chunks(
 
 
 def write_embedded_chunks(
-    chunks: Sequence[Mapping[str, Any]],
+    result: EmbeddingResult,
     path: str | Path,
 ) -> None:
     """Atomically write embedded chunk records as a JSON array."""
+    records = result.to_records()
+
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = output_path.with_name(f'.{output_path.name}.tmp')
@@ -251,14 +263,16 @@ def write_embedded_chunks(
     try:
         with temporary_path.open('w', encoding='utf-8') as file:
             json.dump(
-                list(chunks),
+                records,
                 file,
                 ensure_ascii=False,
                 indent=2,
                 allow_nan=False,
             )
             file.write('\n')
+
         temporary_path.replace(output_path)
+
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
@@ -309,16 +323,26 @@ def main(
     batch_size: int,
     normalize: bool,
 ) -> None:
-    """Embed the chunks in INPUT_PATH and write database-ready JSON."""
+    """Embed chunks from INPUT_PATH and write them as JSON."""
     try:
         chunks = load_chunks(input_path)
-        result = embed_chunks(
-            chunks,
+
+        embedder = FastEmbedder(
             model_name=model_name,
-            batch_size=batch_size,
             normalize=normalize,
         )
-        write_embedded_chunks(result.chunks, output_path)
+
+        result = embed_chunks(
+            chunks,
+            embedder=embedder,
+            batch_size=batch_size,
+        )
+
+        write_embedded_chunks(
+            result,
+            output_path,
+        )
+
     except (
         EmbeddingError,
         OSError,

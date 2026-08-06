@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -12,8 +13,9 @@ import click
 from pydantic import ValidationError
 
 from ai_tour_guide import database
-from ai_tour_guide.embedding.fastembed import FastEmbedder
-from ai_tour_guide.embedding.interfaces import Embedder
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.embedding import Embedder, FastEmbedder
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.ingestion.chunking import chunk_document
 from ai_tour_guide.ingestion.embedding import embed_chunks
@@ -28,6 +30,17 @@ from ai_tour_guide.ingestion.pdf.parser import (
 from ai_tour_guide.ingestion.settings import IngestionSettings
 
 LOGGER = logging.getLogger(__name__)
+
+
+def calculate_file_sha256(path: Path) -> str:
+    """Return the SHA-256 checksum of a file's exact bytes."""
+    digest = hashlib.sha256()
+
+    with path.open('rb') as file:
+        for block in iter(lambda: file.read(1024 * 1024), b''):
+            digest.update(block)
+
+    return digest.hexdigest()
 
 
 def load_documents(source: TextIO) -> tuple[IngestionDocument, ...]:
@@ -79,8 +92,8 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
 
 
 def load_document_and_chunks_to_database(
-    document: Mapping[str, Any],
-    chunks: Sequence[Mapping[str, Any]],
+    document: DocumentRecord,
+    chunks: Sequence[EmbeddedChunk],
 ) -> None:
     """Upsert one document and replace its associated chunks."""
     with database.transaction() as transaction:
@@ -136,6 +149,17 @@ def ingest_document(
         pdf_output_path,
         timeout_seconds=settings.timeout,
     )
+    source_checksum = calculate_file_sha256(pdf_path)
+
+    # TODO
+    # existing = repository.find_document(
+    #     collection=collection_name,
+    #     source_url=document.pdf_url,
+    # )
+
+    # if existing and existing.source_checksum == source_checksum:
+    #     LOGGER.info('Skipping unchanged document: %s', document.pdf_url)
+    #     return
 
     # 2. Parse the downloaded PDF.
     parsed_pdf = parse_pdf(document)
@@ -173,8 +197,15 @@ def ingest_document(
     )
 
     # 6. Upload the document and its embedded chunks.
+    document_record = DocumentRecord(
+        metadata=parsed_pdf.metadata,
+        # collection=collection_name,
+        # version=document_version,
+        source_checksum=source_checksum,
+    )
+
     load_document_and_chunks_to_database(
-        document=parsed_pdf.metadata.to_dict(),
+        document=document_record,
         chunks=embedding_result.chunks,
     )
 

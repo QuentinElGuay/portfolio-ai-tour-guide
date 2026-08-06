@@ -1,9 +1,10 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ai_tour_guide.embedding.fastembed import (
+from ai_tour_guide.embedding.constants import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_MODEL_NAME,
+    DEFAULT_NORMALIZE,
 )
 
 
@@ -18,8 +19,5 @@ class EmbeddingSettings(BaseSettings):
     )
 
     model_name: str = DEFAULT_MODEL_NAME
-    batch_size: int = Field(
-        default=DEFAULT_BATCH_SIZE,
-        gt=0,
-    )
-    normalize: bool = True
+    batch_size: int = Field(default=DEFAULT_BATCH_SIZE, gt=0)
+    normalize: bool = DEFAULT_NORMALIZE

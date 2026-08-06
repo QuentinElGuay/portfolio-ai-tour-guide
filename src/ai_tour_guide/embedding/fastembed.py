@@ -19,7 +19,7 @@ class FastEmbedder(Embedder):
 
     def __init__(
         self,
-        model_name: str = DEFAULT_MODEL_NAME,
+        model_name: str,
         *,
         normalize: bool = True,
         model: Any | None = None,
@@ -62,7 +62,7 @@ class FastEmbedder(Embedder):
         self,
         texts: Sequence[str],
         *,
-        batch_size: int = DEFAULT_BATCH_SIZE,
+        batch_size: int,
     ) -> np.ndarray:
         """Embed document passages and return a float32 matrix."""
         if batch_size <= 0:
