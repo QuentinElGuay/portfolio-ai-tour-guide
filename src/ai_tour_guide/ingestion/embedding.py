@@ -1,41 +1,43 @@
-"""Generate dense vector embeddings for structure-aware ingestion chunks.
+"""Embed structure-aware ingestion chunks using the shared embedding package.
 
-The module reads the JSON array produced by ``chunking.py``, embeds each
-record's ``embedding_text`` value, and writes a new JSON array ready for a
-subsequent database-loading step.
+This module owns ingestion-specific concerns:
+
+- validating chunk records;
+- extracting each chunk's ``embedding_text``;
+- showing batch progress;
+- attaching vectors and provenance metadata to chunk records;
+- reading and writing JSON through a Click CLI.
+
+Model loading, inference, and vector normalization are delegated to the shared
+``ai_tour_guide.embeddings`` package so ingestion and retrieval use the same
+implementation.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any
 
 import click
 import numpy as np
 from tqdm import tqdm
 
-
-DEFAULT_MODEL_NAME = 'BAAI/bge-small-en-v1.5'
-DEFAULT_BATCH_SIZE = 32
-
-
-class EmbeddingError(RuntimeError):
-    """Raised when chunks cannot be embedded safely."""
-
-
-class EmbeddingModel(Protocol):
-    """Minimal model interface used by :func:`embed_chunks`."""
-
-    def encode(self, sentences: Sequence[str], **kwargs: Any) -> Any:
-        """Return one embedding vector per input sentence."""
+from ai_tour_guide.embedding import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MODEL_NAME,
+    Embedder,
+    EmbeddingError,
+    FastEmbedder,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingResult:
-    """Embedded chunk records plus model-level output metadata."""
+    """Embedded chunk records plus the effective model configuration."""
 
     chunks: list[dict[str, Any]]
     model_name: str
@@ -45,7 +47,7 @@ class EmbeddingResult:
 
 def _sha256_text(text: str) -> str:
     """Return a stable SHA-256 hash for embedding input text."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 
 def _validate_chunk_records(
@@ -62,14 +64,22 @@ def _validate_chunk_records(
         chunk = dict(raw_chunk)
         chunk_id = chunk.get('chunk_id')
         if not isinstance(chunk_id, str) or not chunk_id.strip():
-            raise ValueError(f'Chunk {index} must contain a non-empty chunk_id')
+            raise ValueError(
+                f'Chunk {index} must contain a non-empty chunk_id'
+            )
+
         if chunk_id in seen_chunk_ids:
             raise ValueError(f'Duplicate chunk_id: {chunk_id}')
         seen_chunk_ids.add(chunk_id)
 
         embedding_text = chunk.get('embedding_text')
-        if not isinstance(embedding_text, str) or not embedding_text.strip():
-            raise ValueError(f'Chunk {chunk_id} must contain non-empty embedding_text')
+        if (
+            not isinstance(embedding_text, str)
+            or not embedding_text.strip()
+        ):
+            raise ValueError(
+                f'Chunk {chunk_id} must contain non-empty embedding_text'
+            )
 
         validated.append(chunk)
 
@@ -88,24 +98,33 @@ def load_chunks(path: str | Path) -> list[dict[str, Any]]:
     return _validate_chunk_records(payload)
 
 
-def load_embedding_model(model_name: str = DEFAULT_MODEL_NAME) -> EmbeddingModel:
-    """Load a fastembed model lazily.
+def _validate_embedding_batch(
+    vectors: Any,
+    *,
+    expected_count: int,
+) -> np.ndarray:
+    """Convert one embedding batch to a validated float32 matrix."""
+    matrix = np.asarray(vectors, dtype=np.float32)
 
-    Keeping the import local lets the rest of the ingestion package remain
-    usable when the optional embedding dependencies are not installed.
-    """
-    try:
-        from fastembed import TextEmbedding
-    except ImportError as exc:
+    if matrix.ndim != 2:
         raise EmbeddingError(
-            'fastembed is required for embedding. Install it with '
-            '`uv add fastembed`.'
-        ) from exc
+            'The embedding model returned a non-matrix result: '
+            f'shape={matrix.shape}'
+        )
 
-    try:
-        return TextEmbedding(model_name)
-    except Exception as exc:  # The library wraps download and backend errors.
-        raise EmbeddingError(f'Could not load embedding model {model_name!r}') from exc
+    if matrix.shape[0] != expected_count:
+        raise EmbeddingError(
+            'Embedding count mismatch for batch: '
+            f'expected {expected_count}, got {matrix.shape[0]}'
+        )
+
+    if matrix.shape[1] == 0:
+        raise EmbeddingError('The embedding model returned empty vectors')
+
+    if not np.isfinite(matrix).all():
+        raise EmbeddingError('The embedding model returned non-finite values')
+
+    return matrix
 
 
 def embed_chunks(
@@ -114,8 +133,14 @@ def embed_chunks(
     model_name: str = DEFAULT_MODEL_NAME,
     batch_size: int = DEFAULT_BATCH_SIZE,
     normalize: bool = True,
+    embedder: Embedder | None = None,
 ) -> EmbeddingResult:
-    """Embed each chunk's embedding_text and append vector metadata."""
+    """Embed each chunk's ``embedding_text`` and append vector metadata.
+
+    ``embedder`` is injectable for unit tests. Production callers normally
+    leave it as ``None``, causing this function to create a shared
+    :class:`FastEmbedder` with the requested model and normalization setting.
+    """
     if batch_size <= 0:
         raise ValueError('batch_size must be greater than zero')
 
@@ -124,16 +149,28 @@ def embed_chunks(
 
     validated_chunks = _validate_chunk_records(chunks)
 
+    embedding_model = embedder or FastEmbedder(
+        model_name=model_name,
+        normalize=normalize,
+    )
+
+    initial_metadata = embedding_model.metadata
+    if embedder is not None and initial_metadata.normalized != normalize:
+        raise ValueError(
+            'Injected embedder normalization does not match normalize option: '
+            f'{initial_metadata.normalized} != {normalize}'
+        )
+
     if not validated_chunks:
         return EmbeddingResult(
             chunks=[],
-            model_name=model_name,
+            model_name=initial_metadata.model_name,
             dimensions=0,
-            normalized=normalize,
+            normalized=initial_metadata.normalized,
         )
 
-    embedding_model = load_embedding_model(model_name)
-    all_embeddings: list[np.ndarray] = []
+    embedding_batches: list[np.ndarray] = []
+    expected_dimensions: int | None = None
 
     try:
         for start in tqdm(
@@ -144,20 +181,24 @@ def embed_chunks(
             batch = validated_chunks[start : start + batch_size]
             texts = [str(chunk['embedding_text']) for chunk in batch]
 
-            batch_embeddings = list(
-                embedding_model.embed(
+            matrix = _validate_embedding_batch(
+                embedding_model.embed_documents(
                     texts,
                     batch_size=batch_size,
-                )
+                ),
+                expected_count=len(batch),
             )
 
-            if len(batch_embeddings) != len(batch):
+            dimensions = int(matrix.shape[1])
+            if expected_dimensions is None:
+                expected_dimensions = dimensions
+            elif dimensions != expected_dimensions:
                 raise EmbeddingError(
-                    'Embedding model returned '
-                    f'{len(batch_embeddings)} vectors for {len(batch)} chunks'
+                    'Embedding dimensions changed between batches: '
+                    f'{expected_dimensions} != {dimensions}'
                 )
 
-            all_embeddings.extend(batch_embeddings)
+            embedding_batches.append(matrix)
 
     except EmbeddingError:
         raise
@@ -166,13 +207,7 @@ def embed_chunks(
             f'Embedding failed for {len(validated_chunks)} chunk(s)'
         ) from exc
 
-    embedding_matrix = np.asarray(all_embeddings, dtype=np.float32)
-
-    if embedding_matrix.ndim != 2:
-        raise EmbeddingError(
-            'The embedding model returned a non-matrix result: '
-            f'shape={embedding_matrix.shape}'
-        )
+    embedding_matrix = np.concatenate(embedding_batches, axis=0)
 
     if embedding_matrix.shape[0] != len(validated_chunks):
         raise EmbeddingError(
@@ -182,6 +217,13 @@ def embed_chunks(
         )
 
     dimensions = int(embedding_matrix.shape[1])
+    metadata = embedding_model.metadata
+
+    if metadata.dimensions not in (0, dimensions):
+        raise EmbeddingError(
+            'Embedder metadata dimension mismatch: '
+            f'{metadata.dimensions} != {dimensions}'
+        )
 
     embedded_chunks: list[dict[str, Any]] = []
 
@@ -190,25 +232,23 @@ def embed_chunks(
         embedding_matrix,
         strict=True,
     ):
-        embedded_chunk = dict(chunk)
-        embedded_chunk.update(
+        embedding_text = str(chunk['embedding_text'])
+        embedded_chunks.append(
             {
+                **chunk,
                 'embedding': vector.tolist(),
-                'embedding_model': model_name,
+                'embedding_model': metadata.model_name,
                 'embedding_dimensions': dimensions,
-                'embedding_normalized': normalize,
-                'embedding_input_sha256': _sha256_text(
-                    str(chunk['embedding_text'])
-                ),
+                'embedding_normalized': metadata.normalized,
+                'embedding_input_sha256': _sha256_text(embedding_text),
             }
         )
-        embedded_chunks.append(embedded_chunk)
 
     return EmbeddingResult(
         chunks=embedded_chunks,
-        model_name=model_name,
+        model_name=metadata.model_name,
         dimensions=dimensions,
-        normalized=normalize,
+        normalized=metadata.normalized,
     )
 
 
