@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug embedding",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/ai_tour_guide/ingestion/embedding.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "tmp/guide-discover-brittany-chunks.json",
+        "--output",
+        "tmp/guide-discover-brittany-embedded.json"
+      ]
+    }
+  ]
+}

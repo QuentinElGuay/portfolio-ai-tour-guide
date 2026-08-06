@@ -12,9 +12,7 @@ def initialize_database() -> None:
     engine = create_database_engine()
 
     with engine.begin() as connection:
-        connection.execute(
-            text("CREATE EXTENSION IF NOT EXISTS vector")
-        )
+        connection.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
 
         metadata.create_all(
             bind=connection,
@@ -26,8 +24,8 @@ def initialize_database() -> None:
 
 def main() -> None:
     initialize_database()
-    print("Database initialized successfully.")
+    print('Database initialized successfully.')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

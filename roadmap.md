@@ -169,15 +169,18 @@
 - [x] Store document and source-node metadata with each chunk
 - [x] Record chunk position and token count
 - [x] Build separate embedding input from title, heading path, and body
+- [ ] Add automated tests for chunk traceability and boundary preservation
+- [ ] Add reproducibility tests for identical input and configuration
 
 **Acceptance criteria**
 
 - [ ] Every chunk can be traced to its source paragraph or section
-- [ ] Every chunk has `page_start` and `page_end`
+- [x] Every chunk has `page_start` and `page_end`
 - [ ] Chunks never cross unrelated section boundaries
-- [ ] Chunking parameters are configurable
+- [ ] Chunking parameters are configurable through the ingestion configuration
 - [ ] Chunk identifiers and output are reproducible
-- [ ] Stored chunk text does not contain synthetic heading enrichment
+- [x] Stored `text` does not contain synthetic heading enrichment
+- [x] Synthetic heading enrichment is stored separately in `embedding_text`
 
 ---
 
@@ -185,45 +188,84 @@
 
 **Labels:** `ingestion`, `cli`
 
-- [ ] Add command to ingest a PDF
-- [ ] Add collection name option
-- [ ] Add document version or checksum
-- [ ] Print ingestion summary
+- [x] Add a command to ingest a PDF
+- [ ] Add collection or namespace option
+- [ ] Add document version and source checksum
+- [x] Generate chunks as part of the ingestion pipeline
+- [x] Generate embeddings before database upload
+- [ ] Upsert document metadata
+- [ ] Upsert embedded chunks
+- [ ] Delete stale chunks when a document is reprocessed
+- [ ] Upload the document and chunks in one database transaction
+- [x] Print ingestion summary
 - [ ] Make repeated ingestion idempotent
+- [ ] Record ingestion status and failures
 
 **Acceptance criteria**
 
-- [ ] Ingestion runs without a notebook
-- [ ] Reprocessing does not create duplicates
+- [x] Ingestion runs without a notebook
+- [ ] Reprocessing an unchanged document does not create duplicates
+- [ ] Reprocessing a changed document replaces obsolete chunks
+- [ ] A failed chunk upload does not leave a partially ingested document
 - [ ] Errors are logged clearly
+- [ ] The summary reports document, chunk, model, and vector information
 
 **Tools**
 
-- Typer
-- Structlog or standard logging
+- Click
+- Pydantic Settings
+- Standard logging
+- `uv`
 
 ---
 
 # Milestone 3 — Knowledge Base and Retrieval
 
-## [P0] Generate multilingual embeddings
+## [P0] Generate lightweight English embeddings
 
 **Labels:** `embeddings`, `rag`
 
-- [ ] Select a multilingual model
-- [ ] Generate embeddings for all chunks
-- [ ] Store embedding model metadata
-- [ ] Validate vector dimensions
+- [x] Select an English embedding model
+- [x] Select a lightweight inference runtime
+- [x] Generate embeddings for all chunks
+- [x] Use `embedding_text` as the embedding input
+- [x] Process embeddings in configurable batches
+- [x] Display embedding progress
+- [x] Validate the number of returned vectors
+- [x] Validate vector dimensions
+- [x] Store embedding model metadata
+- [x] Store whether vectors are normalized
+- [x] Store a SHA-256 checksum of each embedding input
+- [ ] Pin the embedding model revision or artifact version
+- [ ] Use the same model, revision, normalization, and runtime for queries
+- [ ] Add embedding reproducibility tests
+- [ ] Add retrieval smoke tests
+
+**Selected implementation**
+
+- Model: `BAAI/bge-small-en-v1.5`
+- Runtime: FastEmbed with ONNX Runtime
+- Vector dimensions: `384`
+- Similarity: cosine similarity or dot product over normalized vectors
+- Passage input: chunk `embedding_text`
+- Query input: the same model and normalization configuration
 
 **Acceptance criteria**
 
-- [ ] French and English queries retrieve relevant French content
-- [ ] Embedding generation is reproducible
+- [ ] English queries retrieve relevant English content
+- [ ] Every stored chunk has exactly one 384-dimensional vector
+- [ ] Stored and query embeddings use the same model configuration
+- [ ] Embedding generation is reproducible for a pinned model artifact
+- [ ] Unchanged `embedding_input_sha256` values can skip re-embedding
+- [ ] Embeddings produced by different runtimes are never mixed in one index
+- [ ] Retrieval smoke tests return the expected source sections and pages
 
 **Tools**
 
-- sentence-transformers
-- Hugging Face models
+- FastEmbed
+- ONNX Runtime
+- NumPy
+- tqdm
 
 ---
 
