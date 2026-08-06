@@ -17,8 +17,6 @@ from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import httpx
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 import pymupdf
 
 from ai_tour_guide.domain.documents import DocumentMetadata
