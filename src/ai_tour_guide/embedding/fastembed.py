@@ -10,10 +10,6 @@ import numpy as np
 from .interfaces import Embedder, EmbeddingError, EmbeddingMetadata
 
 
-DEFAULT_MODEL_NAME = 'BAAI/bge-small-en-v1.5'
-DEFAULT_BATCH_SIZE = 32
-
-
 class FastEmbedder(Embedder):
     """Embed passages and queries with FastEmbed and explicit normalization.
 

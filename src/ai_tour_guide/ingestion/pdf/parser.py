@@ -21,7 +21,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import pymupdf
 
-TMP_FOLDER = Path('tmp')
 OUTPUT_SUFFIXES = {'.pdf', '.md', '.txt', '.json'}
 
 MIN_SECTION_HEADING_SIZE_RATIO = 1.25
@@ -174,21 +173,6 @@ def normalize_filename_stem(title: str) -> str:
         )
 
     return candidate
-
-
-class IngestionSettings(BaseSettings):
-    """Operational configuration for PDF ingestion."""
-
-    model_config = SettingsConfigDict(
-        env_prefix='INGESTION_',
-        env_file='.env',
-        env_file_encoding='utf-8',
-        extra='ignore',
-    )
-
-    tmp_folder: Path = TMP_FOLDER
-    timeout: float = Field(default=30.0, gt=0)
-    verbose: bool = False
 
 
 @dataclass(frozen=True, slots=True)

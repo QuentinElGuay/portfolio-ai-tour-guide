@@ -125,7 +125,7 @@ def embed_chunks(
     model_name: str = DEFAULT_MODEL_NAME,
     batch_size: int = DEFAULT_BATCH_SIZE,
     normalize: bool = True,
-    embedder: Embedder | None = None,
+    embedder: Embedder,
 ) -> EmbeddingResult:
     """Embed each chunk's ``embedding_text`` and append vector metadata.
 
@@ -141,12 +141,7 @@ def embed_chunks(
 
     validated_chunks = _validate_chunk_records(chunks)
 
-    embedding_model = embedder or FastEmbedder(
-        model_name=model_name,
-        normalize=normalize,
-    )
-
-    initial_metadata = embedding_model.metadata
+    initial_metadata = embedder.metadata
     if embedder is not None and initial_metadata.normalized != normalize:
         raise ValueError(
             'Injected embedder normalization does not match normalize option: '
