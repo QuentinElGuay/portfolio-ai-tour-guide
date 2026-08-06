@@ -525,9 +525,7 @@ def _parse_downloaded_pdf(
 
             source_page_count = pdf.page_count
             first_page_index = document.excluded_leading_pages
-            last_page_index = (
-                source_page_count - document.excluded_trailing_pages
-            )
+            last_page_index = source_page_count - document.excluded_trailing_pages
 
             if first_page_index >= last_page_index:
                 raise PdfParseError(
@@ -724,8 +722,7 @@ def _split_row_on_large_gaps(
         previous = groups[-1][-1]
         horizontal_gap = fragment.bbox[0] - previous.bbox[2]
         maximum_gap = (
-            max(previous.font_size, fragment.font_size, 1.0)
-            * MAX_HORIZONTAL_GAP_FACTOR
+            max(previous.font_size, fragment.font_size, 1.0) * MAX_HORIZONTAL_GAP_FACTOR
         )
 
         if horizontal_gap > maximum_gap:
@@ -750,10 +747,7 @@ def _merge_fragment_group(
     y1 = max(fragment.bbox[3] for fragment in fragments)
     total_characters = sum(max(len(fragment.text), 1) for fragment in fragments)
     weighted_font_size = (
-        sum(
-            fragment.font_size * max(len(fragment.text), 1)
-            for fragment in fragments
-        )
+        sum(fragment.font_size * max(len(fragment.text), 1) for fragment in fragments)
         / total_characters
     )
     bold_characters = sum(
@@ -1140,9 +1134,7 @@ def _build_heading_level_map(
         is_sparse_chapter_page = (
             page_body_characters <= CHAPTER_PAGE_MAX_BODY_CHARACTERS
         )
-        is_near_page_top = (
-            line.bbox[1] <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
-        )
+        is_near_page_top = line.bbox[1] <= line.page_height * PAGE_TITLE_MAX_Y_RATIO
 
         if size_ratio >= CHAPTER_TITLE_SIZE_RATIO and is_sparse_chapter_page:
             level = 1
@@ -1330,30 +1322,19 @@ def _resolve_pdf_metadata(
     )
     ingestion_authors = _normalise_authors(document.authors)
     xmp_resolved_authors = _normalise_authors(xmp_authors)
-    legacy_authors = _parse_legacy_authors(
-        _metadata_value(pdf_metadata, 'Author')
-    )
+    legacy_authors = _parse_legacy_authors(_metadata_value(pdf_metadata, 'Author'))
     ingestion_keywords = _normalise_keywords(document.keywords)
-    embedded_keywords = _normalise_keywords(
-        _metadata_value(pdf_metadata, 'Keywords')
-    )
+    embedded_keywords = _normalise_keywords(_metadata_value(pdf_metadata, 'Keywords'))
 
     return ParsedPdfMetadata(
         title=_clean_optional_text(document.title) or embedded_title,
         pdf_url=document.pdf_url.strip(),
-        publisher=(
-            _clean_optional_text(document.publisher)
-            or embedded_publisher
-        ),
+        publisher=(_clean_optional_text(document.publisher) or embedded_publisher),
         publication_date=(
             document.publication_date
             or _parse_pdf_metadata_date(embedded_creation_date)
         ),
-        authors=(
-            ingestion_authors
-            or xmp_resolved_authors
-            or legacy_authors
-        ),
+        authors=(ingestion_authors or xmp_resolved_authors or legacy_authors),
         subject=_metadata_value(pdf_metadata, 'Subject'),
         keywords=ingestion_keywords or embedded_keywords,
         creator=_metadata_value(pdf_metadata, 'Creator'),
@@ -1453,6 +1434,7 @@ def _parse_legacy_authors(value: str | None) -> list[str]:
         return []
 
     return _normalise_authors(re.split(r'[;\n]+', value))
+
 
 def _normalise_keywords(value: object) -> list[str]:
     """Return normalized, de-duplicated keyword strings."""
