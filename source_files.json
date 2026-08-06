@@ -1,9 +1,9 @@
 [
   {
     "pdf_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf",
-    "title": "Discovering-Britanny",
+    "title": "Guide Discover Brittany",
     "publisher": "Ibanista",
-    "publication_date": "2025-11-01",
+    "keywords": ["Tourism", "Britanny", "France", "Relocation"],
     "excluded_leading_pages": 4,
     "excluded_trailing_pages": 2,
     "ignored_text_patterns": [
