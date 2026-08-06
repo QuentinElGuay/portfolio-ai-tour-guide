@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
 import click
+
+from ai_tour_guide.domain.chunks import Chunk
 
 
 _SENTENCE_BOUNDARY_RE = re.compile(r'(?<=[.!?])\s+')
@@ -22,27 +24,6 @@ class Paragraph:
     page_start: int | None = None
     page_end: int | None = None
     is_labeled_entry: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class Chunk:
-    """A retrieval chunk generated from one section of a document."""
-
-    chunk_id: str
-    document_title: str
-    section_path: tuple[str, ...]
-    text: str
-    embedding_text: str
-    page_start: int | None
-    page_end: int | None
-    chunk_index: int
-    character_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable representation."""
-        data = asdict(self)
-        data['section_path'] = list(self.section_path)
-        return data
 
 
 def _normalize_text(value: Any) -> str:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -10,24 +12,35 @@ from typing import Any, TextIO
 import click
 from pydantic import ValidationError
 
+from ai_tour_guide import database
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.embedding import Embedder, FastEmbedder
+from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.ingestion.chunking import chunk_document
-from ai_tour_guide.ingestion.embedding import (
-    DEFAULT_BATCH_SIZE,
-    DEFAULT_MODEL_NAME,
-    EmbeddingError,
-    embed_chunks,
-)
+from ai_tour_guide.ingestion.embedding import embed_chunks
 from ai_tour_guide.ingestion.pdf.markdown import write_markdown
 from ai_tour_guide.ingestion.pdf.parser import (
     IngestionDocument,
-    IngestionSettings,
     PdfDownloadError,
     PdfParseError,
     download_pdf,
     parse_pdf,
 )
+from ai_tour_guide.ingestion.settings import IngestionSettings
 
 LOGGER = logging.getLogger(__name__)
+
+
+def calculate_file_sha256(path: Path) -> str:
+    """Return the SHA-256 checksum of a file's exact bytes."""
+    digest = hashlib.sha256()
+
+    with path.open('rb') as file:
+        for block in iter(lambda: file.read(1024 * 1024), b''):
+            digest.update(block)
+
+    return digest.hexdigest()
 
 
 def load_documents(source: TextIO) -> tuple[IngestionDocument, ...]:
@@ -79,23 +92,43 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
 
 
 def load_document_and_chunks_to_database(
-    document: IngestionDocument,
-    chunks: tuple[str, ...],
+    document: DocumentRecord,
+    chunks: Sequence[EmbeddedChunk],
 ) -> None:
-    """Mock database-loading step.
+    """Upsert one document and replace its associated chunks."""
+    with database.transaction() as transaction:
+        document_id = transaction.upsert_document(
+            document,
+            conflict_column='pdf_url',
+        )
 
-    Replace this function with the real persistence or vector-store adapter.
-    """
-    LOGGER.info(
-        'Mock database load for %s: %d chunk(s)',
-        document.title,
-        len(chunks),
-    )
+        chunk_rows = [
+            {
+                'document_id': document_id,
+                **chunk,
+            }
+            for chunk in chunks
+        ]
+
+        current_chunk_ids = [str(chunk['chunk_id']) for chunk in chunks]
+
+        # Prevent obsolete chunks from remaining after re-ingestion.
+        transaction.delete_stale_chunks(
+            document_id=document_id,
+            current_chunk_ids=current_chunk_ids,
+        )
+
+        transaction.upsert_chunks(
+            chunk_rows,
+            conflict_columns=('document_id', 'chunk_id'),
+        )
 
 
 def ingest_document(
     document: IngestionDocument,
     settings: IngestionSettings,
+    embedder: Embedder,
+    embedding_batch_size: int,
 ) -> None:
     """Execute every ingestion step for one source PDF."""
     filename_stem = document.filename_stem
@@ -116,6 +149,17 @@ def ingest_document(
         pdf_output_path,
         timeout_seconds=settings.timeout,
     )
+    source_checksum = calculate_file_sha256(pdf_path)
+
+    # TODO
+    # existing = repository.find_document(
+    #     collection=collection_name,
+    #     source_url=document.pdf_url,
+    # )
+
+    # if existing and existing.source_checksum == source_checksum:
+    #     LOGGER.info('Skipping unchanged document: %s', document.pdf_url)
+    #     return
 
     # 2. Parse the downloaded PDF.
     parsed_pdf = parse_pdf(document)
@@ -140,10 +184,9 @@ def ingest_document(
 
     # 5. Generate embeddings.
     embedding_result = embed_chunks(
-        chunk_records,
-        model_name=settings.embedding_model,
-        batch_size=settings.embedding_batch_size,
-        normalize=settings.embedding_normalize,
+        [chunk.to_dict() for chunk in chunk_records],
+        embedder=embedder,
+        batch_size=embedding_batch_size,
     )
 
     LOGGER.info(
@@ -154,8 +197,15 @@ def ingest_document(
     )
 
     # 6. Upload the document and its embedded chunks.
+    document_record = DocumentRecord(
+        metadata=parsed_pdf.metadata,
+        # collection=collection_name,
+        # version=document_version,
+        source_checksum=source_checksum,
+    )
+
     load_document_and_chunks_to_database(
-        document=parsed_pdf.metadata.to_dict(),
+        document=document_record,
         chunks=embedding_result.chunks,
     )
 
@@ -190,32 +240,39 @@ def ingest_document(
     help='Enable or disable debug logging. Overrides INGESTION_VERBOSE.',
 )
 def main(
-    document: TextIO,
+    documents_list: TextIO,
     tmp_folder: Path | None,
     timeout: float | None,
     verbose: bool | None,
 ) -> None:
     """Download and parse the PDFs described by DOCUMENT.
 
-    DOCUMENT is a JSON file path containing either one document object or an
+    DOCUMENTS_LIST is a JSON file path containing either one document object or an
     array of document objects. Use '-' to read JSON from stdin.
     """
     try:
-        ingestion_documents = load_documents(document)
-        settings = load_settings(
+        ingestion_documents = load_documents(documents_list)
+        ingestion_settings = load_settings(
             tmp_folder=tmp_folder,
             timeout=timeout,
             verbose=verbose,
         )
+
     except (ValueError, ValidationError) as exc:
         raise click.ClickException(f'Invalid ingestion configuration:\n{exc}') from exc
 
     logging.basicConfig(
-        level=logging.DEBUG if settings.verbose else logging.INFO,
+        level=logging.DEBUG if ingestion_settings.verbose else logging.INFO,
         format='%(levelname)s: %(message)s',
     )
 
     document_count = len(ingestion_documents)
+
+    embedding_settings = EmbeddingSettings()
+    embedder = FastEmbedder(
+        model_name=embedding_settings.model_name,
+        normalize=embedding_settings.normalize,
+    )
 
     # Process each source PDF sequentially. A document completes all ingestion
     # steps before the next document starts.
@@ -229,7 +286,12 @@ def main(
         )
 
         try:
-            ingest_document(ingestion_document, settings)
+            ingest_document(
+                ingestion_document,
+                ingestion_settings,
+                embedder,
+                embedding_settings.batch_size,
+            )
         except (PdfDownloadError, PdfParseError, OSError) as exc:
             raise click.ClickException(
                 f'Failed to ingest document {index}/{document_count} '

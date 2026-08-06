@@ -10,10 +10,6 @@ import numpy as np
 from .interfaces import Embedder, EmbeddingError, EmbeddingMetadata
 
 
-DEFAULT_MODEL_NAME = 'BAAI/bge-small-en-v1.5'
-DEFAULT_BATCH_SIZE = 32
-
-
 class FastEmbedder(Embedder):
     """Embed passages and queries with FastEmbed and explicit normalization.
 
@@ -23,7 +19,7 @@ class FastEmbedder(Embedder):
 
     def __init__(
         self,
-        model_name: str = DEFAULT_MODEL_NAME,
+        model_name: str,
         *,
         normalize: bool = True,
         model: Any | None = None,
@@ -66,7 +62,7 @@ class FastEmbedder(Embedder):
         self,
         texts: Sequence[str],
         *,
-        batch_size: int = DEFAULT_BATCH_SIZE,
+        batch_size: int,
     ) -> np.ndarray:
         """Embed document passages and return a float32 matrix."""
         if batch_size <= 0:
