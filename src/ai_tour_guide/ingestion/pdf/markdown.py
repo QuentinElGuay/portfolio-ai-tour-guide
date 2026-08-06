@@ -1,7 +1,5 @@
 """Markdown exporter for structured tourism-guide PDFs."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from ai_tour_guide.ingestion.pdf.parser import ParsedPdf, ParsedSection

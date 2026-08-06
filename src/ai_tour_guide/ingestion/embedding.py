@@ -13,8 +13,6 @@ Model loading, inference, and vector normalization are delegated to the shared
 implementation.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 from collections.abc import Sequence

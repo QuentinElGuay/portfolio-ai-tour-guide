@@ -1,8 +1,6 @@
 """Command-line interface for downloading and parsing a tourism guide."""
 
-from __future__ import annotations
-
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 import hashlib
 import json
 import logging

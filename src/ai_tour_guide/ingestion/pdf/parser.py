@@ -1,7 +1,5 @@
 """Core PDF download and structured parsing logic."""
 
-from __future__ import annotations
-
 import json
 import re
 from collections import Counter, defaultdict

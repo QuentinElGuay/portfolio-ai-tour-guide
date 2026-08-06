@@ -5,8 +5,6 @@ than on a specific inference library. This ensures that document and query
 vectors use the same model configuration and normalization behavior.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
