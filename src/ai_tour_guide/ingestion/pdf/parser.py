@@ -1,7 +1,5 @@
 """Core PDF download and structured parsing logic."""
 
-from __future__ import annotations
-
 import json
 import re
 from collections import Counter, defaultdict
@@ -17,8 +15,6 @@ from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import httpx
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 import pymupdf
 
 from ai_tour_guide.domain.documents import DocumentMetadata
