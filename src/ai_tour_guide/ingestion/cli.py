@@ -10,6 +10,13 @@ from typing import Any, TextIO
 import click
 from pydantic import ValidationError
 
+from ai_tour_guide.ingestion.chunking import chunk_document
+from ai_tour_guide.ingestion.embedding import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MODEL_NAME,
+    EmbeddingError,
+    embed_chunks,
+)
 from ai_tour_guide.ingestion.pdf.markdown import write_markdown
 from ai_tour_guide.ingestion.pdf.parser import (
     IngestionDocument,
@@ -71,17 +78,7 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
     return IngestionSettings(**overrides)
 
 
-def chunk_document_text(text: str) -> tuple[str, ...]:
-    """Mock document chunking step.
-
-    Replace this implementation with the project's real chunking strategy.
-    For now, the complete parsed text is returned as a single chunk.
-    """
-    normalized_text = text.strip()
-    return (normalized_text,) if normalized_text else ()
-
-
-def load_chunks_to_database(
+def load_document_and_chunks_to_database(
     document: IngestionDocument,
     chunks: tuple[str, ...],
 ) -> None:
@@ -123,27 +120,53 @@ def ingest_document(
     # 2. Parse the downloaded PDF.
     parsed_pdf = parse_pdf(document)
 
-    # 3. Write generated artifacts.
-    text_output_path = output_paths['text']
-    text_output_path.write_text(parsed_pdf.text, encoding='utf-8')
+    # 3. Write debugging/intermediate artifacts.
+    output_paths['text'].write_text(parsed_pdf.text, encoding='utf-8')
+    write_markdown(parsed_pdf, output_paths['markdown'])
+    parsed_pdf.write_json(output_paths['json'])
 
-    markdown_output_path = output_paths['markdown']
-    write_markdown(parsed_pdf, markdown_output_path)
+    # 4. Produce structure-aware chunks.
+    chunk_objects = chunk_document(parsed_pdf.to_dict())
+    chunk_records = [chunk.to_dict() for chunk in chunk_objects]
 
-    json_output_path = output_paths['json']
-    parsed_pdf.write_json(json_output_path)
+    if not chunk_records:
+        raise ValueError(
+            f'No chunks were produced for document {document.title!r}'
+        )
 
-    # 4. Chunk the parsed text and load the chunks into the database.
-    chunks = chunk_document_text(parsed_pdf.text)
-    load_chunks_to_database(document, chunks)
+    LOGGER.info(
+        'Generated %d chunks for %s',
+        len(chunk_records),
+        document.title,
+    )
+
+    # 5. Generate embeddings.
+    embedding_result = embed_chunks(
+        chunk_records,
+        model_name=settings.embedding_model,
+        batch_size=settings.embedding_batch_size,
+        normalize=settings.embedding_normalize,
+    )
+
+    LOGGER.info(
+        'Embedded %d chunks using %s (%d dimensions)',
+        len(embedding_result.chunks),
+        embedding_result.model_name,
+        embedding_result.dimensions,
+    )
+
+    # 6. Upload the document and its embedded chunks.
+    load_document_and_chunks_to_database(
+        document=parsed_pdf.metadata.to_dict(),
+        chunks=embedding_result.chunks,
+    )
 
     LOGGER.info('Downloaded PDF to %s', pdf_path)
     LOGGER.info(
-        'Extracted %d pages to %s',
+        'Ingested %d pages and %d chunks',
         parsed_pdf.metadata.page_count,
-        text_output_path,
+        len(embedding_result.chunks),
     )
-
 
 @click.command()
 @click.argument(
