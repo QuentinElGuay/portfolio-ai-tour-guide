@@ -137,9 +137,7 @@ class FastEmbedder(Embedder):
 
         for index, text in enumerate(texts):
             if not isinstance(text, str) or not text.strip():
-                raise ValueError(
-                    f'{label} text {index} must be a non-empty string'
-                )
+                raise ValueError(f'{label} text {index} must be a non-empty string')
             validated.append(text)
 
         return validated
@@ -155,8 +153,7 @@ class FastEmbedder(Embedder):
 
         if matrix.ndim != 2:
             raise EmbeddingError(
-                f'{context} embedding output must be a matrix; '
-                f'got shape {matrix.shape}'
+                f'{context} embedding output must be a matrix; got shape {matrix.shape}'
             )
 
         if matrix.shape[0] != expected_count:
@@ -166,9 +163,7 @@ class FastEmbedder(Embedder):
             )
 
         if matrix.shape[1] == 0:
-            raise EmbeddingError(
-                f'{context} embedding output contains empty vectors'
-            )
+            raise EmbeddingError(f'{context} embedding output contains empty vectors')
 
         if not np.isfinite(matrix).all():
             raise EmbeddingError(

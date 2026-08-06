@@ -130,9 +130,7 @@ def ingest_document(
     chunk_records = [chunk.to_dict() for chunk in chunk_objects]
 
     if not chunk_records:
-        raise ValueError(
-            f'No chunks were produced for document {document.title!r}'
-        )
+        raise ValueError(f'No chunks were produced for document {document.title!r}')
 
     LOGGER.info(
         'Generated %d chunks for %s',
@@ -167,6 +165,7 @@ def ingest_document(
         parsed_pdf.metadata.page_count,
         len(embedding_result.chunks),
     )
+
 
 @click.command()
 @click.argument(

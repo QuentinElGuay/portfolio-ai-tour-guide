@@ -64,22 +64,15 @@ def _validate_chunk_records(
         chunk = dict(raw_chunk)
         chunk_id = chunk.get('chunk_id')
         if not isinstance(chunk_id, str) or not chunk_id.strip():
-            raise ValueError(
-                f'Chunk {index} must contain a non-empty chunk_id'
-            )
+            raise ValueError(f'Chunk {index} must contain a non-empty chunk_id')
 
         if chunk_id in seen_chunk_ids:
             raise ValueError(f'Duplicate chunk_id: {chunk_id}')
         seen_chunk_ids.add(chunk_id)
 
         embedding_text = chunk.get('embedding_text')
-        if (
-            not isinstance(embedding_text, str)
-            or not embedding_text.strip()
-        ):
-            raise ValueError(
-                f'Chunk {chunk_id} must contain non-empty embedding_text'
-            )
+        if not isinstance(embedding_text, str) or not embedding_text.strip():
+            raise ValueError(f'Chunk {chunk_id} must contain non-empty embedding_text')
 
         validated.append(chunk)
 
@@ -108,8 +101,7 @@ def _validate_embedding_batch(
 
     if matrix.ndim != 2:
         raise EmbeddingError(
-            'The embedding model returned a non-matrix result: '
-            f'shape={matrix.shape}'
+            f'The embedding model returned a non-matrix result: shape={matrix.shape}'
         )
 
     if matrix.shape[0] != expected_count:
