@@ -1,4 +1,3 @@
-
 from sqlalchemy import text
 
 from ai_tour_guide.database.connection import create_database_engine

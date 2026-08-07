@@ -104,7 +104,7 @@ def embed_document_stage(
 ) -> EmbeddedDocumentArtifact:
     """Attach embeddings and their complete model metadata to every chunk."""
     initial_metadata = embedder.metadata
-    result = embed_chunks(
+    embedded_chunks = embed_chunks(
         chunked.chunks,
         model_name=initial_metadata.model_name,
         batch_size=batch_size,
@@ -113,7 +113,8 @@ def embed_document_stage(
     )
     return EmbeddedDocumentArtifact(
         document=chunked.document,
-        chunks=result.chunks,
+        chunks=embedded_chunks.chunks,
+        chunking=chunked.chunking,
         embedding=embedder.metadata,
     )
 
@@ -125,6 +126,7 @@ def load_document_stage(embedded: EmbeddedDocumentArtifact) -> int:
     return database.insert_document_with_chunks(
         embedded.document,
         embedded.chunks,
+        embedded.chunking,
         embedded.embedding,
     )
 

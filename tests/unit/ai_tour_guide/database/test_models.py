@@ -3,6 +3,8 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import inspect
 
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
 from ai_tour_guide.database.models import (
@@ -44,6 +46,10 @@ def _document_record(
     )
 
 
+def _chunking_metadata() -> ChunkingMetadata:
+    return ChunkingMetadata(target_chars=750, max_chars=1_000)
+
+
 def _embedded_chunk() -> EmbeddedChunk:
     return EmbeddedChunk(
         chunk=Chunk(
@@ -66,6 +72,7 @@ def test_create_document_preserves_document_field_names() -> None:
     row = ModelFactory.create_document(
         _document_record(),
         embedding_model_id=7,
+        chunking=_chunking_metadata(),
     )
 
     assert isinstance(row, DocumentRow)
@@ -93,6 +100,7 @@ def test_create_document_attaches_mapped_chunk_rows() -> None:
         _document_record(),
         embedding_model_id=7,
         chunks=[_embedded_chunk()],
+        chunking=_chunking_metadata(),
     )
 
     assert len(row.chunks) == 1
@@ -129,6 +137,7 @@ def test_document_collection_is_optional() -> None:
     row = ModelFactory.create_document(
         _document_record(collection=None),
         embedding_model_id=7,
+        chunking=_chunking_metadata(),
     )
 
     assert row.collection is None

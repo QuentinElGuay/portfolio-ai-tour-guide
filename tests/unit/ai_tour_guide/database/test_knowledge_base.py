@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
 from ai_tour_guide.database.knowledge_base import (
@@ -40,6 +42,10 @@ def _document_record(*, collection: str | None = None) -> DocumentRecord:
         source_checksum='document-sha256',
         collection=collection,
     )
+
+
+def _chunking_metadata() -> ChunkingMetadata:
+    return ChunkingMetadata(target_chars=750, max_chars=1_000)
 
 
 def _embedded_chunk() -> EmbeddedChunk:
@@ -78,6 +84,7 @@ def test_insert_document_rejects_an_existing_document_without_changes() -> None:
             session,
             _document_record(),
             [_embedded_chunk()],
+            _chunking_metadata(),
             embedding_model_id=7,
         )
 
@@ -93,6 +100,7 @@ def test_insert_document_rejects_a_document_without_chunks() -> None:
             session,
             _document_record(),
             [],
+            _chunking_metadata(),
             embedding_model_id=7,
         )
 
@@ -109,6 +117,7 @@ def test_insert_document_adds_the_complete_aggregate() -> None:
         session,
         _document_record(collection='tour-guides'),
         [_embedded_chunk()],
+        _chunking_metadata(),
         embedding_model_id=7,
     )
 

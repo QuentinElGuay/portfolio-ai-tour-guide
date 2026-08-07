@@ -22,6 +22,7 @@ from ai_tour_guide.database.tables import (
 )
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 
 class Base(DeclarativeBase):
@@ -166,6 +167,7 @@ class ModelFactory:
         document: DocumentRecord,
         *,
         embedding_model_id: int,
+        chunking: ChunkingMetadata,
         chunks: Sequence[EmbeddedChunk] = (),
     ) -> DocumentRow:
         """Create a document row with child chunk rows ready for a session.
@@ -195,6 +197,8 @@ class ModelFactory:
             source_page_count=metadata.source_page_count,
             page_count=metadata.page_count,
             source_checksum=document.source_checksum,
+            target_chunk_chars=chunking.target_chars,
+            max_chunk_chars=chunking.max_chars,
         )
         row.chunks = [ModelFactory.create_chunk(chunk) for chunk in chunks]
         return row
