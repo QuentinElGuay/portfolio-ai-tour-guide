@@ -7,7 +7,8 @@ Degemer mat ("Welcome" in Breton)!
 This project builds an AI tour guide for Brittany, France, using **Retrieval-Augmented
 Generation (RAG)** to answer travelers' questions from official tourism guides.
 
-> [!IMPORTANT] 🚧 This project is under **<ins>active development</ins>.**
+> [!IMPORTANT]
+> 🚧 This project is under **<ins>active development</ins>.**
 
 ## Table of Contents
 
@@ -48,7 +49,8 @@ respective copyright holder. It is not redistributed as part of this repository.
 
 ## Prerequisites
 
-> [!NOTE] Running the project directly in `Docker Codespaces` allow for an execution
+> [!NOTE]
+> Running the project directly in `Docker Codespaces` allow for an execution
 > without any installation.
 
 The recommended Docker workflow requires:
@@ -211,7 +213,8 @@ Run `make` or `make help` to list the available shortcuts.
 | `make export-csv CSV_LIMIT=100`      | Limit each CSV export to 100 data rows.                                |
 | `make export-csv EXPORT_DIR=path`    | Write the CSV exports to another directory.                            |
 
-> [!WARNING] `make reset-db` runs `docker compose down --volumes` and permanently
+> [!WARNING]
+> `make reset-db` runs `docker compose down --volumes` and permanently
 > deletes the project's PostgreSQL volume.
 
 CSV export creates `embedding_models.csv`, `documents.csv`, and `document_chunks.csv`.
