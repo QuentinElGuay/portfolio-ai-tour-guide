@@ -46,7 +46,7 @@ class EmbeddingModelRow(Base):
     distance_metric: Mapped[str]
     created_at: Mapped[datetime]
 
-    documents: Mapped[list['DocumentRow']] = relationship(
+    documents: Mapped[list[DocumentRow]] = relationship(
         back_populates='embedding_model',
     )
 
@@ -67,7 +67,7 @@ class DocumentRow(Base):
     __table__ = documents
 
     document_id: Mapped[int]
-    embedding_model_id: Mapped[int | None]
+    embedding_model_id: Mapped[int]
     collection: Mapped[str]
     version: Mapped[str | None]
     title: Mapped[str]
@@ -96,10 +96,10 @@ class DocumentRow(Base):
     embedded_at: Mapped[datetime | None]
     created_at: Mapped[datetime]
 
-    embedding_model: Mapped['EmbeddingModelRow | None'] = relationship(
+    embedding_model: Mapped[EmbeddingModelRow] = relationship(
         back_populates='documents',
     )
-    chunks: Mapped[list['DocumentChunkRow']] = relationship(
+    chunks: Mapped[list[DocumentChunkRow]] = relationship(
         back_populates='document',
         cascade='all, delete-orphan',
         passive_deletes=True,
@@ -123,7 +123,6 @@ class DocumentChunkRow(Base):
 
     __table__ = document_chunks
 
-    document_chunk_id: Mapped[int]
     document_id: Mapped[int]
     chunk_id: Mapped[str]
     chunk_index: Mapped[int]
@@ -147,7 +146,6 @@ class DocumentChunkRow(Base):
     def __repr__(self) -> str:
         return (
             'DocumentChunkRow('
-            f'document_chunk_id={self.document_chunk_id!r}, '
             f'document_id={self.document_id!r}, '
             f'chunk_id={self.chunk_id!r}, '
             f'chunk_index={self.chunk_index!r}'
@@ -165,6 +163,8 @@ class ModelFactory:
     @staticmethod
     def create_document(
         document: DocumentRecord,
+        *,
+        embedding_model_id: int,
         chunks: Sequence[EmbeddedChunk] = (),
     ) -> DocumentRow:
         """Create a document row with child chunk rows ready for a session.
@@ -176,6 +176,7 @@ class ModelFactory:
         metadata = document.metadata
 
         row = DocumentRow(
+            embedding_model_id=embedding_model_id,
             collection=document.collection,
             version=document.version,
             title=metadata.title,
