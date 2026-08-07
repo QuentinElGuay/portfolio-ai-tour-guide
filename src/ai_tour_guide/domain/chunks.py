@@ -27,8 +27,8 @@ class Chunk:
         if self.chunk_index < 0:
             raise ValueError('chunk_index must not be negative')
 
-        if self.character_count < 0:
-            raise ValueError('character_count must not be negative')
+        if self.character_count <= 0:
+            raise ValueError('character_count must be greater than zero')
 
         if self.page_start is not None and self.page_start < 1:
             raise ValueError('page_start must be positive')

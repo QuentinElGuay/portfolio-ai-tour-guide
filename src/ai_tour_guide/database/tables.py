@@ -1,4 +1,3 @@
-
 import os
 
 from pgvector.sqlalchemy import VECTOR
@@ -129,6 +128,15 @@ documents = Table(
         ForeignKey('embedding_models.embedding_model_id'),
     ),
     Column(
+        'collection',
+        Text,
+        nullable=False,
+    ),
+    Column(
+        'version',
+        Text,
+    ),
+    Column(
         'title',
         Text,
         nullable=False,
@@ -241,6 +249,19 @@ documents = Table(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+    ),
+    UniqueConstraint(
+        'collection',
+        'pdf_url',
+        name='uq_documents_collection_pdf_url',
+    ),
+    CheckConstraint(
+        "btrim(collection) <> ''",
+        name='ck_documents_collection_not_empty',
+    ),
+    CheckConstraint(
+        "version IS NULL OR btrim(version) <> ''",
+        name='ck_documents_version_not_empty',
     ),
     CheckConstraint(
         'source_page_count IS NULL OR source_page_count > 0',
