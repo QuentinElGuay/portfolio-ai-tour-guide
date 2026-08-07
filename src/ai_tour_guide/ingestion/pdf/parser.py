@@ -2,15 +2,15 @@
 
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, fields
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
-import unicodedata
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -51,7 +51,7 @@ class IngestionDocument:
     """
 
     title: str
-    pdf_url: str
+    source_url: str
     excluded_leading_pages: int = 3
     excluded_trailing_pages: int = 2
     authors: list[str] | None = None
@@ -62,15 +62,15 @@ class IngestionDocument:
 
     def __post_init__(self) -> None:
         if not isinstance(self.title, str):
-            raise ValueError('title must be a string')
+            raise TypeError('title must be a string')
         if not self.title.strip():
             raise ValueError('title must not be empty')
 
         normalize_filename_stem(self.title)
 
-        parsed_url = urlparse(self.pdf_url)
+        parsed_url = urlparse(self.source_url)
         if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
-            raise ValueError('pdf_url must be a valid HTTP or HTTPS URL')
+            raise ValueError('source_url must be a valid HTTP or HTTPS URL')
 
         if self.excluded_leading_pages < 0:
             raise ValueError(
@@ -399,7 +399,7 @@ def parse_pdf(
         download_directory=download_directory,
     )
     downloaded_path = download_pdf(
-        document.pdf_url,
+        document.source_url,
         destination,
         timeout_seconds=timeout_seconds,
         client=client,
@@ -410,8 +410,8 @@ def parse_pdf(
 
 def _validate_ingestion_document(document: IngestionDocument) -> None:
     """Validate ingestion metadata and parser configuration."""
-    if not document.pdf_url.strip():
-        raise ValueError('document.pdf_url cannot be empty')
+    if not document.source_url.strip():
+        raise ValueError('document.source_url cannot be empty')
 
     if document.excluded_leading_pages < 0:
         raise ValueError('document.excluded_leading_pages cannot be negative')
@@ -438,7 +438,7 @@ def _build_pdf_destination(
     title_for_filename = _clean_optional_text(document.title) or 'document'
     safe_title = re.sub(r'[^\w.-]+', '-', title_for_filename, flags=re.UNICODE)
     safe_title = safe_title.strip('-_.')[:80] or 'document'
-    url_digest = sha256(document.pdf_url.encode('utf-8')).hexdigest()[:12]
+    url_digest = sha256(document.source_url.encode('utf-8')).hexdigest()[:12]
 
     return download_directory / f'{safe_title}-{url_digest}.pdf'
 
@@ -739,10 +739,7 @@ def _should_insert_space(previous: str, current: str) -> bool:
         return False
     if previous.endswith(tuple(no_space_after)):
         return False
-    if previous.endswith(('-', '–', '—', '/', "'", '’')):
-        return False
-
-    return True
+    return not previous.endswith(('-', '–', '—', '/', "'", '’'))
 
 
 def _join_span_text(
@@ -1264,7 +1261,7 @@ def _resolve_pdf_metadata(
 
     return DocumentMetadata(
         title=_clean_optional_text(document.title) or embedded_title,
-        source_url=document.pdf_url.strip(),
+        source_url=document.source_url.strip(),
         publisher=(_clean_optional_text(document.publisher) or embedded_publisher),
         publication_date=(
             document.publication_date
@@ -1276,8 +1273,10 @@ def _resolve_pdf_metadata(
         creator=_metadata_value(pdf_metadata, 'Creator'),
         producer=_metadata_value(pdf_metadata, 'Producer'),
         format=_metadata_value(pdf_metadata, 'Format'),
-        creation_date=embedded_creation_date,
-        modification_date=_metadata_value(pdf_metadata, 'Moddate'),
+        creation_date=_parse_pdf_metadata_datetime(embedded_creation_date),
+        modification_date=_parse_pdf_metadata_datetime(
+            _metadata_value(pdf_metadata, 'Moddate')
+        ),
         source_page_count=source_page_count,
         page_count=page_count,
     )
@@ -1446,6 +1445,73 @@ def _parse_pdf_metadata_date(value: str | None) -> date | None:
         return date(year, month, day)
     except ValueError:
         return None
+
+
+_PDF_METADATA_DATETIME_RE = re.compile(
+    r'^(?:D:)?'
+    r'(?P<year>\d{4})'
+    r'(?P<month>\d{2})?'
+    r'(?P<day>\d{2})?'
+    r'(?P<hour>\d{2})?'
+    r'(?P<minute>\d{2})?'
+    r'(?P<second>\d{2})?'
+    r'(?P<zone>Z|(?P<sign>[+-])(?P<zone_hour>\d{2})'
+    r"(?:'?(?P<zone_minute>\d{2})'?)?)$"
+)
+
+
+def _parse_pdf_metadata_datetime(value: str | None) -> datetime | None:
+    """Parse an explicitly zoned source timestamp and normalize it to UTC.
+
+    PDF date strings and ISO-8601 timestamps are accepted. A timestamp without
+    an explicit timezone is discarded because its absolute time cannot be
+    established reliably during ingestion.
+    """
+    value = _clean_optional_text(value)
+    if value is None:
+        return None
+
+    match = _PDF_METADATA_DATETIME_RE.fullmatch(value)
+    if match is not None:
+        zone = match.group('zone')
+        if zone == 'Z':
+            tzinfo = UTC
+        else:
+            offset = timedelta(
+                hours=int(match.group('zone_hour')),
+                minutes=int(match.group('zone_minute') or 0),
+            )
+            if match.group('sign') == '-':
+                offset = -offset
+            try:
+                tzinfo = timezone(offset)
+            except ValueError:
+                return None
+
+        try:
+            parsed = datetime(
+                year=int(match.group('year')),
+                month=int(match.group('month') or 1),
+                day=int(match.group('day') or 1),
+                hour=int(match.group('hour') or 0),
+                minute=int(match.group('minute') or 0),
+                second=int(match.group('second') or 0),
+                tzinfo=tzinfo,
+            )
+        except ValueError:
+            return None
+
+        return parsed.astimezone(UTC)
+
+    try:
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+
+    return parsed.astimezone(UTC)
 
 
 def _normalise_metadata(

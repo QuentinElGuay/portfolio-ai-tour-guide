@@ -97,7 +97,7 @@ def load_document_and_chunks_to_database(
     with database.transaction() as transaction:
         document_id = transaction.upsert_document(
             document,
-            conflict_column='pdf_url',
+            conflict_column='source_url',
         )
 
         chunk_rows = [
@@ -143,7 +143,7 @@ def ingest_document(
     # 1. Download the source PDF.
     pdf_output_path = output_paths['pdf']
     pdf_path = download_pdf(
-        document.pdf_url,
+        document.source_url,
         pdf_output_path,
         timeout_seconds=settings.timeout,
     )
@@ -152,11 +152,11 @@ def ingest_document(
     # TODO
     # existing = repository.find_document(
     #     collection=collection_name,
-    #     source_url=document.pdf_url,
+    #     source_url=document.source_url,
     # )
 
     # if existing and existing.source_checksum == source_checksum:
-    #     LOGGER.info('Skipping unchanged document: %s', document.pdf_url)
+    #     LOGGER.info('Skipping unchanged document: %s', document.source_url)
     #     return
 
     # 2. Parse the downloaded PDF.
@@ -280,7 +280,7 @@ def main(
             index,
             document_count,
             ingestion_document.title,
-            ingestion_document.pdf_url,
+            ingestion_document.source_url,
         )
 
         try:
@@ -294,7 +294,7 @@ def main(
             raise click.ClickException(
                 f'Failed to ingest document {index}/{document_count} '
                 f'({ingestion_document.title}, '
-                f'{ingestion_document.pdf_url}): {exc}'
+                f'{ingestion_document.source_url}): {exc}'
             ) from exc
 
 

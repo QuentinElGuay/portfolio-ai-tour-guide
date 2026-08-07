@@ -6,6 +6,7 @@ These classes map ORM behavior and relationships onto those existing
 single source of truth.
 """
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -15,8 +16,12 @@ from ai_tour_guide.database.tables import (
     document_chunks,
     documents,
     embedding_models,
+)
+from ai_tour_guide.database.tables import (
     metadata as table_metadata,
 )
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
 
 
 class Base(DeclarativeBase):
@@ -66,7 +71,7 @@ class DocumentRow(Base):
     collection: Mapped[str]
     version: Mapped[str | None]
     title: Mapped[str]
-    pdf_url: Mapped[str]
+    source_url: Mapped[str]
     publisher: Mapped[str | None]
     publication_date: Mapped[date | None]
     authors: Mapped[list[str]]
@@ -75,12 +80,12 @@ class DocumentRow(Base):
     language: Mapped[str | None]
     creator: Mapped[str | None]
     producer: Mapped[str | None]
-    pdf_format: Mapped[str | None]
-    pdf_creation_date: Mapped[str | None]
-    pdf_modification_date: Mapped[str | None]
+    format: Mapped[str | None]
+    creation_date: Mapped[datetime | None]
+    modification_date: Mapped[datetime | None]
     source_page_count: Mapped[int | None]
-    parsed_page_count: Mapped[int | None]
-    source_hash: Mapped[str | None]
+    page_count: Mapped[int | None]
+    source_checksum: Mapped[str | None]
     parser_version: Mapped[str | None]
     chunking_version: Mapped[str | None]
     target_chunk_chars: Mapped[int | None]
@@ -108,7 +113,7 @@ class DocumentRow(Base):
             f'collection={self.collection!r}, '
             f'version={self.version!r}, '
             f'title={self.title!r}, '
-            f'pdf_url={self.pdf_url!r}'
+            f'source_url={self.source_url!r}'
             ')'
         )
 
@@ -118,9 +123,9 @@ class DocumentChunkRow(Base):
 
     __table__ = document_chunks
 
-    chunk_id: Mapped[int]
+    document_chunk_id: Mapped[int]
     document_id: Mapped[int]
-    chunk_key: Mapped[str]
+    chunk_id: Mapped[str]
     chunk_index: Mapped[int]
     section_path: Mapped[list[str]]
     text: Mapped[str]
@@ -130,7 +135,7 @@ class DocumentChunkRow(Base):
     character_count: Mapped[int]
     token_count: Mapped[int | None]
     content_hash: Mapped[str | None]
-    embedding_input_hash: Mapped[str | None]
+    embedding_input_sha256: Mapped[str | None]
     embedding: Mapped[list[float] | None]
     search_vector: Mapped[Any]
     created_at: Mapped[datetime]
@@ -142,11 +147,72 @@ class DocumentChunkRow(Base):
     def __repr__(self) -> str:
         return (
             'DocumentChunkRow('
-            f'chunk_id={self.chunk_id!r}, '
+            f'document_chunk_id={self.document_chunk_id!r}, '
             f'document_id={self.document_id!r}, '
-            f'chunk_key={self.chunk_key!r}, '
+            f'chunk_id={self.chunk_id!r}, '
             f'chunk_index={self.chunk_index!r}'
             ')'
+        )
+
+
+class ModelFactory:
+    """Create transient ORM rows from ingestion domain objects.
+
+    The factory unwraps nested domain values and converts immutable tuples to
+    mutable lists suitable for PostgreSQL array and vector columns.
+    """
+
+    @staticmethod
+    def create_document(
+        document: DocumentRecord,
+        chunks: Sequence[EmbeddedChunk] = (),
+    ) -> DocumentRow:
+        """Create a document row with child chunk rows ready for a session.
+
+        Primary keys and timestamps are omitted so PostgreSQL can generate
+        them. Adding the returned row to a session also persists its chunks
+        through the configured ``save-update`` relationship cascade.
+        """
+        metadata = document.metadata
+
+        row = DocumentRow(
+            collection=document.collection,
+            version=document.version,
+            title=metadata.title,
+            source_url=metadata.source_url,
+            publisher=metadata.publisher,
+            publication_date=metadata.publication_date,
+            authors=list(metadata.authors),
+            subject=metadata.subject,
+            keywords=list(metadata.keywords),
+            creator=metadata.creator,
+            producer=metadata.producer,
+            format=metadata.format,
+            creation_date=metadata.creation_date,
+            modification_date=metadata.modification_date,
+            source_page_count=metadata.source_page_count,
+            page_count=metadata.page_count,
+            source_checksum=document.source_checksum,
+        )
+        row.chunks = [ModelFactory.create_chunk(chunk) for chunk in chunks]
+        return row
+
+    @staticmethod
+    def create_chunk(chunk: EmbeddedChunk) -> DocumentChunkRow:
+        """Create a chunk row to attach to a :class:`DocumentRow`."""
+        source = chunk.chunk
+
+        return DocumentChunkRow(
+            chunk_id=source.chunk_id,
+            chunk_index=source.chunk_index,
+            section_path=list(source.section_path),
+            text=source.text,
+            embedding_text=source.embedding_text,
+            page_start=source.page_start,
+            page_end=source.page_end,
+            character_count=source.character_count,
+            embedding_input_sha256=chunk.embedding_input_sha256,
+            embedding=list(chunk.embedding),
         )
 
 
@@ -155,4 +221,5 @@ __all__ = [
     'DocumentChunkRow',
     'DocumentRow',
     'EmbeddingModelRow',
+    'ModelFactory',
 ]
