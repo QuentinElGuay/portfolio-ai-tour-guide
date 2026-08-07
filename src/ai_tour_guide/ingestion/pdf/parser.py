@@ -2,15 +2,15 @@
 
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, fields
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 from hashlib import sha256
+from itertools import pairwise
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
-import unicodedata
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -18,6 +18,7 @@ import httpx
 import pymupdf
 
 from ai_tour_guide.domain.documents import DocumentMetadata
+from ai_tour_guide.ingestion.pdf.downloader import download_pdf
 
 OUTPUT_SUFFIXES = {'.pdf', '.md', '.txt', '.json'}
 
@@ -35,10 +36,6 @@ MIN_VERTICAL_OVERLAP_RATIO = 0.6
 DEFAULT_DOWNLOAD_DIRECTORY = Path('.cache/pdf-ingestion')
 
 
-class PdfDownloadError(RuntimeError):
-    """Raised when a PDF cannot be downloaded or validated."""
-
-
 class PdfParseError(RuntimeError):
     """Raised when a downloaded file cannot be parsed as a PDF."""
 
@@ -51,7 +48,8 @@ class IngestionDocument:
     """
 
     title: str
-    pdf_url: str
+    source_url: str
+    collection: str | None = None
     excluded_leading_pages: int = 3
     excluded_trailing_pages: int = 2
     authors: list[str] | None = None
@@ -62,15 +60,23 @@ class IngestionDocument:
 
     def __post_init__(self) -> None:
         if not isinstance(self.title, str):
-            raise ValueError('title must be a string')
+            raise TypeError('title must be a string')
         if not self.title.strip():
             raise ValueError('title must not be empty')
 
         normalize_filename_stem(self.title)
 
-        parsed_url = urlparse(self.pdf_url)
+        parsed_url = urlparse(self.source_url)
         if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
-            raise ValueError('pdf_url must be a valid HTTP or HTTPS URL')
+            raise ValueError('source_url must be a valid HTTP or HTTPS URL')
+
+        if self.collection is not None:
+            if not isinstance(self.collection, str):
+                raise TypeError('collection must be a string or None')
+            collection = self.collection.strip()
+            if not collection:
+                raise ValueError('collection must not be empty')
+            object.__setattr__(self, 'collection', collection)
 
         if self.excluded_leading_pages < 0:
             raise ValueError(
@@ -291,6 +297,7 @@ class ParsedPdf:
         """Serialize the parsed document as JSON."""
         return json.dumps(
             self.to_dict(),
+            default=str,
             ensure_ascii=ensure_ascii,
             indent=indent,
         )
@@ -310,72 +317,6 @@ class ParsedPdf:
             encoding='utf-8',
         )
         return destination
-
-
-def download_pdf(
-    url: str,
-    destination: Path,
-    *,
-    timeout_seconds: float = 30.0,
-    client: httpx.Client | None = None,
-) -> Path:
-    """Download *url* atomically to *destination* and validate its signature.
-
-    A temporary file is used so a failed or interrupted download does not
-    leave a partially written destination file behind.
-    """
-    destination = destination.expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    owns_client = client is None
-    http_client = client or httpx.Client(
-        follow_redirects=True,
-        timeout=httpx.Timeout(timeout_seconds),
-        headers={'User-Agent': 'portfolio-ai-tour-guide/0.1'},
-    )
-
-    temp_path: Path | None = None
-
-    try:
-        with http_client.stream('GET', url) as response:
-            response.raise_for_status()
-
-            content_type = response.headers.get('content-type', '').lower()
-            if content_type and 'pdf' not in content_type:
-                raise PdfDownloadError(
-                    f'Expected a PDF response, received {content_type!r}.'
-                )
-
-            with NamedTemporaryFile(
-                mode='wb',
-                delete=False,
-                dir=destination.parent,
-                suffix='.part',
-            ) as temp_file:
-                temp_path = Path(temp_file.name)
-
-                for chunk in response.iter_bytes(chunk_size=64 * 1024):
-                    temp_file.write(chunk)
-
-        if temp_path.stat().st_size == 0:
-            raise PdfDownloadError('The downloaded file is empty.')
-
-        with temp_path.open('rb') as file_handle:
-            if file_handle.read(5) != b'%PDF-':
-                raise PdfDownloadError('The downloaded file is not a valid PDF.')
-
-        temp_path.replace(destination)
-        return destination
-
-    except (httpx.HTTPError, OSError) as exc:
-        raise PdfDownloadError(f'Could not download PDF from {url}: {exc}') from exc
-
-    finally:
-        if temp_path is not None and temp_path.exists():
-            temp_path.unlink()
-
-        if owns_client:
-            http_client.close()
 
 
 def parse_pdf(
@@ -398,19 +339,19 @@ def parse_pdf(
         download_directory=download_directory,
     )
     downloaded_path = download_pdf(
-        document.pdf_url,
+        document.source_url,
         destination,
         timeout_seconds=timeout_seconds,
         client=client,
     )
 
-    return _parse_downloaded_pdf(downloaded_path, document=document)
+    return parse_downloaded_pdf(downloaded_path, document=document)
 
 
 def _validate_ingestion_document(document: IngestionDocument) -> None:
     """Validate ingestion metadata and parser configuration."""
-    if not document.pdf_url.strip():
-        raise ValueError('document.pdf_url cannot be empty')
+    if not document.source_url.strip():
+        raise ValueError('document.source_url cannot be empty')
 
     if document.excluded_leading_pages < 0:
         raise ValueError('document.excluded_leading_pages cannot be negative')
@@ -437,88 +378,43 @@ def _build_pdf_destination(
     title_for_filename = _clean_optional_text(document.title) or 'document'
     safe_title = re.sub(r'[^\w.-]+', '-', title_for_filename, flags=re.UNICODE)
     safe_title = safe_title.strip('-_.')[:80] or 'document'
-    url_digest = sha256(document.pdf_url.encode('utf-8')).hexdigest()[:12]
+    url_digest = sha256(document.source_url.encode('utf-8')).hexdigest()[:12]
 
     return download_directory / f'{safe_title}-{url_digest}.pdf'
 
 
-def _parse_downloaded_pdf(
+def parse_downloaded_pdf(
     path: Path,
     *,
     document: IngestionDocument,
 ) -> ParsedPdf:
-    """Parse a downloaded PDF using its ingestion configuration."""
+    """Read an existing PDF file and delegate to the in-memory parser."""
     path = path.expanduser().resolve()
-
     if not path.is_file():
         raise PdfParseError(f'PDF file does not exist: {path}')
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise PdfParseError(f'Could not read PDF {path}: {exc}') from exc
+    return parse_pdf_bytes(content, document=document)
+
+
+def parse_pdf_bytes(
+    content: bytes,
+    *,
+    document: IngestionDocument,
+) -> ParsedPdf:
+    """Parse PDF bytes without creating an intermediary file."""
+    if not isinstance(content, bytes):
+        raise TypeError('content must be bytes')
+    if not content:
+        raise PdfParseError('The in-memory PDF is empty.')
+
+    _validate_ingestion_document(document)
 
     try:
-        with pymupdf.open(path) as pdf:
-            if pdf.needs_pass and pdf.authenticate('') <= 0:
-                raise PdfParseError('The PDF is encrypted and cannot be opened.')
-
-            source_page_count = pdf.page_count
-            first_page_index = document.excluded_leading_pages
-            last_page_index = source_page_count - document.excluded_trailing_pages
-
-            if first_page_index >= last_page_index:
-                raise PdfParseError(
-                    'The excluded leading and trailing pages would remove '
-                    'the entire PDF.'
-                )
-
-            retained_page_count = last_page_index - first_page_index
-            raw_lines = tuple(
-                line
-                for page_index in range(first_page_index, last_page_index)
-                for line in _extract_page_lines(
-                    pdf.load_page(page_index),
-                    document=document,
-                )
-            )
-
-            repeated_marginal_text = _find_repeated_marginal_text(
-                raw_lines,
-                page_count=retained_page_count,
-            )
-            lines = tuple(
-                line
-                for line in raw_lines
-                if not _is_repeated_marginal_line(
-                    line,
-                    repeated_marginal_text,
-                )
-            )
-
-            body_font_size = _estimate_body_font_size(lines)
-            heading_lines = _find_heading_lines(
-                lines,
-                body_font_size=body_font_size,
-            )
-            heading_levels = _build_heading_level_map(
-                lines,
-                heading_lines,
-                body_font_size=body_font_size,
-            )
-            flat_sections = _build_sections(
-                lines,
-                heading_lines=heading_lines,
-                heading_levels=heading_levels,
-                document=document,
-            )
-
-            sections = _nest_sections(flat_sections)
-            pdf_metadata = _normalise_metadata(pdf.metadata)
-            xmp_authors = _extract_xmp_authors(pdf)
-            metadata = _resolve_pdf_metadata(
-                document,
-                pdf_metadata=pdf_metadata,
-                xmp_authors=xmp_authors,
-                source_page_count=source_page_count,
-                page_count=retained_page_count,
-            )
-
+        with pymupdf.open(stream=content, filetype='pdf') as pdf:
+            return _parse_open_pdf(pdf, document=document)
     except PdfParseError:
         raise
     except (
@@ -527,7 +423,77 @@ def _parse_downloaded_pdf(
         RuntimeError,
         ValueError,
     ) as exc:
-        raise PdfParseError(f'Could not parse PDF {path}: {exc}') from exc
+        raise PdfParseError(f'Could not parse PDF from memory: {exc}') from exc
+
+
+def _parse_open_pdf(
+    pdf: pymupdf.Document,
+    *,
+    document: IngestionDocument,
+) -> ParsedPdf:
+    """Parse an open PyMuPDF document using ingestion configuration."""
+    if pdf.needs_pass and pdf.authenticate('') <= 0:
+        raise PdfParseError('The PDF is encrypted and cannot be opened.')
+
+    source_page_count = pdf.page_count
+    first_page_index = document.excluded_leading_pages
+    last_page_index = source_page_count - document.excluded_trailing_pages
+
+    if first_page_index >= last_page_index:
+        raise PdfParseError(
+            'The excluded leading and trailing pages would remove the entire PDF.'
+        )
+
+    retained_page_count = last_page_index - first_page_index
+    raw_lines = tuple(
+        line
+        for page_index in range(first_page_index, last_page_index)
+        for line in _extract_page_lines(
+            pdf.load_page(page_index),
+            document=document,
+        )
+    )
+
+    repeated_marginal_text = _find_repeated_marginal_text(
+        raw_lines,
+        page_count=retained_page_count,
+    )
+    lines = tuple(
+        line
+        for line in raw_lines
+        if not _is_repeated_marginal_line(
+            line,
+            repeated_marginal_text,
+        )
+    )
+
+    body_font_size = _estimate_body_font_size(lines)
+    heading_lines = _find_heading_lines(
+        lines,
+        body_font_size=body_font_size,
+    )
+    heading_levels = _build_heading_level_map(
+        lines,
+        heading_lines,
+        body_font_size=body_font_size,
+    )
+    flat_sections = _build_sections(
+        lines,
+        heading_lines=heading_lines,
+        heading_levels=heading_levels,
+        document=document,
+    )
+
+    sections = _nest_sections(flat_sections)
+    pdf_metadata = _normalise_metadata(pdf.metadata)
+    xmp_authors = _extract_xmp_authors(pdf)
+    metadata = _resolve_pdf_metadata(
+        document,
+        pdf_metadata=pdf_metadata,
+        xmp_authors=xmp_authors,
+        source_page_count=source_page_count,
+        page_count=retained_page_count,
+    )
 
     return ParsedPdf(
         metadata=metadata,
@@ -721,7 +687,7 @@ def _join_text_fragments(
 
     result = fragments[0].text
 
-    for previous, current in zip(fragments, fragments[1:], strict=False):
+    for previous, current in pairwise(fragments):
         if _should_insert_space(previous.text, current.text):
             result += ' '
         result += current.text
@@ -738,10 +704,7 @@ def _should_insert_space(previous: str, current: str) -> bool:
         return False
     if previous.endswith(tuple(no_space_after)):
         return False
-    if previous.endswith(('-', '–', '—', '/', "'", '’')):
-        return False
-
-    return True
+    return not previous.endswith(('-', '–', '—', '/', "'", '’'))
 
 
 def _join_span_text(
@@ -1263,7 +1226,7 @@ def _resolve_pdf_metadata(
 
     return DocumentMetadata(
         title=_clean_optional_text(document.title) or embedded_title,
-        pdf_url=document.pdf_url.strip(),
+        source_url=document.source_url.strip(),
         publisher=(_clean_optional_text(document.publisher) or embedded_publisher),
         publication_date=(
             document.publication_date
@@ -1274,9 +1237,11 @@ def _resolve_pdf_metadata(
         keywords=ingestion_keywords or embedded_keywords,
         creator=_metadata_value(pdf_metadata, 'Creator'),
         producer=_metadata_value(pdf_metadata, 'Producer'),
-        pdf_format=_metadata_value(pdf_metadata, 'Format'),
-        creation_date=embedded_creation_date,
-        modification_date=_metadata_value(pdf_metadata, 'Moddate'),
+        format=_metadata_value(pdf_metadata, 'Format'),
+        creation_date=_parse_pdf_metadata_datetime(embedded_creation_date),
+        modification_date=_parse_pdf_metadata_datetime(
+            _metadata_value(pdf_metadata, 'Moddate')
+        ),
         source_page_count=source_page_count,
         page_count=page_count,
     )
@@ -1445,6 +1410,73 @@ def _parse_pdf_metadata_date(value: str | None) -> date | None:
         return date(year, month, day)
     except ValueError:
         return None
+
+
+_PDF_METADATA_DATETIME_RE = re.compile(
+    r'^(?:D:)?'
+    r'(?P<year>\d{4})'
+    r'(?P<month>\d{2})?'
+    r'(?P<day>\d{2})?'
+    r'(?P<hour>\d{2})?'
+    r'(?P<minute>\d{2})?'
+    r'(?P<second>\d{2})?'
+    r'(?P<zone>Z|(?P<sign>[+-])(?P<zone_hour>\d{2})'
+    r"(?:'?(?P<zone_minute>\d{2})'?)?)$"
+)
+
+
+def _parse_pdf_metadata_datetime(value: str | None) -> datetime | None:
+    """Parse an explicitly zoned source timestamp and normalize it to UTC.
+
+    PDF date strings and ISO-8601 timestamps are accepted. A timestamp without
+    an explicit timezone is discarded because its absolute time cannot be
+    established reliably during ingestion.
+    """
+    value = _clean_optional_text(value)
+    if value is None:
+        return None
+
+    match = _PDF_METADATA_DATETIME_RE.fullmatch(value)
+    if match is not None:
+        zone = match.group('zone')
+        if zone == 'Z':
+            tzinfo = UTC
+        else:
+            offset = timedelta(
+                hours=int(match.group('zone_hour')),
+                minutes=int(match.group('zone_minute') or 0),
+            )
+            if match.group('sign') == '-':
+                offset = -offset
+            try:
+                tzinfo = timezone(offset)
+            except ValueError:
+                return None
+
+        try:
+            parsed = datetime(
+                year=int(match.group('year')),
+                month=int(match.group('month') or 1),
+                day=int(match.group('day') or 1),
+                hour=int(match.group('hour') or 0),
+                minute=int(match.group('minute') or 0),
+                second=int(match.group('second') or 0),
+                tzinfo=tzinfo,
+            )
+        except ValueError:
+            return None
+
+        return parsed.astimezone(UTC)
+
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+
+    return parsed.astimezone(UTC)
 
 
 def _normalise_metadata(

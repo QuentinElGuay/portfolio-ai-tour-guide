@@ -3,7 +3,6 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 TMP_FOLDER = Path('tmp')
 
 
@@ -19,4 +18,4 @@ class IngestionSettings(BaseSettings):
 
     tmp_folder: Path = TMP_FOLDER
     timeout: float = Field(default=30.0, gt=0)
-    verbose: bool = False
+    debug: bool = False

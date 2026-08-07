@@ -5,7 +5,7 @@ description = "Add your description here"
 authors = [
     { name = "Quentin Leguay", email = "33553005+QuentinElGuay@users.noreply.github.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.2",
     "fastembed>=0.8.0",
@@ -35,8 +35,16 @@ module-name = "ai_tour_guide"
 quote-style = "single"
 indent-style = "space"
 
+[tool.mdformat]
+wrap = 88
+end_of_line = "lf"
+
 [dependency-groups]
 dev = [
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=1.0.0",
+    "mdformat-pyproject>=0.1.1",
+    "pip>=26.2.1",
     "pytest>=9.1.1",
     "ruff>=0.16.1",
 ]

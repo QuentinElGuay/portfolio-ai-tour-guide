@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,8 +28,8 @@ class Chunk:
         if self.chunk_index < 0:
             raise ValueError('chunk_index must not be negative')
 
-        if self.character_count < 0:
-            raise ValueError('character_count must not be negative')
+        if self.character_count <= 0:
+            raise ValueError('character_count must be greater than zero')
 
         if self.page_start is not None and self.page_start < 1:
             raise ValueError('page_start must be positive')
@@ -44,7 +45,7 @@ class Chunk:
             raise ValueError('page_start must not exceed page_end')
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> 'Chunk':
+    def from_dict(cls, data: Mapping[str, Any]) -> Chunk:
         return cls(
             chunk_id=str(data['chunk_id']),
             document_title=str(data['document_title']),

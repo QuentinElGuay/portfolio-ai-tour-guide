@@ -20,9 +20,12 @@ class EmbeddingError(RuntimeError):
 class EmbeddingMetadata:
     """Effective embedding configuration and output dimensions."""
 
+    provider: str
     model_name: str
     dimensions: int
     normalized: bool
+    model_revision: str = 'default'
+    distance_metric: str = 'cosine'
 
 
 @runtime_checkable
