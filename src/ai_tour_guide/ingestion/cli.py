@@ -1,9 +1,9 @@
 """Command-line interface for downloading and parsing a tourism guide."""
 
-from collections.abc import Sequence
 import hashlib
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -13,7 +13,12 @@ from pydantic import ValidationError
 from ai_tour_guide import database
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.embedding import Embedder, FastEmbedder
+from ai_tour_guide.embedding import (
+    Embedder,
+    EmbeddingError,
+    EmbeddingMetadata,
+    FastEmbedder,
+)
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.ingestion.chunking import chunk_document
 from ai_tour_guide.ingestion.embedding import embed_chunks
@@ -57,17 +62,17 @@ def load_documents(source: TextIO) -> tuple[IngestionDocument, ...]:
             raise ValueError('The ingestion document array must not be empty')
         document_values = payload
     else:
-        raise ValueError(
+        raise TypeError(
             'The ingestion input must be a JSON object or an array of JSON objects'
         )
 
     documents: list[IngestionDocument] = []
     for index, values in enumerate(document_values, start=1):
         if not isinstance(values, dict):
-            raise ValueError(f'Document {index} must be a JSON object')
+            raise TypeError(f'Document {index} must be a JSON object')
         try:
             documents.append(IngestionDocument.from_dict(values))
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise ValueError(f'Invalid document {index}: {exc}') from exc
 
     filename_stems = [document.filename_stem for document in documents]
@@ -92,34 +97,14 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
 def load_document_and_chunks_to_database(
     document: DocumentRecord,
     chunks: Sequence[EmbeddedChunk],
+    embedding_metadata: EmbeddingMetadata,
 ) -> None:
-    """Upsert one document and replace its associated chunks."""
-    with database.transaction() as transaction:
-        document_id = transaction.upsert_document(
-            document,
-            conflict_column='source_url',
-        )
-
-        chunk_rows = [
-            {
-                'document_id': document_id,
-                **chunk,
-            }
-            for chunk in chunks
-        ]
-
-        current_chunk_ids = [str(chunk['chunk_id']) for chunk in chunks]
-
-        # Prevent obsolete chunks from remaining after re-ingestion.
-        transaction.delete_stale_chunks(
-            document_id=document_id,
-            current_chunk_ids=current_chunk_ids,
-        )
-
-        transaction.upsert_chunks(
-            chunk_rows,
-            conflict_columns=('document_id', 'chunk_id'),
-        )
+    """Insert one document and all its chunks in a single transaction."""
+    database.insert_document_with_chunks(
+        document,
+        chunks,
+        embedding_metadata,
+    )
 
 
 def ingest_document(
@@ -148,16 +133,6 @@ def ingest_document(
         timeout_seconds=settings.timeout,
     )
     source_checksum = calculate_file_sha256(pdf_path)
-
-    # TODO
-    # existing = repository.find_document(
-    #     collection=collection_name,
-    #     source_url=document.source_url,
-    # )
-
-    # if existing and existing.source_checksum == source_checksum:
-    #     LOGGER.info('Skipping unchanged document: %s', document.source_url)
-    #     return
 
     # 2. Parse the downloaded PDF.
     parsed_pdf = parse_pdf(document)
@@ -197,14 +172,14 @@ def ingest_document(
     # 6. Upload the document and its embedded chunks.
     document_record = DocumentRecord(
         metadata=parsed_pdf.metadata,
-        # collection=collection_name,
-        # version=document_version,
+        collection=document.collection,
         source_checksum=source_checksum,
     )
 
     load_document_and_chunks_to_database(
         document=document_record,
         chunks=embedding_result.chunks,
+        embedding_metadata=embedder.metadata,
     )
 
     LOGGER.info('Downloaded PDF to %s', pdf_path)
@@ -256,7 +231,7 @@ def main(
             verbose=verbose,
         )
 
-    except (ValueError, ValidationError) as exc:
+    except (TypeError, ValueError, ValidationError) as exc:
         raise click.ClickException(f'Invalid ingestion configuration:\n{exc}') from exc
 
     logging.basicConfig(
@@ -290,7 +265,15 @@ def main(
                 embedder,
                 embedding_settings.batch_size,
             )
-        except (PdfDownloadError, PdfParseError, OSError) as exc:
+        except (
+            database.DocumentAlreadyExistsError,
+            database.EmbeddingModelConfigurationError,
+            EmbeddingError,
+            PdfDownloadError,
+            PdfParseError,
+            OSError,
+            ValueError,
+        ) as exc:
             raise click.ClickException(
                 f'Failed to ingest document {index}/{document_count} '
                 f'({ingestion_document.title}, '

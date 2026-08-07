@@ -17,7 +17,10 @@ from ai_tour_guide.domain.documents import (
 )
 
 
-def _document_record() -> DocumentRecord:
+def _document_record(
+    *,
+    collection: str | None = 'tour-guides',
+) -> DocumentRecord:
     return DocumentRecord(
         metadata=DocumentMetadata(
             title='A guide to Brittany',
@@ -36,7 +39,7 @@ def _document_record() -> DocumentRecord:
             page_count=11,
         ),
         source_checksum='document-sha256',
-        collection='tour-guides',
+        collection=collection,
         version='2026',
     )
 
@@ -120,3 +123,23 @@ def test_document_chunk_uses_document_scoped_composite_primary_key() -> None:
 
 def test_document_requires_an_embedding_model() -> None:
     assert DocumentRow.__table__.c.embedding_model_id.nullable is False
+
+
+def test_document_collection_is_optional() -> None:
+    row = ModelFactory.create_document(
+        _document_record(collection=None),
+        embedding_model_id=7,
+    )
+
+    assert row.collection is None
+    assert DocumentRow.__table__.c.collection.nullable is True
+
+
+def test_document_source_url_is_globally_unique() -> None:
+    constraint = next(
+        constraint
+        for constraint in DocumentRow.__table__.constraints
+        if constraint.name == 'uq_documents_source_url'
+    )
+
+    assert tuple(column.name for column in constraint.columns) == ('source_url',)

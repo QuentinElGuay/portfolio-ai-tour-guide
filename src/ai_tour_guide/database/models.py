@@ -40,6 +40,7 @@ class EmbeddingModelRow(Base):
     model_name: Mapped[str]
     model_revision: Mapped[str]
     dimensions: Mapped[int]
+    normalized: Mapped[bool]
     tokenizer_name: Mapped[str | None]
     tokenizer_revision: Mapped[str | None]
     max_input_tokens: Mapped[int | None]
@@ -68,7 +69,7 @@ class DocumentRow(Base):
 
     document_id: Mapped[int]
     embedding_model_id: Mapped[int]
-    collection: Mapped[str]
+    collection: Mapped[str | None]
     version: Mapped[str | None]
     title: Mapped[str]
     source_url: Mapped[str]

@@ -38,14 +38,6 @@ from ai_tour_guide.embedding.fastembed import FastEmbedder
 class EmbeddingResult:
     """Embedded chunk records plus the effective model configuration."""
 
-    chunks: Sequence[EmbeddedChunk]
-    model_name: str
-    dimensions: int
-    normalized: bool
-
-
-@dataclass(frozen=True, slots=True)
-class EmbeddingResult:
     chunks: tuple[EmbeddedChunk, ...]
     model_name: str
     dimensions: int
@@ -162,7 +154,7 @@ def embed_chunks(
 
     if not validated_chunks:
         return EmbeddingResult(
-            chunks=[],
+            chunks=(),
             model_name=initial_metadata.model_name,
             dimensions=0,
             normalized=initial_metadata.normalized,
@@ -224,7 +216,7 @@ def embed_chunks(
             f'{metadata.dimensions} != {dimensions}'
         )
 
-    embedded_chunks: list[dict[str, Any]] = []
+    embedded_chunks: list[EmbeddedChunk] = []
 
     for chunk, vector in zip(
         validated_chunks,
@@ -240,7 +232,7 @@ def embed_chunks(
         )
 
     return EmbeddingResult(
-        chunks=embedded_chunks,
+        chunks=tuple(embedded_chunks),
         model_name=metadata.model_name,
         dimensions=dimensions,
         normalized=metadata.normalized,

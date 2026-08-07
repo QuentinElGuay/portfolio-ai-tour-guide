@@ -4,6 +4,7 @@ from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     ARRAY,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     Computed,
@@ -61,6 +62,11 @@ embedding_models = Table(
     Column(
         'dimensions',
         Integer,
+        nullable=False,
+    ),
+    Column(
+        'normalized',
+        Boolean,
         nullable=False,
     ),
     Column(
@@ -130,7 +136,6 @@ documents = Table(
     Column(
         'collection',
         Text,
-        nullable=False,
     ),
     Column(
         'version',
@@ -249,12 +254,11 @@ documents = Table(
         server_default=func.now(),
     ),
     UniqueConstraint(
-        'collection',
         'source_url',
-        name='uq_documents_collection_source_url',
+        name='uq_documents_source_url',
     ),
     CheckConstraint(
-        "btrim(collection) <> ''",
+        "collection IS NULL OR btrim(collection) <> ''",
         name='ck_documents_collection_not_empty',
     ),
     CheckConstraint(

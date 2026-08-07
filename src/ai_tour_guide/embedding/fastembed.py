@@ -51,6 +51,7 @@ class FastEmbedder(Embedder):
     def metadata(self) -> EmbeddingMetadata:
         """Return the model name, observed vector size, and normalization mode."""
         return EmbeddingMetadata(
+            provider='fastembed',
             model_name=self._model_name,
             dimensions=self._dimensions,
             normalized=self._normalize_vectors,

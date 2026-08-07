@@ -52,6 +52,7 @@ class IngestionDocument:
 
     title: str
     source_url: str
+    collection: str | None = None
     excluded_leading_pages: int = 3
     excluded_trailing_pages: int = 2
     authors: list[str] | None = None
@@ -71,6 +72,14 @@ class IngestionDocument:
         parsed_url = urlparse(self.source_url)
         if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
             raise ValueError('source_url must be a valid HTTP or HTTPS URL')
+
+        if self.collection is not None:
+            if not isinstance(self.collection, str):
+                raise TypeError('collection must be a string or None')
+            collection = self.collection.strip()
+            if not collection:
+                raise ValueError('collection must not be empty')
+            object.__setattr__(self, 'collection', collection)
 
         if self.excluded_leading_pages < 0:
             raise ValueError(
