@@ -8,8 +8,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, fields
 from datetime import UTC, date, datetime, timedelta, timezone
 from hashlib import sha256
+from itertools import pairwise
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
 from urllib.parse import urlparse
 from xml.etree import ElementTree
@@ -18,6 +18,7 @@ import httpx
 import pymupdf
 
 from ai_tour_guide.domain.documents import DocumentMetadata
+from ai_tour_guide.ingestion.pdf.downloader import download_pdf
 
 OUTPUT_SUFFIXES = {'.pdf', '.md', '.txt', '.json'}
 
@@ -33,10 +34,6 @@ MAX_HORIZONTAL_GAP_FACTOR = 3.0
 MIN_VERTICAL_OVERLAP_RATIO = 0.6
 
 DEFAULT_DOWNLOAD_DIRECTORY = Path('.cache/pdf-ingestion')
-
-
-class PdfDownloadError(RuntimeError):
-    """Raised when a PDF cannot be downloaded or validated."""
 
 
 class PdfParseError(RuntimeError):
@@ -322,72 +319,6 @@ class ParsedPdf:
         return destination
 
 
-def download_pdf(
-    url: str,
-    destination: Path,
-    *,
-    timeout_seconds: float = 30.0,
-    client: httpx.Client | None = None,
-) -> Path:
-    """Download *url* atomically to *destination* and validate its signature.
-
-    A temporary file is used so a failed or interrupted download does not
-    leave a partially written destination file behind.
-    """
-    destination = destination.expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    owns_client = client is None
-    http_client = client or httpx.Client(
-        follow_redirects=True,
-        timeout=httpx.Timeout(timeout_seconds),
-        headers={'User-Agent': 'portfolio-ai-tour-guide/0.1'},
-    )
-
-    temp_path: Path | None = None
-
-    try:
-        with http_client.stream('GET', url) as response:
-            response.raise_for_status()
-
-            content_type = response.headers.get('content-type', '').lower()
-            if content_type and 'pdf' not in content_type:
-                raise PdfDownloadError(
-                    f'Expected a PDF response, received {content_type!r}.'
-                )
-
-            with NamedTemporaryFile(
-                mode='wb',
-                delete=False,
-                dir=destination.parent,
-                suffix='.part',
-            ) as temp_file:
-                temp_path = Path(temp_file.name)
-
-                for chunk in response.iter_bytes(chunk_size=64 * 1024):
-                    temp_file.write(chunk)
-
-        if temp_path.stat().st_size == 0:
-            raise PdfDownloadError('The downloaded file is empty.')
-
-        with temp_path.open('rb') as file_handle:
-            if file_handle.read(5) != b'%PDF-':
-                raise PdfDownloadError('The downloaded file is not a valid PDF.')
-
-        temp_path.replace(destination)
-        return destination
-
-    except (httpx.HTTPError, OSError) as exc:
-        raise PdfDownloadError(f'Could not download PDF from {url}: {exc}') from exc
-
-    finally:
-        if temp_path is not None and temp_path.exists():
-            temp_path.unlink()
-
-        if owns_client:
-            http_client.close()
-
-
 def parse_pdf(
     document: IngestionDocument,
     *,
@@ -414,7 +345,7 @@ def parse_pdf(
         client=client,
     )
 
-    return _parse_downloaded_pdf(downloaded_path, document=document)
+    return parse_downloaded_pdf(downloaded_path, document=document)
 
 
 def _validate_ingestion_document(document: IngestionDocument) -> None:
@@ -457,88 +388,33 @@ def parse_downloaded_pdf(
     *,
     document: IngestionDocument,
 ) -> ParsedPdf:
-    """Parse an existing PDF file using its ingestion configuration."""
-    _validate_ingestion_document(document)
-    return _parse_downloaded_pdf(path, document=document)
+    """Read an existing PDF file and delegate to the in-memory parser."""
+    path = path.expanduser().resolve()
+    if not path.is_file():
+        raise PdfParseError(f'PDF file does not exist: {path}')
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise PdfParseError(f'Could not read PDF {path}: {exc}') from exc
+    return parse_pdf_bytes(content, document=document)
 
 
-def _parse_downloaded_pdf(
-    path: Path,
+def parse_pdf_bytes(
+    content: bytes,
     *,
     document: IngestionDocument,
 ) -> ParsedPdf:
-    """Implement parsing for a previously validated ingestion document."""
-    path = path.expanduser().resolve()
+    """Parse PDF bytes without creating an intermediary file."""
+    if not isinstance(content, bytes):
+        raise TypeError('content must be bytes')
+    if not content:
+        raise PdfParseError('The in-memory PDF is empty.')
 
-    if not path.is_file():
-        raise PdfParseError(f'PDF file does not exist: {path}')
+    _validate_ingestion_document(document)
 
     try:
-        with pymupdf.open(path) as pdf:
-            if pdf.needs_pass and pdf.authenticate('') <= 0:
-                raise PdfParseError('The PDF is encrypted and cannot be opened.')
-
-            source_page_count = pdf.page_count
-            first_page_index = document.excluded_leading_pages
-            last_page_index = source_page_count - document.excluded_trailing_pages
-
-            if first_page_index >= last_page_index:
-                raise PdfParseError(
-                    'The excluded leading and trailing pages would remove '
-                    'the entire PDF.'
-                )
-
-            retained_page_count = last_page_index - first_page_index
-            raw_lines = tuple(
-                line
-                for page_index in range(first_page_index, last_page_index)
-                for line in _extract_page_lines(
-                    pdf.load_page(page_index),
-                    document=document,
-                )
-            )
-
-            repeated_marginal_text = _find_repeated_marginal_text(
-                raw_lines,
-                page_count=retained_page_count,
-            )
-            lines = tuple(
-                line
-                for line in raw_lines
-                if not _is_repeated_marginal_line(
-                    line,
-                    repeated_marginal_text,
-                )
-            )
-
-            body_font_size = _estimate_body_font_size(lines)
-            heading_lines = _find_heading_lines(
-                lines,
-                body_font_size=body_font_size,
-            )
-            heading_levels = _build_heading_level_map(
-                lines,
-                heading_lines,
-                body_font_size=body_font_size,
-            )
-            flat_sections = _build_sections(
-                lines,
-                heading_lines=heading_lines,
-                heading_levels=heading_levels,
-                document=document,
-            )
-
-            sections = _nest_sections(flat_sections)
-            pdf_metadata = _normalise_metadata(pdf.metadata)
-            xmp_authors = _extract_xmp_authors(pdf)
-            metadata = _resolve_pdf_metadata(
-                document,
-                pdf_metadata=pdf_metadata,
-                xmp_authors=xmp_authors,
-                source_page_count=source_page_count,
-                page_count=retained_page_count,
-            )
-
+        with pymupdf.open(stream=content, filetype='pdf') as pdf:
+            return _parse_open_pdf(pdf, document=document)
     except PdfParseError:
         raise
     except (
@@ -547,7 +423,77 @@ def _parse_downloaded_pdf(
         RuntimeError,
         ValueError,
     ) as exc:
-        raise PdfParseError(f'Could not parse PDF {path}: {exc}') from exc
+        raise PdfParseError(f'Could not parse PDF from memory: {exc}') from exc
+
+
+def _parse_open_pdf(
+    pdf: pymupdf.Document,
+    *,
+    document: IngestionDocument,
+) -> ParsedPdf:
+    """Parse an open PyMuPDF document using ingestion configuration."""
+    if pdf.needs_pass and pdf.authenticate('') <= 0:
+        raise PdfParseError('The PDF is encrypted and cannot be opened.')
+
+    source_page_count = pdf.page_count
+    first_page_index = document.excluded_leading_pages
+    last_page_index = source_page_count - document.excluded_trailing_pages
+
+    if first_page_index >= last_page_index:
+        raise PdfParseError(
+            'The excluded leading and trailing pages would remove the entire PDF.'
+        )
+
+    retained_page_count = last_page_index - first_page_index
+    raw_lines = tuple(
+        line
+        for page_index in range(first_page_index, last_page_index)
+        for line in _extract_page_lines(
+            pdf.load_page(page_index),
+            document=document,
+        )
+    )
+
+    repeated_marginal_text = _find_repeated_marginal_text(
+        raw_lines,
+        page_count=retained_page_count,
+    )
+    lines = tuple(
+        line
+        for line in raw_lines
+        if not _is_repeated_marginal_line(
+            line,
+            repeated_marginal_text,
+        )
+    )
+
+    body_font_size = _estimate_body_font_size(lines)
+    heading_lines = _find_heading_lines(
+        lines,
+        body_font_size=body_font_size,
+    )
+    heading_levels = _build_heading_level_map(
+        lines,
+        heading_lines,
+        body_font_size=body_font_size,
+    )
+    flat_sections = _build_sections(
+        lines,
+        heading_lines=heading_lines,
+        heading_levels=heading_levels,
+        document=document,
+    )
+
+    sections = _nest_sections(flat_sections)
+    pdf_metadata = _normalise_metadata(pdf.metadata)
+    xmp_authors = _extract_xmp_authors(pdf)
+    metadata = _resolve_pdf_metadata(
+        document,
+        pdf_metadata=pdf_metadata,
+        xmp_authors=xmp_authors,
+        source_page_count=source_page_count,
+        page_count=retained_page_count,
+    )
 
     return ParsedPdf(
         metadata=metadata,
@@ -741,7 +687,7 @@ def _join_text_fragments(
 
     result = fragments[0].text
 
-    for previous, current in zip(fragments, fragments[1:], strict=False):
+    for previous, current in pairwise(fragments):
         if _should_insert_space(previous.text, current.text):
             result += ' '
         result += current.text
@@ -1523,7 +1469,7 @@ def _parse_pdf_metadata_datetime(value: str | None) -> datetime | None:
         return parsed.astimezone(UTC)
 
     try:
-        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
 

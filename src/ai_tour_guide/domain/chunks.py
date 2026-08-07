@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ class Chunk:
             raise ValueError('page_start must not exceed page_end')
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> 'Chunk':
+    def from_dict(cls, data: Mapping[str, Any]) -> Chunk:
         return cls(
             chunk_id=str(data['chunk_id']),
             document_title=str(data['document_title']),

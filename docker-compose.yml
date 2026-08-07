@@ -88,6 +88,7 @@ services:
 
     volumes:
       - ./data:/app/data
+      - ./tmp:/app/tmp
 
     depends_on:
       database:

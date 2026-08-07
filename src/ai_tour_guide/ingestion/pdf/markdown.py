@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ai_tour_guide.ingestion.io import write_text_atomic
 from ai_tour_guide.ingestion.pdf.parser import ParsedPdf, ParsedSection
 
 
@@ -35,7 +36,4 @@ def _append_section_markdown(
 
 def write_markdown(parsed: ParsedPdf, destination: Path) -> Path:
     """Write parsed PDF content to a UTF-8 Markdown file."""
-    destination = destination.expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(render_markdown(parsed), encoding='utf-8')
-    return destination
+    return write_text_atomic(render_markdown(parsed), destination)

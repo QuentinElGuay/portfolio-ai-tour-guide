@@ -1,7 +1,8 @@
 # BreizhGuide Roadmap
 
-> [!note]
-> This roadmap had been created by ChatGPT as a first draft and might evolve over time.
+> [!note] This roadmap had been created by ChatGPT as a first draft and might evolve
+> over time.
+
 ## Priority legend
 
 - **P0** — Required for a working project
@@ -9,7 +10,7 @@
 - **P2** — Optional improvement
 - **P3** — Stretch goal
 
----
+______________________________________________________________________
 
 # Milestone 1 — Project Foundation
 
@@ -33,7 +34,7 @@
 - [x] The data source is documented
 - [x] Repository structure is easy to navigate
 
----
+______________________________________________________________________
 
 ## [P0] Define project scope
 
@@ -57,7 +58,7 @@
 - Mermaid
 - GitHub Issues
 
----
+______________________________________________________________________
 
 ## [P0] Create project structure
 
@@ -82,7 +83,7 @@
 - Pydantic Settings
 - pytest
 
----
+______________________________________________________________________
 
 # Milestone 2 — Document Ingestion
 
@@ -105,7 +106,7 @@
 - PyMuPDF
 - Jupyter
 
----
+______________________________________________________________________
 
 ## [P0] Extract structured PDF content
 
@@ -113,7 +114,9 @@
 
 - [x] Extract text page by page
 - [x] Preserve original page numbers
+
 <!-- - [ ] Preserve document title and author -->
+
 - [x] Reconstruct logical paragraphs
 - [x] Detect section titles from typography
 - [x] Infer heading levels
@@ -130,7 +133,7 @@
 - [x] Sample paragraphs and headings match the original document
 - [x] Parsing the same PDF twice produces identical output
 
----
+______________________________________________________________________
 
 ## [P0] Build normalized document hierarchy
 
@@ -154,7 +157,7 @@
 
 `["Brittany", "Family life", "Schools"]`
 
----
+______________________________________________________________________
 
 ## [P0] Implement document chunking
 
@@ -182,7 +185,7 @@
 - [x] Stored `text` does not contain synthetic heading enrichment
 - [x] Synthetic heading enrichment is stored separately in `embedding_text`
 
----
+______________________________________________________________________
 
 ## [P1] Create an ingestion CLI
 
@@ -217,7 +220,7 @@
 - Standard logging
 - `uv`
 
----
+______________________________________________________________________
 
 # Milestone 3 — Knowledge Base and Retrieval
 
@@ -267,7 +270,7 @@
 - NumPy
 - tqdm
 
----
+______________________________________________________________________
 
 ## [P0] Implement vector search
 
@@ -288,7 +291,7 @@
 
 - Qdrant
 
----
+______________________________________________________________________
 
 ## [P1] Implement BM25 search
 
@@ -309,7 +312,7 @@
 - rank-bm25
 - SQLite FTS5
 
----
+______________________________________________________________________
 
 ## [P1] Implement hybrid search
 
@@ -330,7 +333,7 @@
 - Qdrant
 - rank-bm25
 
----
+______________________________________________________________________
 
 # Milestone 4 — RAG Application
 
@@ -356,7 +359,7 @@
 - Ollama
 - OpenAI-compatible client
 
----
+______________________________________________________________________
 
 ## [P0] Add grounded answer rules
 
@@ -379,7 +382,7 @@
 - Plain prompt templates
 - Jinja2 optional
 
----
+______________________________________________________________________
 
 ## [P2] Add conversation-aware query rewriting
 
@@ -400,7 +403,7 @@
 - Ollama
 - Lightweight prompt chain
 
----
+______________________________________________________________________
 
 ## [P2] Add document reranking
 
@@ -420,7 +423,7 @@
 
 - sentence-transformers CrossEncoder
 
----
+______________________________________________________________________
 
 # Milestone 5 — Evaluation
 
@@ -444,7 +447,7 @@
 - JSONL
 - Pandas
 
----
+______________________________________________________________________
 
 ## [P0] Evaluate retrieval approaches
 
@@ -475,7 +478,7 @@
 - pytest
 - Matplotlib or Plotly
 
----
+______________________________________________________________________
 
 ## [P1] Evaluate LLM answers
 
@@ -500,7 +503,7 @@
 - Pandas
 - Ragas or DeepEval optional
 
----
+______________________________________________________________________
 
 # Milestone 6 — User Interface
 
@@ -525,7 +528,7 @@
 
 - Streamlit
 
----
+______________________________________________________________________
 
 ## [P1] Add user feedback
 
@@ -546,7 +549,7 @@
 - SQLite
 - Streamlit
 
----
+______________________________________________________________________
 
 # Milestone 7 — Monitoring
 
@@ -572,7 +575,7 @@
 - SQLite
 - Structlog
 
----
+______________________________________________________________________
 
 ## [P1] Build monitoring dashboard
 
@@ -596,7 +599,7 @@
 - Plotly
 - Pandas
 
----
+______________________________________________________________________
 
 # Milestone 8 — Reproducibility and Delivery
 
@@ -621,7 +624,7 @@
 - Docker
 - Docker Compose
 
----
+______________________________________________________________________
 
 ## [P0] Complete project documentation
 
@@ -651,7 +654,7 @@
 - Mermaid
 - uv.lock
 
----
+______________________________________________________________________
 
 ## [P1] Add automated tests and CI
 
@@ -674,7 +677,7 @@
 - pytest
 - GitHub Actions
 
----
+______________________________________________________________________
 
 ## [P1] Record project demo
 
@@ -697,7 +700,7 @@
 - Loom
 - OBS Studio
 
----
+______________________________________________________________________
 
 # Stretch Goals
 
@@ -748,7 +751,7 @@
 - [ ] Add deployment documentation
 - [ ] Verify public demo
 
----
+______________________________________________________________________
 
 # Suggested release plan
 

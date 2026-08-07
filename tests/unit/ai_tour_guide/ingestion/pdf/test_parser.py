@@ -8,14 +8,13 @@ import pymupdf
 import pytest
 
 from ai_tour_guide.domain.documents import DocumentMetadata
+from ai_tour_guide.ingestion.pdf.downloader import PdfDownloadError, download_pdf
 from ai_tour_guide.ingestion.pdf.parser import (
     IngestionDocument,
     ParsedParagraph,
     ParsedPdf,
     ParsedSection,
-    PdfDownloadError,
     PdfParseError,
-    download_pdf,
     parse_downloaded_pdf,
 )
 
