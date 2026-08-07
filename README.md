@@ -48,7 +48,7 @@ respective copyright holder. It is not redistributed as part of this repository.
 
 ## Prerequisites
 
-> [!Note] Running the project directly in `Docker Codespaces` allow for an execution
+> [!NOTE] Running the project directly in `Docker Codespaces` allow for an execution
 > without any installation.
 
 The recommended Docker workflow requires:
