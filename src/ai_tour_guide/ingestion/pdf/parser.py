@@ -291,6 +291,7 @@ class ParsedPdf:
         """Serialize the parsed document as JSON."""
         return json.dumps(
             self.to_dict(),
+            default=str,
             ensure_ascii=ensure_ascii,
             indent=indent,
         )
@@ -1263,7 +1264,7 @@ def _resolve_pdf_metadata(
 
     return DocumentMetadata(
         title=_clean_optional_text(document.title) or embedded_title,
-        pdf_url=document.pdf_url.strip(),
+        source_url=document.pdf_url.strip(),
         publisher=(_clean_optional_text(document.publisher) or embedded_publisher),
         publication_date=(
             document.publication_date
@@ -1274,7 +1275,7 @@ def _resolve_pdf_metadata(
         keywords=ingestion_keywords or embedded_keywords,
         creator=_metadata_value(pdf_metadata, 'Creator'),
         producer=_metadata_value(pdf_metadata, 'Producer'),
-        pdf_format=_metadata_value(pdf_metadata, 'Format'),
+        format=_metadata_value(pdf_metadata, 'Format'),
         creation_date=embedded_creation_date,
         modification_date=_metadata_value(pdf_metadata, 'Moddate'),
         source_page_count=source_page_count,

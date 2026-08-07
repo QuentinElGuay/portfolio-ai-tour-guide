@@ -169,7 +169,7 @@ def ingest_document(
 
     # 4. Produce structure-aware chunks.
     chunk_objects = chunk_document(parsed_pdf.to_dict())
-    chunk_records = [chunk.to_dict() for chunk in chunk_objects]
+    chunk_records = [chunk for chunk in chunk_objects]
 
     if not chunk_records:
         raise ValueError(f'No chunks were produced for document {document.title!r}')
@@ -182,7 +182,7 @@ def ingest_document(
 
     # 5. Generate embeddings.
     embedding_result = embed_chunks(
-        [chunk.to_dict() for chunk in chunk_records],
+        [chunk for chunk in chunk_records],
         embedder=embedder,
         batch_size=embedding_batch_size,
     )
@@ -217,7 +217,7 @@ def ingest_document(
 
 @click.command()
 @click.argument(
-    'document',
+    'documents',
     type=click.File('r', encoding='utf-8'),
 )
 @click.option(
@@ -238,7 +238,7 @@ def ingest_document(
     help='Enable or disable debug logging. Overrides INGESTION_VERBOSE.',
 )
 def main(
-    documents_list: TextIO,
+    documents: TextIO,
     tmp_folder: Path | None,
     timeout: float | None,
     verbose: bool | None,
@@ -249,7 +249,7 @@ def main(
     array of document objects. Use '-' to read JSON from stdin.
     """
     try:
-        ingestion_documents = load_documents(documents_list)
+        ingestion_documents = load_documents(documents)
         ingestion_settings = load_settings(
             tmp_folder=tmp_folder,
             timeout=timeout,
