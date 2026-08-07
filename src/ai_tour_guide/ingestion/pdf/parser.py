@@ -452,12 +452,22 @@ def _build_pdf_destination(
     return download_directory / f'{safe_title}-{url_digest}.pdf'
 
 
+def parse_downloaded_pdf(
+    path: Path,
+    *,
+    document: IngestionDocument,
+) -> ParsedPdf:
+    """Parse an existing PDF file using its ingestion configuration."""
+    _validate_ingestion_document(document)
+    return _parse_downloaded_pdf(path, document=document)
+
+
 def _parse_downloaded_pdf(
     path: Path,
     *,
     document: IngestionDocument,
 ) -> ParsedPdf:
-    """Parse a downloaded PDF using its ingestion configuration."""
+    """Implement parsing for a previously validated ingestion document."""
     path = path.expanduser().resolve()
 
     if not path.is_file():

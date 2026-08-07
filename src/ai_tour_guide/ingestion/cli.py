@@ -3,7 +3,6 @@
 import hashlib
 import json
 import logging
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -11,12 +10,10 @@ import click
 from pydantic import ValidationError
 
 from ai_tour_guide import database
-from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
 from ai_tour_guide.embedding import (
     Embedder,
     EmbeddingError,
-    EmbeddingMetadata,
     FastEmbedder,
 )
 from ai_tour_guide.embedding.settings import EmbeddingSettings
@@ -28,7 +25,7 @@ from ai_tour_guide.ingestion.pdf.parser import (
     PdfDownloadError,
     PdfParseError,
     download_pdf,
-    parse_pdf,
+    parse_downloaded_pdf,
 )
 from ai_tour_guide.ingestion.settings import IngestionSettings
 
@@ -94,19 +91,6 @@ def load_settings(**cli_values: Any) -> IngestionSettings:
     return IngestionSettings(**overrides)
 
 
-def load_document_and_chunks_to_database(
-    document: DocumentRecord,
-    chunks: Sequence[EmbeddedChunk],
-    embedding_metadata: EmbeddingMetadata,
-) -> None:
-    """Insert one document and all its chunks in a single transaction."""
-    database.insert_document_with_chunks(
-        document,
-        chunks,
-        embedding_metadata,
-    )
-
-
 def ingest_document(
     document: IngestionDocument,
     settings: IngestionSettings,
@@ -135,7 +119,7 @@ def ingest_document(
     source_checksum = calculate_file_sha256(pdf_path)
 
     # 2. Parse the downloaded PDF.
-    parsed_pdf = parse_pdf(document)
+    parsed_pdf = parse_downloaded_pdf(pdf_path, document=document)
 
     # 3. Write debugging/intermediate artifacts.
     output_paths['text'].write_text(parsed_pdf.text, encoding='utf-8')
@@ -176,10 +160,10 @@ def ingest_document(
         source_checksum=source_checksum,
     )
 
-    load_document_and_chunks_to_database(
-        document=document_record,
-        chunks=embedding_result.chunks,
-        embedding_metadata=embedder.metadata,
+    database.insert_document_with_chunks(
+        document_record,
+        embedding_result.chunks,
+        embedder.metadata,
     )
 
     LOGGER.info('Downloaded PDF to %s', pdf_path)
@@ -218,9 +202,9 @@ def main(
     timeout: float | None,
     verbose: bool | None,
 ) -> None:
-    """Download and parse the PDFs described by DOCUMENT.
+    """Download and parse the PDFs described by DOCUMENTS.
 
-    DOCUMENTS_LIST is a JSON file path containing either one document object or an
+    DOCUMENTS is a JSON file path containing either one document object or an
     array of document objects. Use '-' to read JSON from stdin.
     """
     try:

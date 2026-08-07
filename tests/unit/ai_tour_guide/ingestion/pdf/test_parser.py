@@ -1,20 +1,22 @@
-
 import json
+import re
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Iterator, Sequence
 
 import httpx
 import pymupdf
 import pytest
 
+from ai_tour_guide.domain.documents import DocumentMetadata
 from ai_tour_guide.ingestion.pdf.parser import (
+    IngestionDocument,
     ParsedParagraph,
     ParsedPdf,
     ParsedSection,
     PdfDownloadError,
     PdfParseError,
     download_pdf,
-    parse_pdf,
+    parse_downloaded_pdf,
 )
 
 
@@ -35,6 +37,65 @@ def _pdf_bytes(*, pages: tuple[str, ...] = ('',)) -> bytes:
             if text:
                 page.insert_text((20, 80), text, fontsize=11)
         return document.tobytes()
+
+
+def _ingestion_document(
+    *,
+    title: str = 'Test guide',
+    excluded_leading_pages: int = 0,
+    excluded_trailing_pages: int = 0,
+    ignored_text_patterns: tuple[re.Pattern[str], ...] = (),
+) -> IngestionDocument:
+    return IngestionDocument(
+        title=title,
+        source_url='https://example.test/guide.pdf',
+        excluded_leading_pages=excluded_leading_pages,
+        excluded_trailing_pages=excluded_trailing_pages,
+        ignored_text_patterns=ignored_text_patterns,
+    )
+
+
+def _parse_downloaded_fixture(
+    path: Path,
+    *,
+    title: str = 'Test guide',
+    excluded_leading_pages: int = 0,
+    excluded_trailing_pages: int = 0,
+    ignored_text_patterns: tuple[re.Pattern[str], ...] = (),
+) -> ParsedPdf:
+    return parse_downloaded_pdf(
+        path,
+        document=_ingestion_document(
+            title=title,
+            excluded_leading_pages=excluded_leading_pages,
+            excluded_trailing_pages=excluded_trailing_pages,
+            ignored_text_patterns=ignored_text_patterns,
+        ),
+    )
+
+
+def _document_metadata(
+    *,
+    title: str,
+    source_page_count: int,
+    page_count: int,
+) -> DocumentMetadata:
+    return DocumentMetadata(
+        title=title,
+        source_url='https://example.test/guide.pdf',
+        publisher=None,
+        publication_date=None,
+        authors=(),
+        subject=None,
+        keywords=(),
+        creator=None,
+        producer=None,
+        format='PDF 1.7',
+        creation_date=None,
+        modification_date=None,
+        source_page_count=source_page_count,
+        page_count=page_count,
+    )
 
 
 def test_download_pdf_writes_valid_response_atomically(tmp_path: Path) -> None:
@@ -70,13 +131,15 @@ def test_download_pdf_rejects_non_pdf_content_type(tmp_path: Path) -> None:
         )
 
     destination = tmp_path / 'guide.pdf'
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(PdfDownloadError, match='Expected a PDF'):
-            download_pdf(
-                'https://example.test/guide.pdf',
-                destination,
-                client=client,
-            )
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(PdfDownloadError, match='Expected a PDF'),
+    ):
+        download_pdf(
+            'https://example.test/guide.pdf',
+            destination,
+            client=client,
+        )
 
     assert not destination.exists()
     assert not list(tmp_path.glob('*.part'))
@@ -91,13 +154,15 @@ def test_download_pdf_rejects_invalid_signature(tmp_path: Path) -> None:
         )
 
     destination = tmp_path / 'guide.pdf'
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(PdfDownloadError, match='not a valid PDF'):
-            download_pdf(
-                'https://example.test/guide.pdf',
-                destination,
-                client=client,
-            )
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(PdfDownloadError, match='not a valid PDF'),
+    ):
+        download_pdf(
+            'https://example.test/guide.pdf',
+            destination,
+            client=client,
+        )
 
     assert not destination.exists()
     assert not list(tmp_path.glob('*.part'))
@@ -114,11 +179,11 @@ def test_parse_pdf_returns_only_structured_sections(tmp_path: Path) -> None:
         )
     )
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(path)
 
-    assert result.source == path.resolve()
-    assert result.source_page_count == 2
-    assert result.page_count == 2
+    assert result.metadata.source_url == 'https://example.test/guide.pdf'
+    assert result.metadata.source_page_count == 2
+    assert result.metadata.page_count == 2
     assert not hasattr(result, 'pages')
     assert not hasattr(result, 'body_font_size')
     assert len(result.sections) == 1
@@ -136,9 +201,9 @@ def test_parse_pdf_returns_empty_structure_for_blank_page(tmp_path: Path) -> Non
     path = tmp_path / 'blank.pdf'
     path.write_bytes(_pdf_bytes())
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(path)
 
-    assert result.page_count == 1
+    assert result.metadata.page_count == 1
     assert result.sections == ()
     assert result.text == ''
 
@@ -152,7 +217,7 @@ def test_parse_pdf_sorts_text_by_page_coordinates(tmp_path: Path) -> None:
         page.insert_text((20, 50), 'First section')
         document.save(path)
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(path)
 
     assert result.text.splitlines() == [
         'First section',
@@ -183,7 +248,7 @@ def test_parse_pdf_detects_heading_levels_and_paragraph_pages(
         document.set_metadata({'title': 'Discover Brittany'})
         document.save(path)
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(path, title='Discover Brittany')
     all_sections = tuple(_walk_sections(result.sections))
 
     assert result.title == 'Discover Brittany'
@@ -230,14 +295,14 @@ def test_parse_pdf_preserves_original_pages_after_exclusions(tmp_path: Path) -> 
         )
     )
 
-    result = parse_pdf(
+    result = _parse_downloaded_fixture(
         path,
         excluded_leading_pages=1,
         excluded_trailing_pages=1,
     )
 
-    assert result.source_page_count == 4
-    assert result.page_count == 2
+    assert result.metadata.source_page_count == 4
+    assert result.metadata.page_count == 2
     assert result.sections[0].page_start == 2
     assert result.sections[0].page_end == 3
     assert result.sections[0].paragraphs == (
@@ -259,7 +324,7 @@ def test_parse_pdf_removes_repeated_headers_and_footers(tmp_path: Path) -> None:
             page.insert_text((20, 290), 'Running footer', fontsize=8)
         document.save(path)
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(path)
 
     assert 'Running header' not in result.text
     assert 'Running footer' not in result.text
@@ -276,7 +341,10 @@ def test_parse_pdf_removes_ibanista_domain(tmp_path: Path) -> None:
         page.insert_text((20, 250), 'ibanista.com')
         document.save(path)
 
-    result = parse_pdf(path)
+    result = _parse_downloaded_fixture(
+        path,
+        ignored_text_patterns=(re.compile(r'ibanista\.com', re.IGNORECASE),),
+    )
 
     assert result.text == 'Welcome to Brittany'
     assert 'ibanista.com' not in result.to_json().casefold()
@@ -284,10 +352,11 @@ def test_parse_pdf_removes_ibanista_domain(tmp_path: Path) -> None:
 
 def test_parsed_pdf_json_contains_only_canonical_structure(tmp_path: Path) -> None:
     parsed = ParsedPdf(
-        source=tmp_path / 'guide.pdf',
-        source_page_count=12,
-        page_count=10,
-        metadata={'Title': 'Découvrir la Bretagne'},
+        metadata=_document_metadata(
+            title='Découvrir la Bretagne',
+            source_page_count=12,
+            page_count=10,
+        ),
         sections=(
             ParsedSection(
                 title='Saint-Malo',
@@ -307,7 +376,7 @@ def test_parsed_pdf_json_contains_only_canonical_structure(tmp_path: Path) -> No
 
     data = json.loads(parsed.to_json())
 
-    assert data['title'] == 'Découvrir la Bretagne'
+    assert data['metadata']['title'] == 'Découvrir la Bretagne'
     assert data['sections'][0]['paragraphs'][0]['text'] == (
         'Une cité historique au bord de la mer.'
     )
@@ -323,7 +392,7 @@ def test_parsed_pdf_json_contains_only_canonical_structure(tmp_path: Path) -> No
 
 def test_parse_pdf_raises_error_when_file_does_not_exist(tmp_path: Path) -> None:
     with pytest.raises(PdfParseError, match='PDF file does not exist'):
-        parse_pdf(tmp_path / 'missing.pdf')
+        _parse_downloaded_fixture(tmp_path / 'missing.pdf')
 
 
 def test_parse_pdf_rejects_malformed_pdf(tmp_path: Path) -> None:
@@ -331,7 +400,7 @@ def test_parse_pdf_rejects_malformed_pdf(tmp_path: Path) -> None:
     path.write_bytes(b'%PDF-this-is-not-a-real-pdf')
 
     with pytest.raises(PdfParseError, match='Could not parse PDF'):
-        parse_pdf(path)
+        _parse_downloaded_fixture(path)
 
 
 def test_parse_pdf_rejects_exclusions_that_remove_every_page(
@@ -341,7 +410,7 @@ def test_parse_pdf_rejects_exclusions_that_remove_every_page(
     path.write_bytes(_pdf_bytes(pages=('Only page',)))
 
     with pytest.raises(PdfParseError, match='remove the entire PDF'):
-        parse_pdf(path, excluded_leading_pages=1)
+        _parse_downloaded_fixture(path, excluded_leading_pages=1)
 
 
 def test_parse_pdf_merges_multiline_chapter_title(
@@ -375,7 +444,7 @@ def test_parse_pdf_merges_multiline_chapter_title(
 
         document.save(path)
 
-    parsed = parse_pdf(path)
+    parsed = _parse_downloaded_fixture(path)
 
     titled_sections = [section for section in parsed.sections if section.title]
 
@@ -446,7 +515,7 @@ def test_parse_pdf_detects_body_sized_bold_level_three_headings(
 
         document.save(path)
 
-    parsed = parse_pdf(path)
+    parsed = _parse_downloaded_fixture(path)
     all_sections = tuple(_walk_sections(parsed.sections))
     sections_by_title = {
         section.title: section for section in all_sections if section.title

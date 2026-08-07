@@ -1,6 +1,6 @@
-
 from pathlib import Path
 
+from ai_tour_guide.domain.documents import DocumentMetadata
 from ai_tour_guide.ingestion.pdf.markdown import render_markdown, write_markdown
 from ai_tour_guide.ingestion.pdf.parser import (
     ParsedParagraph,
@@ -9,12 +9,33 @@ from ai_tour_guide.ingestion.pdf.parser import (
 )
 
 
-def _parsed_pdf(tmp_path: Path) -> ParsedPdf:
+def _metadata(
+    *,
+    title: str = 'Discover Brittany',
+    source_page_count: int = 8,
+    page_count: int = 6,
+) -> DocumentMetadata:
+    return DocumentMetadata(
+        title=title,
+        source_url='https://example.test/guide.pdf',
+        publisher=None,
+        publication_date=None,
+        authors=(),
+        subject=None,
+        keywords=(),
+        creator=None,
+        producer=None,
+        format='PDF 1.7',
+        creation_date=None,
+        modification_date=None,
+        source_page_count=source_page_count,
+        page_count=page_count,
+    )
+
+
+def _parsed_pdf() -> ParsedPdf:
     return ParsedPdf(
-        source=tmp_path / 'guide.pdf',
-        source_page_count=8,
-        page_count=6,
-        metadata={'Title': 'Discover Brittany'},
+        metadata=_metadata(),
         sections=(
             ParsedSection(
                 title='Brittany',
@@ -46,8 +67,8 @@ def _parsed_pdf(tmp_path: Path) -> ParsedPdf:
     )
 
 
-def test_render_markdown_uses_paragraph_text(tmp_path: Path) -> None:
-    markdown = render_markdown(_parsed_pdf(tmp_path))
+def test_render_markdown_uses_paragraph_text() -> None:
+    markdown = render_markdown(_parsed_pdf())
 
     assert markdown == (
         '# Brittany\n\n'
@@ -59,7 +80,7 @@ def test_render_markdown_uses_paragraph_text(tmp_path: Path) -> None:
 
 def test_write_markdown_creates_parent_directories(tmp_path: Path) -> None:
     destination = write_markdown(
-        _parsed_pdf(tmp_path),
+        _parsed_pdf(),
         tmp_path / 'nested' / 'guide.md',
     )
 
@@ -67,12 +88,9 @@ def test_write_markdown_creates_parent_directories(tmp_path: Path) -> None:
     assert destination.read_text(encoding='utf-8').startswith('# Brittany')
 
 
-def test_render_markdown_handles_untitled_content(tmp_path: Path) -> None:
+def test_render_markdown_handles_untitled_content() -> None:
     parsed = ParsedPdf(
-        source=tmp_path / 'guide.pdf',
-        source_page_count=1,
-        page_count=1,
-        metadata={},
+        metadata=_metadata(source_page_count=1, page_count=1),
         sections=(
             ParsedSection(
                 title=None,
