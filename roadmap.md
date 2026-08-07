@@ -135,22 +135,20 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Build normalized document hierarchy
+## [P0] Preserve document hierarchy
 
 **Labels:** `ingestion`, `document-model`
 
 - [x] Derive parent sections from heading levels
-- [x] Build heading paths
-- [x] Assign deterministic section and paragraph identifiers
+- [x] Preserve nested sections in the parsed document
+- [x] Build heading paths for retrieval chunks
 - [x] Preserve section and paragraph ordering
-- [x] Convert parsed sections into content-node records
+- [x] Preserve paragraph and section page ranges
 
 **Acceptance criteria**
 
-- [x] Every section has a stable identifier
-- [x] Every child section references its parent
-- [x] Every paragraph references its section
-- [x] Every node has a deterministic position
+- [x] Child sections are nested under their parents
+- [x] Paragraph order is deterministic
 - [x] Heading paths are correct
 
 **Example heading path**
@@ -164,54 +162,67 @@ ______________________________________________________________________
 **Labels:** `ingestion`, `rag`
 
 - [x] Chunk paragraphs within section boundaries
-- [x] Preserve heading paths and section identifiers
+- [x] Preserve heading paths
 - [x] Preserve page ranges
 - [x] Add deterministic chunk identifiers
-- [x] Add configurable target size, maximum size, and overlap
-- [x] Avoid overlap across unrelated sections
-- [x] Store document and source-node metadata with each chunk
-- [x] Record chunk position and token count
+- [x] Add configurable target and maximum character sizes
+- [x] Prevent chunks from crossing section boundaries
+- [x] Store document title and section path with each chunk
+- [x] Record chunk position and character count
 - [x] Build separate embedding input from title, heading path, and body
 - [ ] Add automated tests for chunk traceability and boundary preservation
 - [ ] Add reproducibility tests for identical input and configuration
+- [ ] Add tests for oversized paragraphs, labeled entries, and hard size limits
 
 **Acceptance criteria**
 
-- [ ] Every chunk can be traced to its source paragraph or section
+- [x] Every chunk can be traced to source pages and a heading path
 - [x] Every chunk has `page_start` and `page_end`
 - [ ] Chunks never cross unrelated section boundaries
-- [ ] Chunking parameters are configurable through the ingestion configuration
+- [x] Character-based chunking parameters are configurable through the CLI
 - [ ] Chunk identifiers and output are reproducible
 - [x] Stored `text` does not contain synthetic heading enrichment
 - [x] Synthetic heading enrichment is stored separately in `embedding_text`
 
 ______________________________________________________________________
 
-## [P1] Create an ingestion CLI
+## [P1] Create ingestion interfaces and a CLI
 
 **Labels:** `ingestion`, `cli`
 
-- [x] Add a command to ingest a PDF
-- [ ] Add collection or namespace option
-- [ ] Add document version and source checksum
+- [x] Add typed download, parse, chunk, embed, and load stages
+- [x] Add one CLI command for each independent stage
+- [x] Add a `run` command that processes one or more documents sequentially
+- [x] Keep normal end-to-end execution in memory
+- [x] Retain every intermediate artifact only in debug mode
+- [x] Add versioned JSON artifacts between independent stages
+- [x] Make chunked and embedded artifacts self-contained
+- [x] Read optional collection metadata from the document input
+- [x] Calculate and persist the PDF source checksum
 - [x] Generate chunks as part of the ingestion pipeline
 - [x] Generate embeddings before database upload
-- [ ] Upsert document metadata
-- [ ] Upsert embedded chunks
-- [ ] Delete stale chunks when a document is reprocessed
-- [ ] Upload the document and chunks in one database transaction
-- [x] Print ingestion summary
-- [ ] Make repeated ingestion idempotent
-- [ ] Record ingestion status and failures
+- [x] Upload the document and chunks in one database transaction
+- [x] Reject an existing source URL without mutating stored data
+- [x] Print concise completion summaries for the pipeline and individual stages
+- [x] Return validation and stage failures as nonzero CLI errors
 
 **Acceptance criteria**
 
 - [x] Ingestion runs without a notebook
-- [ ] Reprocessing an unchanged document does not create duplicates
-- [ ] Reprocessing a changed document replaces obsolete chunks
-- [ ] A failed chunk upload does not leave a partially ingested document
-- [ ] Errors are logged clearly
-- [ ] The summary reports document, chunk, model, and vector information
+- [x] Every independent command processes exactly one document
+- [x] Only `run` accepts an array of documents
+- [x] Normal execution creates no intermediate files
+- [x] Debug execution creates PDF, text, Markdown, and all JSON artifacts
+- [x] Reprocessing an unchanged source URL does not create duplicates
+- [x] Invalid input or stage artifacts fail before database insertion
+- [x] CLI help documents commands and their required inputs
+
+**Current scope decision**
+
+The CLI deliberately uses insert-only document semantics. An existing source URL is
+rejected instead of being upserted, because replacing document metadata without
+replacing all chunks and embeddings would create an inconsistent aggregate.
+Version-aware replacement is postponed to the document lifecycle stretch goal.
 
 **Tools**
 
@@ -219,6 +230,62 @@ ______________________________________________________________________
 - Pydantic Settings
 - Standard logging
 - `uv`
+
+______________________________________________________________________
+
+## [P0] Persist documents and chunks in PostgreSQL
+
+**Labels:** `database`, `ingestion`, `pgvector`
+
+- [x] Define embedding model, document, and document chunk tables
+- [x] Use `(document_id, chunk_id)` as the chunk primary key
+- [x] Require every document to reference an embedding model
+- [x] Store timezone-aware PDF creation and modification timestamps
+- [x] Store vectors in a pgvector column with a configured dimension
+- [x] Map domain dataclasses to SQLAlchemy rows
+- [x] Insert a complete document aggregate transactionally
+- [x] Reuse matching embedding model metadata
+- [x] Reject incompatible embedding model configurations
+- [x] Reject duplicate source URLs
+- [ ] Persist parser and chunking versions
+- [ ] Persist effective target and maximum chunk sizes
+- [ ] Add PostgreSQL integration tests for commit, rollback, and constraints
+
+**Acceptance criteria**
+
+- [x] Schema initialization is callable without a notebook
+- [x] A document and all its chunks share one transaction
+- [x] Duplicate detection does not alter existing rows
+- [ ] A real PostgreSQL test proves rollback leaves no partial aggregate
+- [ ] Stored processing provenance explains how chunks were produced
+
+______________________________________________________________________
+
+## Remaining before Milestone 3
+
+These are the Milestone 2 exit tasks. Complete them before starting retrieval work:
+
+- [ ] **P0 — Add focused chunking tests.** Cover section boundaries, page and
+  heading-path traceability, deterministic identifiers, reproducible output, labeled
+  entries, oversized paragraphs, and hard character limits.
+- [ ] **P0 — Persist processing provenance.** Populate `parser_version`,
+  `chunking_version`, `target_chunk_chars`, and `max_chunk_chars` instead of leaving the
+  existing database columns null.
+- [ ] **P0 — Add PostgreSQL integration coverage.** Initialize a temporary test database
+  and verify aggregate insertion, duplicate rejection, constraints, and rollback after a
+  chunk failure.
+- [ ] **P0 — Run and record an end-to-end ingestion smoke test.** Ingest the configured
+  Brittany PDF through Docker, inspect debug artifacts and exported CSV data, and
+  confirm that every stored chunk has a vector and source pages.
+
+The following work is deliberately deferred and is not a Milestone 2 exit criterion:
+
+- Versioned replacement and stale-chunk cleanup are part of the document lifecycle
+  stretch goal.
+- Persistent ingestion status, structured stage failures, and detailed telemetry are
+  part of Milestone 7 observability.
+- Token-based chunk sizing, overlap, and token counts
+- Stable section and paragraph IDs beyond page ranges and heading paths
 
 ______________________________________________________________________
 
@@ -577,6 +644,31 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## [P2] Add ingestion observability
+
+**Labels:** `ingestion`, `monitoring`, `operations`
+
+- [ ] Assign an identifier to every ingestion run
+- [ ] Record document and stage status transitions
+- [ ] Persist structured failure details
+- [ ] Record stage duration and chunk counts
+- [ ] Record embedding model, dimensions, and normalization
+- [ ] Add an optional detailed CLI summary
+
+**Acceptance criteria**
+
+- [ ] A failed run identifies its document and failing stage
+- [ ] Operators can distinguish completed, rejected, and failed runs
+- [ ] Operational records do not alter the document aggregate transaction
+- [ ] Detailed telemetry is optional in normal CLI output
+
+**Tools**
+
+- Standard logging or Structlog
+- PostgreSQL
+
+______________________________________________________________________
+
 ## [P1] Build monitoring dashboard
 
 **Labels:** `monitoring`, `dashboard`
@@ -708,7 +800,13 @@ ______________________________________________________________________
 
 - [ ] Add document filters
 - [ ] Add region and topic metadata
-- [ ] Support document updates
+- [ ] Define document identity independently from a mutable source URL
+- [ ] Detect unchanged and changed source checksums
+- [ ] Add explicit document versions and deprecation status
+- [ ] Replace a document, its chunks, and its embeddings atomically
+- [ ] Soft-delete or deprecate superseded document versions
+- [ ] Remove or exclude stale chunks from retrieval
+- [ ] Test concurrent and repeated document updates
 
 ## [P2] Add OCR fallback
 
