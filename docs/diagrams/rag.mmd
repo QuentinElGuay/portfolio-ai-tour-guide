@@ -1,0 +1,45 @@
+flowchart LR
+    %% -------------------------
+    %% Entry / Exit
+    %% -------------------------
+    START([Start])
+    END([End])
+
+    %% -------------------------
+    %% Shared components
+    %% -------------------------
+    KB[(Knowledge Base)]
+    LLM[LLM Model]
+
+    %% -------------------------
+    %% RAG
+    %% -------------------------
+    subgraph RAG[RAG]
+        direction LR
+        Q[Question] --> T[Tokenize] --> V[Embed] --> S[Search]
+        R[Retrieve] --> P[Build Prompt]
+        O[Response]
+    end
+
+    %% Entry / Exit connections
+    START --> Q
+    O --> END
+
+    %% RAG interactions
+    S --> KB
+    KB --> R
+    P --> LLM
+    LLM --> O
+
+    %% -------------------------
+    %% Styling
+    %% -------------------------
+    classDef rag fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef shared fill:#fff7e6,stroke:#d99000,stroke-width:2px;
+    classDef startNode fill:#198754,color:#ffffff,stroke:#146c43,stroke-width:3px,font-weight:bold;
+    classDef endNode fill:#dc3545,color:#ffffff,stroke:#b02a37,stroke-width:3px,font-weight:bold;
+
+    class Q,T,V,S,R,P,O rag;
+    class KB,LLM shared;
+    class START startNode;
+    class END endNode;
