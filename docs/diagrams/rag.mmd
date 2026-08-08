@@ -11,25 +11,16 @@ flowchart LR
     KB[(Knowledge Base)]
     LLM[LLM Model]
 
-    %% -------------------------
-    %% RAG
-    %% -------------------------
-    subgraph RAG[RAG]
-        direction LR
-        Q[Question] --> T[Tokenize] --> V[Embed] --> S[Search]
-        R[Retrieve] --> P[Build Prompt]
-        O[Response]
-    end
+    Q[Question] --> T[Tokenize] --> V[Embed] --> S[Search] --> P[Build Prompt] --> O[Response]
+
 
     %% Entry / Exit connections
     START --> Q
     O --> END
 
     %% RAG interactions
-    S --> KB
-    KB --> R
-    P --> LLM
-    LLM --> O
+    S <--> KB
+    P <--> LLM
 
     %% -------------------------
     %% Styling
