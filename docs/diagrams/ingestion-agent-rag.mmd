@@ -1,9 +1,16 @@
-flowchart TB
+flowchart LR
     %% -------------------------
-    %% Entry / Exit
+    %% Entry
     %% -------------------------
     START([Start])
-    END([End])
+
+    %% -------------------------
+    %% RAG
+    %% -------------------------
+    subgraph RAG[RAG]
+        direction LR
+        Q1[Question] --> T1[Tokenize] --> V1[Embed] --> S1[Search] --> BD[Best Documents]
+    end
 
     %% -------------------------
     %% Ingestion
@@ -18,15 +25,7 @@ flowchart TB
     %% -------------------------
     KB[(Knowledge Base)]
     LLM[LLM Model]
-
-    %% -------------------------
-    %% RAG
-    %% -------------------------
-    subgraph RAG[RAG]
-        direction LR
-        Q1[Question] --> T1[Tokenize] --> V1[Embed] --> S1[Search]
-        R1[Retrieve] --> BD[Best Documents]
-    end
+    TOOLS[Tools]
 
     %% -------------------------
     %% Agent
@@ -36,30 +35,27 @@ flowchart TB
         Q2[Question] --> R2[Reason] --> O2[Response]
     end
 
+
     %% -------------------------
-    %% Tools
+    %% Exit
     %% -------------------------
-    subgraph TOOLS[Tools]
-        direction LR
-        W[Weather Service]
-        BKG[Booking Service]
-    end
+    END([End])
 
     %% Entry / Exit connections
     START --> Q2
     O2 --> END
+    O2 --> Q2
 
     %% Ingestion output
     E --> KB
 
     %% RAG interactions
-    S1 --> KB
-    KB --> R1
+    S1 <--> KB
 
     %% Agent interactions
-    R2 <--> LLM
-    R2 <--> TOOLS
     R2 <--> RAG
+    R2 <--> TOOLS
+    R2 <--> LLM
 
     %% -------------------------
     %% Styling
@@ -77,7 +73,6 @@ flowchart TB
     class A,B,C,D,E ingress;
     class Q1,T1,V1,S1,R1,BD rag;
     class Q2,R2,O2 agent;
-    class KB,LLM shared;
-    class W,BKG tool;
+    class KB,LLM,TOOLS shared;
     class START startNode;
     class END endNode;
