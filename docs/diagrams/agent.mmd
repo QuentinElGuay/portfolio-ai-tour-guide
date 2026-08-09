@@ -1,0 +1,51 @@
+flowchart LR
+    %% -------------------------
+    %% Entry / Exit
+    %% -------------------------
+    START([Start])
+    END([End])
+
+    %% -------------------------
+    %% Agent
+    %% -------------------------
+    subgraph AG[Agent]
+        direction LR
+        Q[Question] --> R[Reason] --> O[Response]
+    end
+
+    %% -------------------------
+    %% LLM
+    %% -------------------------
+    LLM[LLM Model]
+
+    %% -------------------------
+    %% Tools
+    %% -------------------------
+    subgraph TOOLS[Tools]
+        direction LR
+        RS[RAG Service]
+        OT[Other Tools]
+    end
+
+    %% Entry / Exit connections
+    START --> Q
+    O --> END
+
+    %% Agent interactions
+    R <--> LLM
+    R <--> TOOLS
+
+    %% -------------------------
+    %% Styling
+    %% -------------------------
+    classDef agent fill:#eefcf3,stroke:#2f9e44,stroke-width:1.5px;
+    classDef shared fill:#fff7e6,stroke:#d99000,stroke-width:2px;
+    classDef tool fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef startNode fill:#198754,color:#ffffff,stroke:#146c43,stroke-width:3px,font-weight:bold;
+    classDef endNode fill:#dc3545,color:#ffffff,stroke:#b02a37,stroke-width:3px,font-weight:bold;
+
+    class Q,R,O agent;
+    class LLM shared;
+    class RS,OT tool;
+    class START startNode;
+    class END endNode;

@@ -1,0 +1,78 @@
+flowchart LR
+    %% -------------------------
+    %% Entry
+    %% -------------------------
+    START([Start])
+
+    %% -------------------------
+    %% RAG
+    %% -------------------------
+    subgraph RAG[RAG]
+        direction LR
+        Q1[Question] --> T1[Tokenize] --> V1[Embed] --> S1[Search] --> BD[Best Documents]
+    end
+
+    %% -------------------------
+    %% Ingestion
+    %% -------------------------
+    subgraph ING[Document Ingestion]
+        direction LR
+        A[Download] --> B[Parse] --> C[Chunk] --> D[Tokenize] --> E[Embed]
+    end
+
+    %% -------------------------
+    %% Shared components
+    %% -------------------------
+    KB[(Knowledge Base)]
+    LLM[LLM Model]
+    TOOLS[Tools]
+
+    %% -------------------------
+    %% Agent
+    %% -------------------------
+    subgraph AG[Agent]
+        direction LR
+        Q2[Question] --> R2[Reason] --> O2[Response]
+    end
+
+
+    %% -------------------------
+    %% Exit
+    %% -------------------------
+    END([End])
+
+    %% Entry / Exit connections
+    START --> Q2
+    O2 --> END
+    O2 --> Q2
+
+    %% Ingestion output
+    E --> KB
+
+    %% RAG interactions
+    S1 <--> KB
+
+    %% Agent interactions
+    R2 <--> RAG
+    R2 <--> TOOLS
+    R2 <--> LLM
+
+    %% -------------------------
+    %% Styling
+    %% -------------------------
+    classDef ingress fill:#eef6ff,stroke:#4a90e2,stroke-width:1.5px;
+    classDef rag fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef agent fill:#eefcf3,stroke:#2f9e44,stroke-width:1.5px;
+    classDef shared fill:#fff7e6,stroke:#d99000,stroke-width:2px;
+    classDef tool fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef terminal fill:#111111,color:#ffffff,stroke:#111111,stroke-width:2.5px;
+
+    classDef startNode fill:#198754,color:#ffffff,stroke:#146c43,stroke-width:3px,font-weight:bold;
+    classDef endNode fill:#dc3545,color:#ffffff,stroke:#b02a37,stroke-width:3px,font-weight:bold;
+
+    class A,B,C,D,E ingress;
+    class Q1,T1,V1,S1,R1,BD rag;
+    class Q2,R2,O2 agent;
+    class KB,LLM,TOOLS shared;
+    class START startNode;
+    class END endNode;
