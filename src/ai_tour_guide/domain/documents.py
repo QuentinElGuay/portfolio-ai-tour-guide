@@ -1,5 +1,9 @@
 from dataclasses import asdict, dataclass
+<<<<<<< HEAD
 from datetime import date, datetime
+=======
+from datetime import date
+>>>>>>> 5eea5a5 (create models for database)
 from typing import Any
 
 
@@ -22,6 +26,7 @@ class DocumentMetadata:
     source_page_count: int
     page_count: int
 
+<<<<<<< HEAD
     def __post_init__(self) -> None:
         """Require database-bound timestamps to include a UTC offset."""
         for field_name in ('creation_date', 'modification_date'):
@@ -33,6 +38,8 @@ class DocumentMetadata:
             if value.tzinfo is None or value.utcoffset() is None:
                 raise ValueError(f'{field_name} must include timezone information')
 
+=======
+>>>>>>> 5eea5a5 (create models for database)
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible representation."""
         return asdict(self)
@@ -44,5 +51,9 @@ class DocumentRecord:
 
     metadata: DocumentMetadata
     source_checksum: str
+<<<<<<< HEAD
     collection: str | None = None
+=======
+    collection: str | None = None  # TODO
+>>>>>>> 5eea5a5 (create models for database)
     version: str | None = None  # TODO
