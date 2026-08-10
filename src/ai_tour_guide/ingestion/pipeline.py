@@ -121,9 +121,9 @@ def embed_document_stage(
 
 def load_document_stage(embedded: EmbeddedDocumentArtifact) -> int:
     """Load one complete embedded document into the knowledge base."""
-    from ai_tour_guide import database
+    from ai_tour_guide import knowledge_base
 
-    return database.insert_document_with_chunks(
+    return knowledge_base.insert_document_with_chunks(
         embedded.document,
         embedded.chunks,
         embedded.chunking,

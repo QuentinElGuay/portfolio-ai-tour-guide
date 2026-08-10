@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
-from ai_tour_guide.database.connection import create_database_engine
-from ai_tour_guide.database.tables import metadata
+from ai_tour_guide.knowledge_base.connection import create_database_engine
+from ai_tour_guide.knowledge_base.tables import metadata
 
 
 def initialize_database() -> None:

@@ -1,4 +1,4 @@
-from ai_tour_guide.database.knowledge_base import (
+from ai_tour_guide.knowledge_base.insert import (
     DocumentAlreadyExistsError,
     EmbeddingModelConfigurationError,
     insert_document_with_chunks,

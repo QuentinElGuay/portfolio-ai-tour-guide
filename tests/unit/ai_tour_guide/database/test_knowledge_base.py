@@ -9,13 +9,13 @@ from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
-from ai_tour_guide.database.knowledge_base import (
+from ai_tour_guide.knowledge_base.insert import (
     DocumentAlreadyExistsError,
     EmbeddingModelConfigurationError,
     get_or_create_embedding_model,
     insert_document,
 )
-from ai_tour_guide.database.models import EmbeddingModelRow
+from ai_tour_guide.knowledge_base.models import EmbeddingModelRow
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata

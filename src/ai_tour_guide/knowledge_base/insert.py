@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.database.connection import create_database_engine
-from ai_tour_guide.database.models import (
+from ai_tour_guide.knowledge_base.connection import create_database_engine
+from ai_tour_guide.knowledge_base.models import (
     DocumentRow,
     EmbeddingModelRow,
     ModelFactory,

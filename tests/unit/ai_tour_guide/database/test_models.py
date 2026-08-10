@@ -7,7 +7,7 @@ from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
-from ai_tour_guide.database.models import (
+from ai_tour_guide.knowledge_base.models import (
     DocumentChunkRow,
     DocumentRow,
     ModelFactory,

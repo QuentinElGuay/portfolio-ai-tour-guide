@@ -12,12 +12,12 @@ from typing import Any
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
-from ai_tour_guide.database.tables import (
+from ai_tour_guide.knowledge_base.tables import (
     document_chunks,
     documents,
     embedding_models,
 )
-from ai_tour_guide.database.tables import (
+from ai_tour_guide.knowledge_base.tables import (
     metadata as table_metadata,
 )
 from ai_tour_guide.domain.chunks import EmbeddedChunk
