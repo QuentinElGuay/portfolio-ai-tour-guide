@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from math import isfinite
 
@@ -33,6 +34,23 @@ class ScoreKind(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class SourceMetadata:
+    """Stable provenance needed to identify and cite a retrieved chunk."""
+
+    document_id: int
+    chunk_id: str
+    title: str
+    source_url: str
+    publisher: str | None
+    publication_date: date | None
+    collection: str | None
+    version: str | None
+    section_path: tuple[str, ...]
+    page_start: int | None
+    page_end: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class RetrievedChunk:
     """A ranked chunk and the score that produced its position."""
 
@@ -40,6 +58,7 @@ class RetrievedChunk:
     rank: int
     score: float
     score_kind: ScoreKind
+    source: SourceMetadata
 
 
 DEFAULT_RRF_RANK_CONSTANT = 60
@@ -90,6 +109,24 @@ def _chunk_identity(chunk: DocumentChunkRow) -> _ChunkIdentity:
     return _ChunkIdentity(document_id=document_id, chunk_id=chunk.chunk_id)
 
 
+def _create_source_metadata(chunk: DocumentChunkRow) -> SourceMetadata:
+    """Copy source provenance while the ORM relationship is still attached."""
+    document = chunk.document
+    return SourceMetadata(
+        document_id=chunk.document_id,
+        chunk_id=chunk.chunk_id,
+        title=document.title,
+        source_url=document.source_url,
+        publisher=document.publisher,
+        publication_date=document.publication_date,
+        collection=document.collection,
+        version=document.version,
+        section_path=tuple(chunk.section_path),
+        page_start=chunk.page_start,
+        page_end=chunk.page_end,
+    )
+
+
 def _relevance_score(raw_score: float, distance_metric: str) -> float:
     """Convert a lower-is-better vector distance to a higher-is-better score."""
     if distance_metric == 'cosine':
@@ -114,7 +151,7 @@ def _fuse_rankings(
     *,
     k: int,
     rank_constant: int,
-) -> list[DocumentChunkRow]:
+) -> list[RetrievedChunk]:
     """Combine ranked results using reciprocal-rank fusion."""
     candidates: dict[_ChunkIdentity, _FusionCandidate] = {}
     for ranking, weight in rankings:
@@ -137,6 +174,7 @@ def _fuse_rankings(
             rank=rank,
             score=candidate.score,
             score_kind=ScoreKind.RRF,
+            source=_create_source_metadata(candidate.chunk),
         )
         for rank, candidate in enumerate(ranked_candidates[:k], start=1)
     ]
@@ -194,6 +232,7 @@ def retrieve(
                             embedder.metadata.distance_metric,
                         ),
                         score_kind=vector_score_kind,
+                        source=_create_source_metadata(result.chunk),
                     )
                     for rank, result in enumerate(
                         vector_results,
@@ -211,6 +250,7 @@ def retrieve(
                         rank=rank,
                         score=result.score,
                         score_kind=ScoreKind.TEXT_RANK,
+                        source=_create_source_metadata(result.chunk),
                     )
                     for rank, result in enumerate(text_results, start=1)
                 ]
@@ -230,6 +270,7 @@ def retrieve(
                     rank=rank,
                     score=result.score,
                     score_kind=ScoreKind.TEXT_RANK,
+                    source=_create_source_metadata(result.chunk),
                 )
                 for rank, result in enumerate(text_results, start=1)
             ]
@@ -243,5 +284,6 @@ __all__ = [
     'RetrievedChunk',
     'ScoreKind',
     'SearchMode',
+    'SourceMetadata',
     'retrieve',
 ]

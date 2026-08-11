@@ -7,7 +7,11 @@ from ai_tour_guide.agent.rag.pipeline import (
     answer_question,
 )
 from ai_tour_guide.agent.rag.prompting import build_context
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, ScoreKind
+from ai_tour_guide.knowledge_base.retrieval import (
+    RetrievedChunk,
+    ScoreKind,
+    SourceMetadata,
+)
 
 
 def _chunk():
@@ -32,6 +36,19 @@ def test_answer_question_retrieves_context_and_returns_sources(
             rank=1,
             score=0.9,
             score_kind=ScoreKind.TEXT_RANK,
+            source=SourceMetadata(
+                document_id=7,
+                chunk_id='chunk-123',
+                title='A museum guide',
+                source_url='https://example.com/museum',
+                publisher=None,
+                publication_date=None,
+                collection=None,
+                version=None,
+                section_path=('Museum',),
+                page_start=12,
+                page_end=12,
+            ),
         )
     ]
     backend = MagicMock()
@@ -40,7 +57,30 @@ def test_answer_question_retrieves_context_and_returns_sources(
 
     result = answer_question('When does it open?', mode='text', k=3)
 
-    assert result == RAGResult(answer='It opens at ten.', chunks=[chunk])
+    assert result == RAGResult(
+        answer='It opens at ten.',
+        retrieved=[
+            RetrievedChunk(
+                chunk=chunk,
+                rank=1,
+                score=0.9,
+                score_kind=ScoreKind.TEXT_RANK,
+                source=SourceMetadata(
+                    document_id=7,
+                    chunk_id='chunk-123',
+                    title='A museum guide',
+                    source_url='https://example.com/museum',
+                    publisher=None,
+                    publication_date=None,
+                    collection=None,
+                    version=None,
+                    section_path=('Museum',),
+                    page_start=12,
+                    page_end=12,
+                ),
+            )
+        ],
+    )
     retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
     messages = backend.reply.call_args.args[0]
     assert 'chunk-123' in messages[1]['content']

@@ -1,3 +1,5 @@
+from datetime import date
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -10,6 +12,7 @@ from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
     ScoreKind,
     SearchMode,
+    SourceMetadata,
     retrieve,
 )
 from ai_tour_guide.knowledge_base.search import ScoredDocumentChunk
@@ -21,6 +24,40 @@ def _settings() -> MagicMock:
     settings.normalize = True
     settings.cache_dir = None
     return settings
+
+
+def _chunk(chunk_id: str):
+    return SimpleNamespace(
+        document_id=7,
+        chunk_id=chunk_id,
+        section_path=['Brittany', 'Coast'],
+        page_start=2,
+        page_end=3,
+        document=SimpleNamespace(
+            title='A guide to Brittany',
+            source_url='https://example.com/brittany',
+            publisher='Tourism Board',
+            publication_date=date(2026, 1, 2),
+            collection='tour-guides',
+            version='2026',
+        ),
+    )
+
+
+def _source(chunk_id: str) -> SourceMetadata:
+    return SourceMetadata(
+        document_id=7,
+        chunk_id=chunk_id,
+        title='A guide to Brittany',
+        source_url='https://example.com/brittany',
+        publisher='Tourism Board',
+        publication_date=date(2026, 1, 2),
+        collection='tour-guides',
+        version='2026',
+        section_path=('Brittany', 'Coast'),
+        page_start=2,
+        page_end=3,
+    )
 
 
 @patch('ai_tour_guide.knowledge_base.retrieval.search_vector')
@@ -42,7 +79,7 @@ def test_vector_retrieval_embeds_once_and_passes_metadata(
     settings_class.return_value = _settings()
     embedder_class.return_value.embed_query.return_value = np.array([0.1, 0.2])
     embedder_class.return_value.metadata.distance_metric = 'cosine'
-    chunk = MagicMock(chunk_id='chunk-1')
+    chunk = _chunk('chunk-1')
     search_vector.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.2)]
 
     result = retrieve('Brittany coast', mode='vector', k=2)
@@ -54,6 +91,7 @@ def test_vector_retrieval_embeds_once_and_passes_metadata(
             rank=1,
             score=0.8,
             score_kind=ScoreKind.COSINE_SIMILARITY,
+            source=_source('chunk-1'),
         )
     ]
     search_vector.assert_called_once_with(
@@ -79,7 +117,7 @@ def test_text_retrieval_does_not_embed(
     session = MagicMock(spec=Session)
     create_engine.return_value = engine
     session_class.return_value.__enter__.return_value = session
-    chunk = MagicMock(chunk_id='chunk-1')
+    chunk = _chunk('chunk-1')
     search_text.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.7)]
 
     assert retrieve('Brittany coast', mode='text', k=2) == [
@@ -88,6 +126,7 @@ def test_text_retrieval_does_not_embed(
             rank=1,
             score=0.7,
             score_kind=ScoreKind.TEXT_RANK,
+            source=_source('chunk-1'),
         )
     ]
 
@@ -117,9 +156,9 @@ def test_hybrid_retrieval_combines_rankings(
     settings_class.return_value = _settings()
     embedder_class.return_value.embed_query.return_value = np.array([0.1, 0.2])
     embedder_class.return_value.metadata.distance_metric = 'cosine'
-    vector_chunk = MagicMock(chunk_id='vector')
-    shared_chunk = MagicMock(chunk_id='shared')
-    text_chunk = MagicMock(chunk_id='text')
+    vector_chunk = _chunk('vector')
+    shared_chunk = _chunk('shared')
+    text_chunk = _chunk('text')
     search_vector.return_value = [
         ScoredDocumentChunk(chunk=shared_chunk, score=0.1),
         ScoredDocumentChunk(chunk=vector_chunk, score=0.2),

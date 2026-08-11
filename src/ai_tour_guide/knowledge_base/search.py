@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.knowledge_base.models import (
@@ -83,6 +83,7 @@ def _vector_statement(
     distance = _vector_distance(query, embedding_metadata.distance_metric)
     return (
         select(DocumentChunkRow, distance.label('score'))
+        .options(selectinload(DocumentChunkRow.document))
         .join(DocumentChunkRow.document)
         .join(DocumentRow.embedding_model)
         .where(DocumentChunkRow.embedding.is_not(None))
@@ -104,6 +105,7 @@ def _text_statement(query: str, k: int):
     rank = func.ts_rank_cd(DocumentChunkRow.search_vector, tsquery)
     return (
         select(DocumentChunkRow, rank.label('score'))
+        .options(selectinload(DocumentChunkRow.document))
         .where(DocumentChunkRow.search_vector.op('@@')(tsquery))
         .order_by(rank.desc())
         .limit(k)

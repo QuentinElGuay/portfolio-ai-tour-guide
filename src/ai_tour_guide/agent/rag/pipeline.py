@@ -21,15 +21,19 @@ def answer_question(
 ) -> RAGResult:
     """Retrieve context and generate a grounded answer for ``question``."""
     retrieved = retrieve(question, mode=mode, k=k)
-    chunks = [result.chunk for result in retrieved]
+    if not retrieved:
+        return RAGResult(answer=INSUFFICIENT_CONTEXT_ANSWER, retrieved=[])
 
-    if not chunks:
-        return RAGResult(answer=INSUFFICIENT_CONTEXT_ANSWER, chunks=[])
-
-    messages = build_messages(question, build_context(chunks))
+    messages = build_messages(
+        question,
+        build_context([result.chunk for result in retrieved]),
+    )
     selected_backend = backend or create_backend()
     answer = asyncio.run(selected_backend.reply(messages))
-    return RAGResult(answer=answer, chunks=chunks)
+    return RAGResult(
+        answer=answer,
+        retrieved=retrieved,
+    )
 
 
 __all__ = ['INSUFFICIENT_CONTEXT_ANSWER', 'answer_question']

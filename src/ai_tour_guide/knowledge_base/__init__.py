@@ -9,6 +9,7 @@ from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
     ScoreKind,
     SearchMode,
+    SourceMetadata,
     retrieve,
 )
 from ai_tour_guide.knowledge_base.search import (
@@ -26,6 +27,7 @@ __all__ = [
     'ScoreKind',
     'ScoredDocumentChunk',
     'SearchMode',
+    'SourceMetadata',
     'insert_document_with_chunks',
     'retrieve',
     'search_text',

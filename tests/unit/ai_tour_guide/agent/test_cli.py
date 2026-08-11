@@ -1,10 +1,15 @@
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
 from ai_tour_guide.agent.cli import main
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, ScoreKind
+from ai_tour_guide.knowledge_base.retrieval import (
+    RetrievedChunk,
+    ScoreKind,
+    SourceMetadata,
+)
 
 
 def _chunk(*, page_start: int | None = 2, page_end: int | None = 3):
@@ -22,6 +27,19 @@ def _retrieved_chunk():
         rank=1,
         score=0.98765,
         score_kind=ScoreKind.COSINE_SIMILARITY,
+        source=SourceMetadata(
+            document_id=7,
+            chunk_id='brittany:chunk-0001',
+            title='A guide to Brittany',
+            source_url='https://example.com/brittany',
+            publisher='Tourism Board',
+            publication_date=date(2026, 1, 2),
+            collection='tour-guides',
+            version='2026',
+            section_path=('Brittany', 'Coast'),
+            page_start=2,
+            page_end=3,
+        ),
     )
 
 
@@ -33,8 +51,7 @@ def test_search_command_prints_chunks(retrieve: MagicMock) -> None:
 
     assert result.exit_code == 0
     assert (
-        result.output
-        == 'brittany:chunk-0001 (pages 2-3) '
+        result.output == 'brittany:chunk-0001 (pages 2-3) '
         '[rank 1, score 0.9877 cosine_similarity]\n'
         'Visit the Brittany coast.\n'
     )

@@ -349,6 +349,7 @@ ______________________________________________________________________
 - [x] Return page references with retrieved chunks
 - [x] Return typed retrieval hits with scores and a clearly defined score contract
 - [x] Use one scored search-result API for vector and full-text primitives
+- [x] Return typed source provenance with each retrieved chunk
 
 **Acceptance criteria**
 
@@ -421,6 +422,11 @@ ______________________________________________________________________
 - [ ] Build the prompt
 - [ ] Call the LLM through a direct backend
 - [ ] Return answer and sources
+
+**Current implementation decisions**
+
+- [x] Keep retrieved chunks, scores, and source metadata together in one result list
+- [x] Expose `RAGResult.chunks` as a derived convenience property
 
 **Backend decision**
 
