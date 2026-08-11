@@ -2,13 +2,11 @@
 
 import click
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
-from ai_tour_guide.embedding import FastEmbedder
-from ai_tour_guide.embedding.settings import EmbeddingSettings
-from ai_tour_guide.knowledge_base.connection import create_database_engine
+from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.search import search_text, search_vector
+from ai_tour_guide.knowledge_base.retrieval import retrieve
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -35,7 +33,7 @@ def main() -> None:
 def search_command(query: str, mode: str, k: int) -> None:
     """Search for document chunks matching QUERY."""
     try:
-        chunks = _search(query, mode=mode, k=k)
+        chunks = retrieve(query, mode=mode, k=k)
     except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -47,45 +45,43 @@ def search_command(query: str, mode: str, k: int) -> None:
         click.echo(_format_chunk(chunk))
 
 
-def _search(query: str, *, mode: str, k: int) -> list[DocumentChunkRow]:
-    """Run the selected retrieval mode and return its ranked chunks."""
-    engine = create_database_engine()
-
+@main.command('ask')
+@click.argument('question')
+@click.option(
+    '--mode',
+    type=click.Choice(['vector', 'text'], case_sensitive=False),
+    default='vector',
+    show_default=True,
+    help='Use semantic vector search or PostgreSQL full-text search.',
+)
+@click.option(
+    '--k',
+    type=click.IntRange(min=1),
+    default=5,
+    show_default=True,
+    help='Maximum number of chunks to use as context.',
+)
+def ask_command(question: str, mode: str, k: int) -> None:
+    """Answer QUESTION using the tour-guide knowledge base."""
     try:
-        with Session(engine) as session:
-            if mode == 'vector':
-                settings = EmbeddingSettings()
-                embedder = FastEmbedder(
-                    model_name=settings.model_name,
-                    normalize=settings.normalize,
-                    cache_dir=settings.cache_dir,
-                )
-                query_embedding = embedder.embed_query(query).tolist()
-                return search_vector(
-                    session,
-                    query_embedding,
-                    k,
-                    embedding_metadata=embedder.metadata,
-                )
+        result = answer_question(question, mode=mode, k=k)
+    except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
-            return search_text(session, query, k)
-    finally:
-        engine.dispose()
+    click.echo(result.answer)
+    click.echo()
+    click.echo('Sources:')
+    if not result.chunks:
+        click.echo('- none')
+        return
+
+    for chunk in result.chunks:
+        click.echo(f'- {chunk.chunk_id} ({format_page_range(chunk)})')
 
 
 def _format_chunk(chunk: DocumentChunkRow) -> str:
     """Format a chunk with the provenance needed to inspect a result."""
-    page_range = _format_page_range(chunk)
-    return f'{chunk.chunk_id} ({page_range})\n{chunk.text}'
+    return f'{chunk.chunk_id} ({format_page_range(chunk)})\n{chunk.text}'
 
 
-def _format_page_range(chunk: DocumentChunkRow) -> str:
-    """Render the source-page range when it is available."""
-    if chunk.page_start is None:
-        return 'page unavailable'
-    if chunk.page_end is None or chunk.page_end == chunk.page_start:
-        return f'page {chunk.page_start}'
-    return f'pages {chunk.page_start}-{chunk.page_end}'
-
-
-__all__ = ['main', 'search_command']
+__all__ = ['ask_command', 'main', 'search_command']

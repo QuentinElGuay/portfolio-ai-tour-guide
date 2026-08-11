@@ -360,7 +360,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Implement BM25 search
+## [P1] Implement PostgreSQL full-text search
 
 **Labels:** `retrieval`, `search`
 
@@ -384,7 +384,7 @@ ______________________________________________________________________
 
 **Labels:** `retrieval`, `best-practice`
 
-- [ ] Combine vector and BM25 results
+- [ ] Combine vector and full-text search results
 - [ ] Implement reciprocal rank fusion
 - [ ] Make retrieval weights configurable
 - [ ] Compare against individual retrievers
@@ -396,8 +396,7 @@ ______________________________________________________________________
 
 **Tools**
 
-- Qdrant
-- rank-bm25
+- PostgreSQL with pgvector and full-text search
 
 ______________________________________________________________________
 
@@ -410,8 +409,21 @@ ______________________________________________________________________
 - [ ] Accept a user question
 - [ ] Retrieve relevant chunks
 - [ ] Build the prompt
-- [ ] Call the LLM
+- [ ] Call the LLM through a direct backend
 - [ ] Return answer and sources
+
+**Backend decision**
+
+The first production-oriented chat backend will call the LLM directly from the
+agent process. This keeps the initial RAG application self-contained and avoids
+requiring a separate chat server. The existing HTTP client remains a future
+integration point, but implementing a remote backend and its server is deferred
+until the direct backend is working.
+
+- [ ] Implement a direct backend using the existing `ChatBackend` protocol
+- [ ] Add configuration for the direct model/provider
+- [ ] Use the direct backend from the RAG pipeline and chat application
+- [ ] Defer remote HTTP backend/server implementation
 
 **Acceptance criteria**
 
@@ -520,7 +532,7 @@ ______________________________________________________________________
 **Labels:** `evaluation`, `retrieval`
 
 - [ ] Evaluate vector search
-- [ ] Evaluate BM25
+- [ ] Evaluate full-text search
 - [ ] Evaluate hybrid search
 - [ ] Compare chunking configurations
 - [ ] Measure latency
@@ -868,7 +880,7 @@ ______________________________________________________________________
 ## v0.3.0 — Evaluation
 
 - Golden dataset
-- BM25 comparison
+- Full-text search comparison
 - Hybrid search
 - Prompt evaluation
 
