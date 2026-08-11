@@ -7,16 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 from ai_tour_guide.knowledge_base.connection import create_database_engine
 from ai_tour_guide.knowledge_base.models import (
     DocumentRow,
     EmbeddingModelRow,
     ModelFactory,
 )
-from ai_tour_guide.domain.chunks import EmbeddedChunk
-from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.embedding import EmbeddingMetadata
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 
 class DocumentAlreadyExistsError(RuntimeError):

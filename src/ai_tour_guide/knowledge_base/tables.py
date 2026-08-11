@@ -142,15 +142,6 @@ documents = Table(
         Text,
     ),
     Column(
-        'collection',
-        Text,
-        nullable=False,
-    ),
-    Column(
-        'version',
-        Text,
-    ),
-    Column(
         'title',
         Text,
         nullable=False,

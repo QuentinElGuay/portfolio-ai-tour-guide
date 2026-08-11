@@ -12,6 +12,9 @@ from typing import Any
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 from ai_tour_guide.knowledge_base.tables import (
     document_chunks,
     documents,
@@ -20,9 +23,6 @@ from ai_tour_guide.knowledge_base.tables import (
 from ai_tour_guide.knowledge_base.tables import (
     metadata as table_metadata,
 )
-from ai_tour_guide.domain.chunks import EmbeddedChunk
-from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 
 class Base(DeclarativeBase):
