@@ -7,15 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.database.connection import create_database_engine
-from ai_tour_guide.database.models import (
+from ai_tour_guide.domain.chunks import EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentRecord
+from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.knowledge_base.connection import create_database_engine
+from ai_tour_guide.knowledge_base.models import (
     DocumentRow,
     EmbeddingModelRow,
     ModelFactory,
 )
-from ai_tour_guide.domain.chunks import EmbeddedChunk
-from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.embedding import EmbeddingMetadata
 
 
 class DocumentAlreadyExistsError(RuntimeError):
@@ -70,6 +71,7 @@ def insert_document(
     session: Session,
     document: DocumentRecord,
     chunks: Sequence[EmbeddedChunk],
+    chunking: ChunkingMetadata,
     *,
     embedding_model_id: int,
 ) -> DocumentRow:
@@ -85,14 +87,14 @@ def insert_document(
 
     if existing_document_id is not None:
         raise DocumentAlreadyExistsError(
-            'Document already exists for source URL '
-            f'{document.metadata.source_url!r}'
+            f'Document already exists for source URL {document.metadata.source_url!r}'
         )
 
     row = ModelFactory.create_document(
         document,
         embedding_model_id=embedding_model_id,
         chunks=chunks,
+        chunking=chunking,
     )
     row.embedded_at = datetime.now(UTC)
     session.add(row)
@@ -102,15 +104,13 @@ def insert_document(
 
 def _is_document_identity_violation(exc: IntegrityError) -> bool:
     diagnostic = getattr(exc.orig, 'diag', None)
-    return (
-        getattr(diagnostic, 'constraint_name', None)
-        == 'uq_documents_source_url'
-    )
+    return getattr(diagnostic, 'constraint_name', None) == 'uq_documents_source_url'
 
 
 def insert_document_with_chunks(
     document: DocumentRecord,
     chunks: Sequence[EmbeddedChunk],
+    chunking_metadata: ChunkingMetadata,
     embedding_metadata: EmbeddingMetadata,
 ) -> int:
     """Persist a fully embedded document atomically and return its ID."""
@@ -128,6 +128,7 @@ def insert_document_with_chunks(
                         session,
                         document,
                         chunks,
+                        chunking_metadata,
                         embedding_model_id=embedding_model.embedding_model_id,
                     )
             except IntegrityError as exc:

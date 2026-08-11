@@ -128,6 +128,12 @@ def _parsed_artifact() -> ParsedDocumentArtifact:
                         embedding_input_sha256='embedding-sha256',
                     ),
                 ),
+                chunking=(
+                    ChunkingMetadata(
+                        target_chars=750,
+                        max_chars=1_000,
+                    )
+                ),
                 embedding=EmbeddingMetadata(
                     provider='fastembed',
                     model_name='test-model',

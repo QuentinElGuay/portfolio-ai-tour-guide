@@ -2,7 +2,6 @@
 
 from ai_tour_guide.embedding.constants import (
     DEFAULT_BATCH_SIZE,
-    DEFAULT_MODEL_NAME,
     DEFAULT_NORMALIZE,
 )
 from ai_tour_guide.embedding.fastembed import FastEmbedder
@@ -14,7 +13,6 @@ from ai_tour_guide.embedding.interfaces import (
 
 __all__ = [
     'DEFAULT_BATCH_SIZE',
-    'DEFAULT_MODEL_NAME',
     'DEFAULT_NORMALIZE',
     'Embedder',
     'EmbeddingError',

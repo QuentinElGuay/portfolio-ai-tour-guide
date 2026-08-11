@@ -3,9 +3,11 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import inspect
 
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
-from ai_tour_guide.database.models import (
+from ai_tour_guide.knowledge_base.models import (
     DocumentChunkRow,
     DocumentRow,
     ModelFactory,
@@ -44,6 +46,10 @@ def _document_record(
     )
 
 
+def _chunking_metadata() -> ChunkingMetadata:
+    return ChunkingMetadata(target_chars=750, max_chars=1_000)
+
+
 def _embedded_chunk() -> EmbeddedChunk:
     return EmbeddedChunk(
         chunk=Chunk(
@@ -66,6 +72,7 @@ def test_create_document_preserves_document_field_names() -> None:
     row = ModelFactory.create_document(
         _document_record(),
         embedding_model_id=7,
+        chunking=_chunking_metadata(),
     )
 
     assert isinstance(row, DocumentRow)
@@ -93,6 +100,7 @@ def test_create_document_attaches_mapped_chunk_rows() -> None:
         _document_record(),
         embedding_model_id=7,
         chunks=[_embedded_chunk()],
+        chunking=_chunking_metadata(),
     )
 
     assert len(row.chunks) == 1
@@ -121,6 +129,25 @@ def test_document_chunk_uses_document_scoped_composite_primary_key() -> None:
     assert primary_key_columns == ('document_id', 'chunk_id')
 
 
+def test_document_chunks_have_ann_indexes_for_every_distance_metric() -> None:
+    indexes = {index.name: index for index in DocumentChunkRow.__table__.indexes}
+
+    assert indexes['ix_document_chunks_embedding_cosine_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_cosine_ops'}
+    assert indexes['ix_document_chunks_embedding_l2_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_l2_ops'}
+    assert indexes['ix_document_chunks_embedding_inner_product_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_ip_ops'}
+    assert all(
+        index.dialect_options['postgresql']['using'] == 'hnsw'
+        for name, index in indexes.items()
+        if name.startswith('ix_document_chunks_embedding_')
+    )
+
+
 def test_document_requires_an_embedding_model() -> None:
     assert DocumentRow.__table__.c.embedding_model_id.nullable is False
 
@@ -129,6 +156,7 @@ def test_document_collection_is_optional() -> None:
     row = ModelFactory.create_document(
         _document_record(collection=None),
         embedding_model_id=7,
+        chunking=_chunking_metadata(),
     )
 
     assert row.collection is None

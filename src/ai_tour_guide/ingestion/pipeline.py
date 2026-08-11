@@ -97,34 +97,35 @@ def chunk_document_stage(
 
 
 def embed_document_stage(
-    chunked: ChunkedDocumentArtifact,
+    chunked_document: ChunkedDocumentArtifact,
     *,
     embedder: Embedder,
     batch_size: int,
 ) -> EmbeddedDocumentArtifact:
     """Attach embeddings and their complete model metadata to every chunk."""
     initial_metadata = embedder.metadata
-    result = embed_chunks(
-        chunked.chunks,
-        model_name=initial_metadata.model_name,
+    embedded_chunks = embed_chunks(
+        chunked_document.chunks,
         batch_size=batch_size,
         normalize=initial_metadata.normalized,
         embedder=embedder,
     )
     return EmbeddedDocumentArtifact(
-        document=chunked.document,
-        chunks=result.chunks,
+        document=chunked_document.document,
+        chunks=embedded_chunks.chunks,
+        chunking=chunked_document.chunking,
         embedding=embedder.metadata,
     )
 
 
 def load_document_stage(embedded: EmbeddedDocumentArtifact) -> int:
     """Load one complete embedded document into the knowledge base."""
-    from ai_tour_guide import database
+    from ai_tour_guide import knowledge_base
 
-    return database.insert_document_with_chunks(
+    return knowledge_base.insert_document_with_chunks(
         embedded.document,
         embedded.chunks,
+        embedded.chunking,
         embedded.embedding,
     )
 
@@ -175,13 +176,13 @@ def run_document_pipeline(
         timeout_seconds=settings.timeout,
     )
     parsed = parse_pdf_stage(downloaded)
-    chunked = chunk_document_stage(
+    chunked_document = chunk_document_stage(
         parsed,
         target_chars=target_chars,
         max_chars=max_chars,
     )
     embedded = embed_document_stage(
-        chunked,
+        chunked_document,
         embedder=embedder,
         batch_size=embedding_batch_size,
     )
@@ -191,7 +192,7 @@ def run_document_pipeline(
             settings.tmp_folder,
             downloaded,
             parsed,
-            chunked,
+            chunked_document,
             embedded,
         )
 

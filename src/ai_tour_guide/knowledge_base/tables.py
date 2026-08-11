@@ -142,15 +142,6 @@ documents = Table(
         Text,
     ),
     Column(
-        'collection',
-        Text,
-        nullable=False,
-    ),
-    Column(
-        'version',
-        Text,
-    ),
-    Column(
         'title',
         Text,
         nullable=False,
@@ -477,4 +468,27 @@ Index(
     'ix_document_chunks_search_vector',
     document_chunks.c.search_vector,
     postgresql_using='gin',
+)
+
+# Each supported distance metric needs its own operator class and ANN index.
+# HNSW indexes exclude null vectors automatically.
+Index(
+    'ix_document_chunks_embedding_cosine_hnsw',
+    document_chunks.c.embedding,
+    postgresql_using='hnsw',
+    postgresql_ops={'embedding': 'vector_cosine_ops'},
+)
+
+Index(
+    'ix_document_chunks_embedding_l2_hnsw',
+    document_chunks.c.embedding,
+    postgresql_using='hnsw',
+    postgresql_ops={'embedding': 'vector_l2_ops'},
+)
+
+Index(
+    'ix_document_chunks_embedding_inner_product_hnsw',
+    document_chunks.c.embedding,
+    postgresql_using='hnsw',
+    postgresql_ops={'embedding': 'vector_ip_ops'},
 )

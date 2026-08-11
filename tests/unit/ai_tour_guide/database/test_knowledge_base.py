@@ -1,19 +1,22 @@
 import os
 from datetime import UTC, date, datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
 
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 
-from ai_tour_guide.database.knowledge_base import (
+from ai_tour_guide.knowledge_base.insert import (
     DocumentAlreadyExistsError,
     EmbeddingModelConfigurationError,
     get_or_create_embedding_model,
     insert_document,
 )
-from ai_tour_guide.database.models import EmbeddingModelRow
+from ai_tour_guide.knowledge_base.init_db import initialize_database
+from ai_tour_guide.knowledge_base.models import EmbeddingModelRow
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata
@@ -40,6 +43,10 @@ def _document_record(*, collection: str | None = None) -> DocumentRecord:
         source_checksum='document-sha256',
         collection=collection,
     )
+
+
+def _chunking_metadata() -> ChunkingMetadata:
+    return ChunkingMetadata(target_chars=750, max_chars=1_000)
 
 
 def _embedded_chunk() -> EmbeddedChunk:
@@ -78,6 +85,7 @@ def test_insert_document_rejects_an_existing_document_without_changes() -> None:
             session,
             _document_record(),
             [_embedded_chunk()],
+            _chunking_metadata(),
             embedding_model_id=7,
         )
 
@@ -93,6 +101,7 @@ def test_insert_document_rejects_a_document_without_chunks() -> None:
             session,
             _document_record(),
             [],
+            _chunking_metadata(),
             embedding_model_id=7,
         )
 
@@ -109,6 +118,7 @@ def test_insert_document_adds_the_complete_aggregate() -> None:
         session,
         _document_record(collection='tour-guides'),
         [_embedded_chunk()],
+        _chunking_metadata(),
         embedding_model_id=7,
     )
 
@@ -174,3 +184,25 @@ def test_get_or_create_embedding_model_rejects_changed_dimensions() -> None:
 
     session.add.assert_not_called()
     session.flush.assert_not_called()
+
+
+@patch('ai_tour_guide.knowledge_base.init_db.metadata')
+@patch('ai_tour_guide.knowledge_base.init_db.create_database_engine')
+def test_initialize_database_creates_missing_indexes(
+    create_engine: MagicMock,
+    metadata: MagicMock,
+) -> None:
+    engine = MagicMock()
+    connection = MagicMock()
+    create_engine.return_value = engine
+    engine.begin.return_value.__enter__.return_value = connection
+    index = MagicMock()
+    table = MagicMock()
+    table.indexes = [index]
+    metadata.tables.values.return_value = [table]
+
+    initialize_database()
+
+    metadata.create_all.assert_called_once_with(bind=connection, checkfirst=True)
+    index.create.assert_called_once_with(bind=connection, checkfirst=True)
+    engine.dispose.assert_called_once_with()

@@ -327,6 +327,7 @@ class EmbeddedDocumentArtifact:
 
     document: DocumentRecord
     chunks: tuple[EmbeddedChunk, ...]
+    chunking: ChunkingMetadata
     embedding: EmbeddingMetadata
 
     def to_dict(self) -> dict[str, Any]:
@@ -342,6 +343,7 @@ class EmbeddedDocumentArtifact:
                 }
                 for chunk in self.chunks
             ],
+            'chunking': self.chunking.to_dict(),
             'embedding': _embedding_metadata_to_dict(self.embedding),
         }
 
@@ -374,6 +376,12 @@ class EmbeddedDocumentArtifact:
                 _require_mapping(data.get('document'), field_name='document')
             ),
             chunks=tuple(embedded_chunks),
+            chunking=ChunkingMetadata.from_dict(
+                _require_mapping(
+                    data.get('chunking'),
+                    field_name='chunking',
+                )
+            ),
             embedding=_embedding_metadata_from_dict(
                 _require_mapping(data.get('embedding'), field_name='embedding')
             ),

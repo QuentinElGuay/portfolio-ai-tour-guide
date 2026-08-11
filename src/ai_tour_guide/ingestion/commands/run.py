@@ -54,6 +54,7 @@ def run_command(
         embedder = FastEmbedder(
             model_name=embedding_settings.model_name,
             normalize=embedding_settings.normalize,
+            cache_dir=embedding_settings.cache_dir,
         )
 
         logging.basicConfig(

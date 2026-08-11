@@ -247,8 +247,8 @@ ______________________________________________________________________
 - [x] Reuse matching embedding model metadata
 - [x] Reject incompatible embedding model configurations
 - [x] Reject duplicate source URLs
+- [x] Persist effective target and maximum chunk sizes
 - [ ] Persist parser and chunking versions
-- [ ] Persist effective target and maximum chunk sizes
 - [ ] Add PostgreSQL integration tests for commit, rollback, and constraints
 
 **Acceptance criteria**
@@ -268,9 +268,9 @@ These are the Milestone 2 exit tasks. Complete them before starting retrieval wo
 - [ ] **P0 — Add focused chunking tests.** Cover section boundaries, page and
   heading-path traceability, deterministic identifiers, reproducible output, labeled
   entries, oversized paragraphs, and hard character limits.
-- [ ] **P0 — Persist processing provenance.** Populate `parser_version`,
-  `chunking_version`, `target_chunk_chars`, and `max_chunk_chars` instead of leaving the
-  existing database columns null.
+- [ ] **P0 — Persist processing provenance.** Populate `parser_version` and
+  `chunking_version`; effective target and maximum chunk sizes are now stored with each
+  document.
 - [ ] **P0 — Add PostgreSQL integration coverage.** Initialize a temporary test database
   and verify aggregate insertion, duplicate rejection, constraints, and rollback after a
   chunk failure.
@@ -307,7 +307,7 @@ ______________________________________________________________________
 - [x] Store whether vectors are normalized
 - [x] Store a SHA-256 checksum of each embedding input
 - [ ] Pin the embedding model revision or artifact version
-- [ ] Use the same model, revision, normalization, and runtime for queries
+- [x] Use the same model, revision, normalization, and runtime for queries
 - [ ] Add embedding reproducibility tests
 - [ ] Add retrieval smoke tests
 
@@ -323,8 +323,8 @@ ______________________________________________________________________
 **Acceptance criteria**
 
 - [ ] English queries retrieve relevant English content
-- [ ] Every stored chunk has exactly one 384-dimensional vector
-- [ ] Stored and query embeddings use the same model configuration
+- [x] Every stored chunk has exactly one 384-dimensional vector
+- [x] Stored and query embeddings use the same model configuration
 - [ ] Embedding generation is reproducible for a pinned model artifact
 - [ ] Unchanged `embedding_input_sha256` values can skip re-embedding
 - [ ] Embeddings produced by different runtimes are never mixed in one index
@@ -343,20 +343,20 @@ ______________________________________________________________________
 
 **Labels:** `retrieval`, `vector-search`
 
-- [ ] Create vector collection
-- [ ] Store chunks and metadata
-- [ ] Implement top-k retrieval
+- [x] Create a pgvector-backed chunk index
+- [x] Store chunks and metadata
+- [x] Implement top-k retrieval
 - [ ] Return scores and page references
 
 **Acceptance criteria**
 
-- [ ] Search returns ranked chunks
-- [ ] Results include page citations
-- [ ] Collection persists locally
+- [x] Search returns ranked chunks
+- [x] Results include page citations
+- [x] Collection persists locally
 
 **Tools**
 
-- Qdrant
+- PostgreSQL with pgvector
 
 ______________________________________________________________________
 
@@ -364,20 +364,19 @@ ______________________________________________________________________
 
 **Labels:** `retrieval`, `search`
 
-- [ ] Index chunk text
-- [ ] Implement lexical retrieval
-- [ ] Return ranked chunks and scores
+- [x] Index chunk text
+- [x] Implement lexical retrieval
+- [x] Return ranked chunks
 - [ ] Test exact place-name queries
 
 **Acceptance criteria**
 
-- [ ] BM25 retrieval can run independently
+- [x] Lexical retrieval can run independently
 - [ ] Results are included in evaluation
 
 **Tools**
 
-- rank-bm25
-- SQLite FTS5
+- PostgreSQL full-text search
 
 ______________________________________________________________________
 

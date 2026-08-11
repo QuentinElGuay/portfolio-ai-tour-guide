@@ -7,6 +7,8 @@ x-app-environment: &app-environment
   DB_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
   DB_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
   EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:?EMBEDDING_DIMENSIONS is required}"
+  EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+  EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:-true}"
 
 services:
   database:
@@ -46,6 +48,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
 
     profiles:
       - tools
@@ -60,7 +64,7 @@ services:
         "run",
         "python",
         "-m",
-        "ai_tour_guide.database.init_db",
+        "ai_tour_guide.knowledge_base.init_db",
       ]
 
     depends_on:
@@ -79,6 +83,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
 
     profiles:
       - ingestion
@@ -87,7 +93,6 @@ services:
       <<: *app-environment
 
     volumes:
-      - ./data:/app/data
       - ./tmp:/app/tmp
 
     depends_on:
@@ -106,6 +111,8 @@ services:
     build:
       context: .
       dockerfile: docker/agent.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
 
     profiles:
       - agent
