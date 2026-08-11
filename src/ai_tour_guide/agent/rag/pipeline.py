@@ -29,7 +29,7 @@ def answer_question(
         build_context([result.chunk for result in retrieved]),
     )
     selected_backend = backend or create_backend()
-    answer = asyncio.run(selected_backend.reply(messages))
+    answer = asyncio.run(selected_backend.generate(messages))
     return RAGResult(
         answer=answer,
         retrieved=retrieved,

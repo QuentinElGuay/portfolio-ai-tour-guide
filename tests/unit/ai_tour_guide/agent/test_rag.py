@@ -1,5 +1,9 @@
+import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+
+os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.agent.rag.models import RAGResult
 from ai_tour_guide.agent.rag.pipeline import (
@@ -52,7 +56,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
         )
     ]
     backend = MagicMock()
-    backend.reply = AsyncMock(return_value='It opens at ten.')
+    backend.generate = AsyncMock(return_value='It opens at ten.')
     create_backend.return_value = backend
 
     result = answer_question('When does it open?', mode='text', k=3)
@@ -82,7 +86,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
         ],
     )
     retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
-    messages = backend.reply.call_args.args[0]
+    messages = backend.generate.call_args.args[0]
     assert 'chunk-123' in messages[1]['content']
     assert 'The museum opens at ten.' in messages[1]['content']
     assert 'When does it open?' in messages[1]['content']

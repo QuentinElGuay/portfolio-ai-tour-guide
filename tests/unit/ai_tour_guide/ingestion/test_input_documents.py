@@ -5,6 +5,7 @@ from io import StringIO
 import pytest
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.ingestion.cli import load_documents
 

@@ -8,18 +8,19 @@ from sqlalchemy.orm import Session
 from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
+from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
+from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
+from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.knowledge_base.init_db import initialize_database
 from ai_tour_guide.knowledge_base.insert import (
     DocumentAlreadyExistsError,
     EmbeddingModelConfigurationError,
     get_or_create_embedding_model,
     insert_document,
 )
-from ai_tour_guide.knowledge_base.init_db import initialize_database
 from ai_tour_guide.knowledge_base.models import EmbeddingModelRow
-from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
-from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
-from ai_tour_guide.embedding import EmbeddingMetadata
 
 
 def _document_record(*, collection: str | None = None) -> DocumentRecord:

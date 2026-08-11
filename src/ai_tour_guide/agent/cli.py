@@ -78,8 +78,36 @@ def ask_command(question: str, mode: str, k: int) -> None:
         click.echo('- none')
         return
 
-    for chunk in result.chunks:
-        click.echo(f'- {chunk.chunk_id} ({format_page_range(chunk)})')
+    references: dict[tuple[int, str], list[RetrievedChunk]] = {}
+    for retrieved in result.retrieved:
+        source = retrieved.source
+        document = (source.document_id, source.title)
+        document_references = references.setdefault(document, [])
+        page_range = (source.page_start, source.page_end)
+        if any(
+            (item.source.page_start, item.source.page_end) == page_range
+            for item in document_references
+        ):
+            continue
+        document_references.append(retrieved)
+
+    for (_, title), document_references in references.items():
+        document_references.sort(
+            key=lambda item: (
+                item.source.page_start is None,
+                item.source.page_start or 0,
+                item.source.page_end or 0,
+            )
+        )
+        page_ranges = [format_page_range(item.chunk) for item in document_references]
+        if len(page_ranges) == 1:
+            pages = page_ranges[0]
+        else:
+            pages = 'pages ' + ', '.join(
+                page_range.removeprefix('pages ').removeprefix('page ')
+                for page_range in page_ranges
+            )
+        click.echo(f'- {title} ({pages})')
 
 
 def _format_chunk(result: RetrievedChunk) -> str:

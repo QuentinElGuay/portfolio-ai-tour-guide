@@ -74,14 +74,20 @@ The API should return:
 A minimal FastAPI endpoint could be:
 
 ```python
-from typing import Literal
+from enum import StrEnum
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 
+class Role(StrEnum):
+    USER = 'user'
+    ASSISTANT = 'assistant'
+    SYSTEM = 'system'
+
+
 class Message(BaseModel):
-    role: Literal["user", "assistant", "system"]
+    role: Role
     content: str
 
 
@@ -96,16 +102,14 @@ class ChatResponse(BaseModel):
 app = FastAPI()
 
 
-@app.post("/chat")
+@app.post('/chat')
 async def chat(request: ChatRequest) -> ChatResponse:
     latest_message = request.messages[-1].content
 
     # Replace this with your provider or application service.
-    answer = f"Your backend received: {latest_message}"
+    answer = f'Your backend received: {latest_message}'
 
-    return ChatResponse(
-        message=Message(role="assistant", content=answer)
-    )
+    return ChatResponse(message=Message(role='assistant', content=answer))
 ```
 
 ## Project structure

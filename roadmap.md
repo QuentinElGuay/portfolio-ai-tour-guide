@@ -454,6 +454,9 @@ ______________________________________________________________________
 - [ ] Build the prompt
 - [ ] Call the LLM through a direct backend
 - [ ] Return answer and sources
+- [ ] Define a structured LLM response containing the answer and cited chunk IDs
+- [ ] Validate cited chunk IDs against the retrieved context
+- [ ] Render only cited sources, grouped by document with sorted page references
 
 **Current implementation decisions**
 
@@ -468,16 +471,24 @@ requiring a separate chat server. The existing HTTP client remains a future
 integration point, but implementing a remote backend and its server is deferred
 until the direct backend is working.
 
-- [ ] Implement a direct backend using the existing `ChatBackend` protocol
-- [ ] Add configuration for the direct model/provider
-- [ ] Use the direct backend from the RAG pipeline and chat application
+- [x] Implement a direct backend using the existing `ChatBackend` protocol
+- [x] Add configuration for the direct model/provider
+- [x] Use the direct backend from the RAG pipeline and chat application
 - [ ] Defer remote HTTP backend/server implementation
 
 **Acceptance criteria**
 
 - [ ] Answers use retrieved context
-- [ ] Sources include page numbers
+- [ ] Sources include page numbers only for chunks cited by the LLM
 - [ ] Components can be tested independently
+
+**Citation contract**
+
+The LLM must return stable retrieved `chunk_id` values alongside its answer.
+The application owns citation validation and presentation: invalid IDs are
+discarded, duplicate document/page references are merged, and pages are sorted.
+Until this contract is implemented, the CLI can only display all retrieved
+context sources and cannot reliably distinguish sources the LLM actually used.
 
 **Tools**
 

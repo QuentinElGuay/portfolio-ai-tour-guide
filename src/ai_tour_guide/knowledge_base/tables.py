@@ -1,5 +1,3 @@
-import os
-
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     ARRAY,
@@ -23,12 +21,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 
-try:
-    EMBEDDING_DIMENSIONS = int(os.environ['EMBEDDING_DIMENSIONS'])
-except KeyError as exc:
-    raise RuntimeError(
-        'EMBEDDING_DIMENSIONS must be configured before loading the database schema'
-    ) from exc
+from ai_tour_guide.embedding.settings import EmbeddingSettings
+
+EMBEDDING_DIMENSIONS = EmbeddingSettings().dimensions
 
 
 metadata = MetaData()

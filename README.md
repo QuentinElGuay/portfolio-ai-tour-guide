@@ -238,10 +238,11 @@ are:
 
 | Variable               | Purpose                                          | Default                  |
 | ---------------------- | ------------------------------------------------ | ------------------------ |
-| `POSTGRES_DB`          | PostgreSQL database name                         | `postgres`               |
-| `POSTGRES_USER`        | PostgreSQL user                                  | `postgres`               |
-| `POSTGRES_PASSWORD`    | PostgreSQL password                              | `postgres`               |
-| `POSTGRES_PORT`        | Optional host port exposed by Compose            | `5432`                   |
+| `DB_HOST`              | Database host                                    | `localhost`              |
+| `DB_PORT`              | Database port                                    | `5432`                   |
+| `DB_NAME`              | PostgreSQL database name                         | `postgres`               |
+| `DB_USER`              | PostgreSQL user                                  | `postgres`               |
+| `DB_PASSWORD`          | PostgreSQL password                              | `postgres`               |
 | `EMBEDDING_MODEL_NAME` | FastEmbed model used for document vectors        | Required                 |
 | `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the database schema | `384`                    |
 | `EMBEDDING_BATCH_SIZE` | Number of chunks embedded per inference batch    | `32`                     |

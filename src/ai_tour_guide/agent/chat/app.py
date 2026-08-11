@@ -39,7 +39,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
         messages.append({'role': 'user', 'content': message})
 
         try:
-            return await selected_backend.reply(messages)
+            return await selected_backend.generate(messages)
         except RuntimeError as exc:
             return f'**Backend error:** {exc}'
 
@@ -59,8 +59,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
         ),
         title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
         description=(
-            "A minimal Gradio interface connected to a replaceable "
-            "Python chat backend."
+            'A minimal Gradio interface connected to a replaceable Python chat backend.'
         ),
         examples=[
             'What can this portfolio application do?',

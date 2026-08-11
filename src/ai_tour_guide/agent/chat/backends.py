@@ -5,12 +5,24 @@ from collections.abc import Sequence
 from typing import Protocol
 
 import httpx
+from pydantic import ValidationError
 
 from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.llm.client import OpenAIClient
+from ai_tour_guide.agent.llm.settings import OpenAISettings
 
 
+# Backend Factory
 def create_backend() -> ChatBackend:
     """Create the configured chat backend for agent applications."""
+    try:
+        openai_settings = OpenAISettings()
+    except ValidationError:
+        openai_settings = None
+
+    if openai_settings is not None:
+        return LocalBackend(settings=openai_settings)
+
     api_url = os.getenv('CHAT_API_URL')
 
     if api_url:
@@ -20,14 +32,30 @@ def create_backend() -> ChatBackend:
 
 
 class ChatBackend(Protocol):
-    async def reply(self, messages: Sequence[Message]) -> str:
+    async def generate(self, messages: Sequence[Message]) -> str:
         """Return an assistant response for the complete conversation."""
+
+
+class LocalBackend:
+    """Generate responses directly without a separate application server."""
+
+    def __init__(
+        self,
+        client: OpenAIClient | None = None,
+        *,
+        settings: OpenAISettings | None = None,
+    ) -> None:
+        self.client = client or OpenAIClient(settings)
+
+    async def generate(self, messages: Sequence[Message]) -> str:
+        """Delegate generation to the configured direct LLM client."""
+        return await self.client.generate(messages)
 
 
 class DemoBackend:
     """Local backend that makes the UI runnable without an LLM provider."""
 
-    async def reply(self, messages: Sequence[Message]) -> str:
+    async def generate(self, messages: Sequence[Message]) -> str:
         latest = messages[-1]['content']
 
         return (
@@ -44,7 +72,7 @@ class HttpChatBackend:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
-    async def reply(self, messages: Sequence[Message]) -> str:
+    async def generate(self, messages: Sequence[Message]) -> str:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(

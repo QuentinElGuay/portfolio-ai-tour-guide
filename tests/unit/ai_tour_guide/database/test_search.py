@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.knowledge_base.models import DocumentChunkRow
