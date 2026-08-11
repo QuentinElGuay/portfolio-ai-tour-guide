@@ -23,7 +23,6 @@ from tqdm import tqdm
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.embedding import (
     DEFAULT_BATCH_SIZE,
-    DEFAULT_MODEL_NAME,
     Embedder,
     EmbeddingError,
 )
@@ -93,22 +92,17 @@ def _validate_embedding_batch(
 def embed_chunks(
     chunks: Sequence[Chunk],
     *,
-    model_name: str = DEFAULT_MODEL_NAME,
     batch_size: int = DEFAULT_BATCH_SIZE,
     normalize: bool = True,
     embedder: Embedder,
 ) -> EmbeddingResult:
     """Embed each chunk's ``embedding_text`` and append vector metadata.
 
-    ``embedder`` is injectable for unit tests. Production callers normally
-    leave it as ``None``, causing this function to create a shared
-    :class:`FastEmbedder` with the requested model and normalization setting.
+    ``embedder`` is supplied by the caller so query and document embedding share the
+    configured model and normalization policy.
     """
     if batch_size <= 0:
         raise ValueError('batch_size must be greater than zero')
-
-    if not model_name.strip():
-        raise ValueError('model_name must not be empty')
 
     validated_chunks: tuple[Chunk] = _validate_chunks(chunks)
 

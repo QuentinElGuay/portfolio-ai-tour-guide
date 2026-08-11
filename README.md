@@ -242,7 +242,7 @@ are:
 | `POSTGRES_USER`        | PostgreSQL user                                  | `postgres`               |
 | `POSTGRES_PASSWORD`    | PostgreSQL password                              | `postgres`               |
 | `POSTGRES_PORT`        | Optional host port exposed by Compose            | `5432`                   |
-| `EMBEDDING_MODEL_NAME` | FastEmbed model used for document vectors        | `BAAI/bge-small-en-v1.5` |
+| `EMBEDDING_MODEL_NAME` | FastEmbed model used for document vectors        | Required                 |
 | `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the database schema | `384`                    |
 | `EMBEDDING_BATCH_SIZE` | Number of chunks embedded per inference batch    | `32`                     |
 | `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized         | `true`                   |

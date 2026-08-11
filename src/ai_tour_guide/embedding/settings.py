@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_tour_guide.embedding.constants import (
     DEFAULT_BATCH_SIZE,
-    DEFAULT_MODEL_NAME,
     DEFAULT_NORMALIZE,
 )
 
@@ -20,7 +19,7 @@ class EmbeddingSettings(BaseSettings):
         extra='ignore',
     )
 
-    model_name: str = DEFAULT_MODEL_NAME
+    model_name: str
     batch_size: int = Field(default=DEFAULT_BATCH_SIZE, gt=0)
     normalize: bool = DEFAULT_NORMALIZE
     cache_dir: Path | None = None
