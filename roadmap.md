@@ -384,8 +384,8 @@ ______________________________________________________________________
 
 **Labels:** `retrieval`, `best-practice`
 
-- [ ] Combine vector and full-text search results
-- [ ] Implement reciprocal rank fusion
+- [x] Combine vector and full-text search results
+- [x] Implement reciprocal rank fusion
 - [ ] Make retrieval weights configurable
 - [ ] Compare against individual retrievers
 

@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.retrieval import SearchMode, retrieve
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -18,7 +18,7 @@ def main() -> None:
 @click.argument('query')
 @click.option(
     '--mode',
-    type=click.Choice(['vector', 'text'], case_sensitive=False),
+    type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
     default='vector',
     show_default=True,
     help='Use semantic vector search or PostgreSQL full-text search.',
@@ -49,7 +49,7 @@ def search_command(query: str, mode: str, k: int) -> None:
 @click.argument('question')
 @click.option(
     '--mode',
-    type=click.Choice(['vector', 'text'], case_sensitive=False),
+    type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
     default='vector',
     show_default=True,
     help='Use semantic vector search or PostgreSQL full-text search.',
