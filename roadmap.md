@@ -1,6 +1,7 @@
 # BreizhGuide Roadmap
 
-> [!note] This roadmap had been created by ChatGPT as a first draft and might evolve
+> [!note]
+> This roadmap had been created by ChatGPT as a first draft and might evolve
 > over time.
 
 ## Priority legend
