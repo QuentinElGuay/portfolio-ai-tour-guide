@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,3 +23,4 @@ class EmbeddingSettings(BaseSettings):
     model_name: str = DEFAULT_MODEL_NAME
     batch_size: int = Field(default=DEFAULT_BATCH_SIZE, gt=0)
     normalize: bool = DEFAULT_NORMALIZE
+    cache_dir: Path | None = None

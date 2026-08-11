@@ -1,6 +1,7 @@
 """FastEmbed implementation of the shared text embedding interface."""
 
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,7 @@ class FastEmbedder(Embedder):
         model_name: str,
         *,
         normalize: bool = True,
+        cache_dir: Path | None = None,
         model: Any | None = None,
     ) -> None:
         if not model_name.strip():
@@ -28,10 +30,12 @@ class FastEmbedder(Embedder):
         self._model_name = model_name
         self._normalize_vectors = normalize
         self._dimensions = 0
-        self._model = model if model is not None else self._load_model(model_name)
+        self._model = (
+            model if model is not None else self._load_model(model_name, cache_dir)
+        )
 
     @staticmethod
-    def _load_model(model_name: str) -> Any:
+    def _load_model(model_name: str, cache_dir: Path | None) -> Any:
         try:
             from fastembed import TextEmbedding
         except ImportError as exc:
@@ -41,7 +45,10 @@ class FastEmbedder(Embedder):
             ) from exc
 
         try:
-            return TextEmbedding(model_name=model_name)
+            options: dict[str, str] = {'model_name': model_name}
+            if cache_dir is not None:
+                options['cache_dir'] = str(cache_dir)
+            return TextEmbedding(**options)
         except Exception as exc:
             raise EmbeddingError(
                 f'Could not load embedding model {model_name!r}'

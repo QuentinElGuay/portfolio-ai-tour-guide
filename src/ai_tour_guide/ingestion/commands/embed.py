@@ -9,6 +9,7 @@ from ai_tour_guide.embedding import (
     DEFAULT_MODEL_NAME,
     FastEmbedder,
 )
+from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.ingestion.pipeline import embed_document_stage
 from ai_tour_guide.ingestion.serialization import (
     CHUNKED_DOCUMENT_JSON,
@@ -40,7 +41,11 @@ def embed_command(
 ) -> None:
     """Read CHUNKED_DOCUMENT JSON and write EMBEDDED_DOCUMENT JSON."""
     try:
-        embedder = FastEmbedder(model_name=model_name, normalize=normalize)
+        embedder = FastEmbedder(
+            model_name=model_name,
+            normalize=normalize,
+            cache_dir=EmbeddingSettings().cache_dir,
+        )
         result = embed_document_stage(
             CHUNKED_DOCUMENT_JSON.read(input_path),
             embedder=embedder,

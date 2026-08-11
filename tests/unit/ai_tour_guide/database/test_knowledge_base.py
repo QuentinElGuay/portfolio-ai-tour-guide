@@ -1,6 +1,6 @@
 import os
 from datetime import UTC, date, datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from ai_tour_guide.knowledge_base.insert import (
     get_or_create_embedding_model,
     insert_document,
 )
+from ai_tour_guide.knowledge_base.init_db import initialize_database
 from ai_tour_guide.knowledge_base.models import EmbeddingModelRow
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
@@ -183,3 +184,25 @@ def test_get_or_create_embedding_model_rejects_changed_dimensions() -> None:
 
     session.add.assert_not_called()
     session.flush.assert_not_called()
+
+
+@patch('ai_tour_guide.knowledge_base.init_db.metadata')
+@patch('ai_tour_guide.knowledge_base.init_db.create_database_engine')
+def test_initialize_database_creates_missing_indexes(
+    create_engine: MagicMock,
+    metadata: MagicMock,
+) -> None:
+    engine = MagicMock()
+    connection = MagicMock()
+    create_engine.return_value = engine
+    engine.begin.return_value.__enter__.return_value = connection
+    index = MagicMock()
+    table = MagicMock()
+    table.indexes = [index]
+    metadata.tables.values.return_value = [table]
+
+    initialize_database()
+
+    metadata.create_all.assert_called_once_with(bind=connection, checkfirst=True)
+    index.create.assert_called_once_with(bind=connection, checkfirst=True)
+    engine.dispose.assert_called_once_with()

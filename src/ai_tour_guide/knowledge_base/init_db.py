@@ -16,6 +16,9 @@ def initialize_database() -> None:
             bind=connection,
             checkfirst=True,
         )
+        for table in metadata.tables.values():
+            for index in table.indexes:
+                index.create(bind=connection, checkfirst=True)
 
     engine.dispose()
 

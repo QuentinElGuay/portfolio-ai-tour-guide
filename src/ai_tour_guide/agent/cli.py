@@ -58,6 +58,7 @@ def _search(query: str, *, mode: str, k: int) -> list[DocumentChunkRow]:
                 embedder = FastEmbedder(
                     model_name=settings.model_name,
                     normalize=settings.normalize,
+                    cache_dir=settings.cache_dir,
                 )
                 query_embedding = embedder.embed_query(query).tolist()
                 return search_vector(

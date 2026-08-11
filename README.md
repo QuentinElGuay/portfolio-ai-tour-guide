@@ -212,6 +212,8 @@ Run `make` or `make help` to list the available shortcuts.
 | `make export-csv`                    | Export the ingestion tables to CSV files in `tmp/`.                    |
 | `make export-csv CSV_LIMIT=100`      | Limit each CSV export to 100 data rows.                                |
 | `make export-csv EXPORT_DIR=path`    | Write the CSV exports to another directory.                            |
+| `make vector_search QUESTION='...'`  | Embed a question and search for the nearest document chunks.           |
+| `make text_search QUESTION='...'`    | Search document chunks with PostgreSQL full-text search.                |
 
 > [!WARNING]
 > `make reset-db` runs `docker compose down --volumes` and permanently
@@ -225,6 +227,8 @@ The Makefile variables can be combined:
 ```bash
 make ingest SOURCE_FILES=data/another-source.json DEBUG=1
 make export-csv EXPORT_DIR=tmp/evaluation CSV_LIMIT=250
+make vector_search QUESTION='Where is the Brittany coast?' K=10
+make text_search QUESTION='Brittany coast'
 ```
 
 ## Configuration
@@ -242,14 +246,18 @@ are:
 | `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the database schema | `384`                    |
 | `EMBEDDING_BATCH_SIZE` | Number of chunks embedded per inference batch    | `32`                     |
 | `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized         | `true`                   |
+| `EMBEDDING_CACHE_DIR`  | Optional local directory for FastEmbed model files | FastEmbed default       |
 | `INGESTION_DEBUG`      | Retain intermediate artifacts                    | `false`                  |
 | `INGESTION_TIMEOUT`    | PDF download timeout in seconds                  | `30`                     |
 | `INGESTION_TMP_FOLDER` | Debug artifact directory                         | `tmp`                    |
 
 The direct Python CLI reads `EMBEDDING_*` and `INGESTION_*` settings from `.env`. Docker
-Compose forwards the PostgreSQL settings and `EMBEDDING_DIMENSIONS` to the ingestion
-container; other container settings use their application defaults unless explicitly
-passed to the service.
+Compose forwards the PostgreSQL and embedding settings to application containers; other
+container settings use their application defaults unless explicitly passed to the service.
+
+The Docker agent and ingestion images preload `EMBEDDING_MODEL_NAME` during their build,
+so vector searches do not download the embedding model at runtime. Rebuild the images
+after intentionally changing the model configuration.
 
 `EMBEDDING_DIMENSIONS` must match the selected model. Changing it after the database has
 been initialized requires recreating the schema, which can be done in development with

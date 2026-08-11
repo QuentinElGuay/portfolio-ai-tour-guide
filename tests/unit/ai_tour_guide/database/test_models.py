@@ -129,6 +129,25 @@ def test_document_chunk_uses_document_scoped_composite_primary_key() -> None:
     assert primary_key_columns == ('document_id', 'chunk_id')
 
 
+def test_document_chunks_have_ann_indexes_for_every_distance_metric() -> None:
+    indexes = {index.name: index for index in DocumentChunkRow.__table__.indexes}
+
+    assert indexes['ix_document_chunks_embedding_cosine_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_cosine_ops'}
+    assert indexes['ix_document_chunks_embedding_l2_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_l2_ops'}
+    assert indexes['ix_document_chunks_embedding_inner_product_hnsw'].dialect_options[
+        'postgresql'
+    ]['ops'] == {'embedding': 'vector_ip_ops'}
+    assert all(
+        index.dialect_options['postgresql']['using'] == 'hnsw'
+        for name, index in indexes.items()
+        if name.startswith('ix_document_chunks_embedding_')
+    )
+
+
 def test_document_requires_an_embedding_model() -> None:
     assert DocumentRow.__table__.c.embedding_model_id.nullable is False
 

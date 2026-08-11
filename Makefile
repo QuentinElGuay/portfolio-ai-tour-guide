@@ -5,9 +5,11 @@ SOURCE_FILES ?= source_files.json
 EXPORT_DIR ?= tmp
 CSV_LIMIT ?= 1000
 DEBUG ?= 0
+QUESTION ?=
+K ?= 5
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 
-.PHONY: help init-db reset-db ingest export-csv
+.PHONY: help init-db reset-db ingest export-csv vector_search text_search
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -19,6 +21,9 @@ help: ## Show the available commands.
 	@echo "  make export-csv                      Export ingestion tables to CSV"
 	@echo "  make export-csv EXPORT_DIR=path      Export CSV files to another directory"
 	@echo "  make export-csv CSV_LIMIT=100        Limit each export to 100 data rows"
+	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
+	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
+	@echo "  make vector_search QUESTION='...' K=10  Return up to 10 semantic matches"
 
 init-db: ## Start PostgreSQL and initialize its schema.
 	$(COMPOSE) --profile tools run --rm init-db
@@ -51,3 +56,13 @@ export-csv: ## Export ingestion tables as deterministic CSV files.
 		> "$(EXPORT_DIR)/document_chunks.csv.tmp"
 	@mv "$(EXPORT_DIR)/document_chunks.csv.tmp" "$(EXPORT_DIR)/document_chunks.csv"
 	@echo "Exported up to $(CSV_LIMIT) data rows per table to $(EXPORT_DIR)/"
+
+vector_search: ## Search chunks semantically using QUESTION and optional K.
+	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent search --mode vector --k "$(K)" "$(QUESTION)"
+
+text_search: ## Search chunks lexically using QUESTION and optional K.
+	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make text_search QUESTION='Brittany coast'" >&2; exit 1)
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent search --mode text --k "$(K)" "$(QUESTION)"
