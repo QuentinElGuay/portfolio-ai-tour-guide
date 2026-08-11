@@ -22,6 +22,26 @@ class SearchMode(StrEnum):
     HYBRID = 'hybrid'
 
 
+class ScoreKind(StrEnum):
+    """Meaning of a retrieval score."""
+
+    COSINE_SIMILARITY = 'cosine_similarity'
+    L2_RELEVANCE = 'l2_relevance'
+    INNER_PRODUCT = 'inner_product'
+    TEXT_RANK = 'text_rank'
+    RRF = 'rrf'
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievedChunk:
+    """A ranked chunk and the score that produced its position."""
+
+    chunk: DocumentChunkRow
+    rank: int
+    score: float
+    score_kind: ScoreKind
+
+
 DEFAULT_RRF_RANK_CONSTANT = 60
 
 
@@ -70,8 +90,27 @@ def _chunk_identity(chunk: DocumentChunkRow) -> _ChunkIdentity:
     return _ChunkIdentity(document_id=document_id, chunk_id=chunk.chunk_id)
 
 
+def _relevance_score(raw_score: float, distance_metric: str) -> float:
+    """Convert a lower-is-better vector distance to a higher-is-better score."""
+    if distance_metric == 'cosine':
+        return 1.0 - raw_score
+    if distance_metric in {'l2', 'inner_product'}:
+        return -raw_score
+    raise ValueError(f'Unsupported embedding distance metric {distance_metric!r}')
+
+
+def _score_kind(distance_metric: str) -> ScoreKind:
+    if distance_metric == 'cosine':
+        return ScoreKind.COSINE_SIMILARITY
+    if distance_metric == 'l2':
+        return ScoreKind.L2_RELEVANCE
+    if distance_metric == 'inner_product':
+        return ScoreKind.INNER_PRODUCT
+    raise ValueError(f'Unsupported embedding distance metric {distance_metric!r}')
+
+
 def _fuse_rankings(
-    rankings: Iterable[tuple[list[DocumentChunkRow], float]],
+    rankings: Iterable[tuple[list[RetrievedChunk], float]],
     *,
     k: int,
     rank_constant: int,
@@ -80,10 +119,10 @@ def _fuse_rankings(
     candidates: dict[_ChunkIdentity, _FusionCandidate] = {}
     for ranking, weight in rankings:
         for rank, chunk in enumerate(ranking, start=1):
-            identity = _chunk_identity(chunk)
+            identity = _chunk_identity(chunk.chunk)
             candidate = candidates.setdefault(
                 identity,
-                _FusionCandidate(chunk=chunk),
+                _FusionCandidate(chunk=chunk.chunk),
             )
             candidate.score += weight / (rank_constant + rank)
 
@@ -92,7 +131,15 @@ def _fuse_rankings(
         key=lambda candidate: candidate.score,
         reverse=True,
     )
-    return [candidate.chunk for candidate in ranked_candidates[:k]]
+    return [
+        RetrievedChunk(
+            chunk=candidate.chunk,
+            rank=rank,
+            score=candidate.score,
+            score_kind=ScoreKind.RRF,
+        )
+        for rank, candidate in enumerate(ranked_candidates[:k], start=1)
+    ]
 
 
 def retrieve(
@@ -101,7 +148,7 @@ def retrieve(
     mode: SearchMode = 'vector',
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
-) -> list[DocumentChunkRow]:
+) -> list[RetrievedChunk]:
     """Retrieve ranked document chunks using the selected search mode.
 
     This function owns the database, session, and embedding lifecycle so
@@ -131,17 +178,42 @@ def retrieve(
                     cache_dir=settings.cache_dir,
                 )
                 query_embedding = embedder.embed_query(query).tolist()
-                vector_chunks = search_vector(
+                vector_results = search_vector(
                     session,
                     query_embedding,
                     k,
                     embedding_metadata=embedder.metadata,
                 )
+                vector_score_kind = _score_kind(embedder.metadata.distance_metric)
+                vector_chunks = [
+                    RetrievedChunk(
+                        chunk=result.chunk,
+                        rank=rank,
+                        score=_relevance_score(
+                            result.score,
+                            embedder.metadata.distance_metric,
+                        ),
+                        score_kind=vector_score_kind,
+                    )
+                    for rank, result in enumerate(
+                        vector_results,
+                        start=1,
+                    )
+                ]
 
                 if selected_mode is SearchMode.VECTOR:
                     return vector_chunks
 
-                text_chunks = search_text(session, query, k)
+                text_results = search_text(session, query, k)
+                text_chunks = [
+                    RetrievedChunk(
+                        chunk=result.chunk,
+                        rank=rank,
+                        score=result.score,
+                        score_kind=ScoreKind.TEXT_RANK,
+                    )
+                    for rank, result in enumerate(text_results, start=1)
+                ]
                 return _fuse_rankings(
                     [
                         (vector_chunks, selected_hybrid_settings.vector_weight),
@@ -151,7 +223,16 @@ def retrieve(
                     rank_constant=selected_hybrid_settings.rank_constant,
                 )
 
-            return search_text(session, query, k)
+            text_results = search_text(session, query, k)
+            return [
+                RetrievedChunk(
+                    chunk=result.chunk,
+                    rank=rank,
+                    score=result.score,
+                    score_kind=ScoreKind.TEXT_RANK,
+                )
+                for rank, result in enumerate(text_results, start=1)
+            ]
     finally:
         engine.dispose()
 
@@ -159,6 +240,8 @@ def retrieve(
 __all__ = [
     'DEFAULT_RRF_RANK_CONSTANT',
     'HybridSearchSettings',
+    'RetrievedChunk',
+    'ScoreKind',
     'SearchMode',
     'retrieve',
 ]

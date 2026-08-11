@@ -5,8 +5,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import SearchMode, retrieve
+from ai_tour_guide.knowledge_base.retrieval import (
+    RetrievedChunk,
+    SearchMode,
+    retrieve,
+)
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -79,9 +82,14 @@ def ask_command(question: str, mode: str, k: int) -> None:
         click.echo(f'- {chunk.chunk_id} ({format_page_range(chunk)})')
 
 
-def _format_chunk(chunk: DocumentChunkRow) -> str:
+def _format_chunk(result: RetrievedChunk) -> str:
     """Format a chunk with the provenance needed to inspect a result."""
-    return f'{chunk.chunk_id} ({format_page_range(chunk)})\n{chunk.text}'
+    chunk = result.chunk
+    return (
+        f'{chunk.chunk_id} ({format_page_range(chunk)}) '
+        f'[rank {result.rank}, score {result.score:.4f} '
+        f'{result.score_kind.value}]\n{chunk.text}'
+    )
 
 
 __all__ = ['ask_command', 'main', 'search_command']

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from ai_tour_guide.agent.cli import main
+from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, ScoreKind
 
 
 def _chunk(*, page_start: int | None = 2, page_end: int | None = 3):
@@ -15,15 +16,27 @@ def _chunk(*, page_start: int | None = 2, page_end: int | None = 3):
     )
 
 
+def _retrieved_chunk():
+    return RetrievedChunk(
+        chunk=_chunk(),
+        rank=1,
+        score=0.98765,
+        score_kind=ScoreKind.COSINE_SIMILARITY,
+    )
+
+
 @patch('ai_tour_guide.agent.cli.retrieve')
 def test_search_command_prints_chunks(retrieve: MagicMock) -> None:
-    retrieve.return_value = [_chunk()]
+    retrieve.return_value = [_retrieved_chunk()]
 
     result = CliRunner().invoke(main, ['search', 'Brittany coast', '--k', '1'])
 
     assert result.exit_code == 0
     assert (
-        result.output == 'brittany:chunk-0001 (pages 2-3)\nVisit the Brittany coast.\n'
+        result.output
+        == 'brittany:chunk-0001 (pages 2-3) '
+        '[rank 1, score 0.9877 cosine_similarity]\n'
+        'Visit the Brittany coast.\n'
     )
     retrieve.assert_called_once_with('Brittany coast', mode='vector', k=1)
 

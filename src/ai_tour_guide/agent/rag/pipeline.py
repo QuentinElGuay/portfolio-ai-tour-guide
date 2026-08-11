@@ -20,7 +20,8 @@ def answer_question(
     backend: ChatBackend | None = None,
 ) -> RAGResult:
     """Retrieve context and generate a grounded answer for ``question``."""
-    chunks = retrieve(question, mode=mode, k=k)
+    retrieved = retrieve(question, mode=mode, k=k)
+    chunks = [result.chunk for result in retrieved]
 
     if not chunks:
         return RAGResult(answer=INSUFFICIENT_CONTEXT_ANSWER, chunks=[])

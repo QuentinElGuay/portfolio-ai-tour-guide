@@ -7,6 +7,7 @@ from ai_tour_guide.agent.rag.pipeline import (
     answer_question,
 )
 from ai_tour_guide.agent.rag.prompting import build_context
+from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, ScoreKind
 
 
 def _chunk():
@@ -25,7 +26,14 @@ def test_answer_question_retrieves_context_and_returns_sources(
     create_backend: MagicMock,
 ) -> None:
     chunk = _chunk()
-    retrieve.return_value = [chunk]
+    retrieve.return_value = [
+        RetrievedChunk(
+            chunk=chunk,
+            rank=1,
+            score=0.9,
+            score_kind=ScoreKind.TEXT_RANK,
+        )
+    ]
     backend = MagicMock()
     backend.reply = AsyncMock(return_value='It opens at ten.')
     create_backend.return_value = backend

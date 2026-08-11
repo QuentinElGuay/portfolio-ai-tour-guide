@@ -7,9 +7,12 @@ from sqlalchemy.orm import Session
 from ai_tour_guide.knowledge_base.retrieval import (
     DEFAULT_RRF_RANK_CONSTANT,
     HybridSearchSettings,
+    RetrievedChunk,
+    ScoreKind,
     SearchMode,
     retrieve,
 )
+from ai_tour_guide.knowledge_base.search import ScoredDocumentChunk
 
 
 def _settings() -> MagicMock:
@@ -38,12 +41,21 @@ def test_vector_retrieval_embeds_once_and_passes_metadata(
     session_class.return_value.__enter__.return_value = session
     settings_class.return_value = _settings()
     embedder_class.return_value.embed_query.return_value = np.array([0.1, 0.2])
-    chunks = [MagicMock()]
-    search_vector.return_value = chunks
+    embedder_class.return_value.metadata.distance_metric = 'cosine'
+    chunk = MagicMock(chunk_id='chunk-1')
+    search_vector.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.2)]
 
-    assert retrieve('Brittany coast', mode='vector', k=2) == chunks
+    result = retrieve('Brittany coast', mode='vector', k=2)
 
     embedder_class.return_value.embed_query.assert_called_once_with('Brittany coast')
+    assert result == [
+        RetrievedChunk(
+            chunk=chunk,
+            rank=1,
+            score=0.8,
+            score_kind=ScoreKind.COSINE_SIMILARITY,
+        )
+    ]
     search_vector.assert_called_once_with(
         session,
         [0.1, 0.2],
@@ -67,10 +79,17 @@ def test_text_retrieval_does_not_embed(
     session = MagicMock(spec=Session)
     create_engine.return_value = engine
     session_class.return_value.__enter__.return_value = session
-    chunks = [MagicMock()]
-    search_text.return_value = chunks
+    chunk = MagicMock(chunk_id='chunk-1')
+    search_text.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.7)]
 
-    assert retrieve('Brittany coast', mode='text', k=2) == chunks
+    assert retrieve('Brittany coast', mode='text', k=2) == [
+        RetrievedChunk(
+            chunk=chunk,
+            rank=1,
+            score=0.7,
+            score_kind=ScoreKind.TEXT_RANK,
+        )
+    ]
 
     embedder_class.assert_not_called()
     search_text.assert_called_once_with(session, 'Brittany coast', 2)
@@ -97,11 +116,18 @@ def test_hybrid_retrieval_combines_rankings(
     session_class.return_value.__enter__.return_value = session
     settings_class.return_value = _settings()
     embedder_class.return_value.embed_query.return_value = np.array([0.1, 0.2])
+    embedder_class.return_value.metadata.distance_metric = 'cosine'
     vector_chunk = MagicMock(chunk_id='vector')
     shared_chunk = MagicMock(chunk_id='shared')
     text_chunk = MagicMock(chunk_id='text')
-    search_vector.return_value = [shared_chunk, vector_chunk]
-    search_text.return_value = [shared_chunk, text_chunk]
+    search_vector.return_value = [
+        ScoredDocumentChunk(chunk=shared_chunk, score=0.1),
+        ScoredDocumentChunk(chunk=vector_chunk, score=0.2),
+    ]
+    search_text.return_value = [
+        ScoredDocumentChunk(chunk=shared_chunk, score=0.9),
+        ScoredDocumentChunk(chunk=text_chunk, score=0.8),
+    ]
 
     result = retrieve(
         'Brittany coast',
@@ -110,7 +136,8 @@ def test_hybrid_retrieval_combines_rankings(
         hybrid_settings=HybridSearchSettings(vector_weight=0, text_weight=1),
     )
 
-    assert result == [shared_chunk, text_chunk, vector_chunk]
+    assert [item.chunk for item in result] == [shared_chunk, text_chunk, vector_chunk]
+    assert all(item.score_kind is ScoreKind.RRF for item in result)
     search_vector.assert_called_once()
     search_text.assert_called_once_with(session, 'Brittany coast', 3)
     engine.dispose.assert_called_once_with()

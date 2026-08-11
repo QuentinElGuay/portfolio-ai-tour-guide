@@ -346,7 +346,9 @@ ______________________________________________________________________
 - [x] Create a pgvector-backed chunk index
 - [x] Store chunks and metadata
 - [x] Implement top-k retrieval
-- [ ] Return scores and page references
+- [x] Return page references with retrieved chunks
+- [x] Return typed retrieval hits with scores and a clearly defined score contract
+- [x] Use one scored search-result API for vector and full-text primitives
 
 **Acceptance criteria**
 
@@ -386,8 +388,16 @@ ______________________________________________________________________
 
 - [x] Combine vector and full-text search results
 - [x] Implement reciprocal rank fusion
-- [ ] Make retrieval weights configurable
+- [x] Make retrieval weights and the RRF rank constant configurable
+- [x] Represent supported retrieval modes with an explicit `SearchMode` enum
 - [ ] Compare against individual retrievers
+
+**Current scope decision**
+
+Hybrid tuning is available through typed `HybridSearchSettings` at the retrieval
+API boundary. The vector and text weights default to `1.0`, and the RRF rank
+constant defaults to `60`. These settings are intentionally not CLI flags yet;
+they should be tuned through evaluation before becoming user-facing options.
 
 **Acceptance criteria**
 
