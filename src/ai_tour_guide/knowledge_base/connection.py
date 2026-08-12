@@ -3,6 +3,10 @@ from sqlalchemy import URL, Engine, create_engine
 from ai_tour_guide.knowledge_base.settings import DatabaseSettings
 
 
+def _search_path_option(schema: str) -> str:
+    return f'-csearch_path={schema},public'
+
+
 def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
     """Create the PostgreSQL SQLAlchemy engine."""
     selected_settings = settings or DatabaseSettings()
@@ -18,5 +22,6 @@ def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
 
     return create_engine(
         database_url,
+        connect_args={'options': _search_path_option(selected_settings.schema_name)},
         pool_pre_ping=True,
     )

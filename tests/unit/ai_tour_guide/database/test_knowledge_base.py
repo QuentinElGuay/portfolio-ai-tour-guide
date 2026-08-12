@@ -188,13 +188,18 @@ def test_get_or_create_embedding_model_rejects_changed_dimensions() -> None:
 
 
 @patch('ai_tour_guide.knowledge_base.init_db.metadata')
+@patch('ai_tour_guide.knowledge_base.init_db.DatabaseSettings')
 @patch('ai_tour_guide.knowledge_base.init_db.create_database_engine')
 def test_initialize_database_creates_missing_indexes(
     create_engine: MagicMock,
+    settings_class: MagicMock,
     metadata: MagicMock,
 ) -> None:
+    settings = MagicMock()
+    settings.schema_name = 'evaluation'
     engine = MagicMock()
     connection = MagicMock()
+    settings_class.return_value = settings
     create_engine.return_value = engine
     engine.begin.return_value.__enter__.return_value = connection
     index = MagicMock()
@@ -204,6 +209,8 @@ def test_initialize_database_creates_missing_indexes(
 
     initialize_database()
 
+    create_engine.assert_called_once_with(settings)
+    assert connection.execute.call_count == 2
     metadata.create_all.assert_called_once_with(bind=connection, checkfirst=True)
     index.create.assert_called_once_with(bind=connection, checkfirst=True)
     engine.dispose.assert_called_once_with()

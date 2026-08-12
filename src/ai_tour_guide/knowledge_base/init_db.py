@@ -1,16 +1,22 @@
 from sqlalchemy import text
+from sqlalchemy.schema import CreateSchema
 
 from ai_tour_guide.knowledge_base.connection import create_database_engine
+from ai_tour_guide.knowledge_base.settings import DatabaseSettings
 from ai_tour_guide.knowledge_base.tables import metadata
 
 
 def initialize_database() -> None:
     """Enable pgvector and create the application tables."""
 
-    engine = create_database_engine()
+    settings = DatabaseSettings()
+    engine = create_database_engine(settings)
 
     with engine.begin() as connection:
-        connection.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+        connection.execute(
+            text('CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public')
+        )
+        connection.execute(CreateSchema(settings.schema_name, if_not_exists=True))
 
         metadata.create_all(
             bind=connection,

@@ -1,7 +1,7 @@
-# BreizhGuide Roadmap
+# IA Tour Guide Roadmap
 
 > [!NOTE]
-> This roadmap had been created by ChatGPT as a first draft and might evolve over time.
+> This roadmap might evolve over time.
 
 ## Priority legend
 
@@ -486,7 +486,7 @@ the LLM response.
 **Tools**
 
 - Python
-- OpenAI-compatible client
+- OpenAI API client
 
 ______________________________________________________________________
 
@@ -515,15 +515,14 @@ ______________________________________________________________________
 
 ## 🔄 Milestone 4 follow-up
 
-The v0.2.0 MVP is shipped. These hardening tasks are intentionally deferred to the
-evaluation milestone and do not change its delivered scope:
+The v0.2.0 MVP is shipped. These hardening tasks do not change its delivered scope.
 
-- [ ] **P0 — Validate answer behaviour.** Verify grounded answers, clear unsupported
-  question responses, English-only responses, and protection against invented prices or
+- [ ] **P1 — Add verified runtime citations.** Require cited `chunk_id` values in a
+  structured LLM response, validate them against retrieved context, and display only
+  valid sources.
+- [ ] **P1 — Enforce runtime answer guardrails.** Add deterministic handling where
+  useful for unsupported questions, English-only responses, and unsupported prices or
   opening hours.
-- [ ] **P0 — Add verified citations.** Require cited `chunk_id` values in a structured
-  LLM response, validate them against retrieved context, and display only valid sources.
-- [ ] **P1 — Record prompt versions.** Version prompt changes before comparing them.
 - [ ] **P2 — Evaluate query rewriting.** Preserve the original question and keep it only
   if evaluation improves retrieval.
 - [ ] **P2 — Evaluate reranking.** Retrieve more candidates, rerank them, and keep the
@@ -543,51 +542,130 @@ Delivers the first end-to-end RAG experience for the Brittany guide:
 
 ______________________________________________________________________
 
-## ⏳ Milestone 5 — Evaluation
+## ⏳ Milestone 5 — Retrieval and LLM Evaluation
 
-### [P0] Validate generated answers and citations
+Milestone 5 is intentionally focused on the two evaluation criteria required for the
+project submission:
 
-**Labels:** `rag`, `validation`, `prompt-engineering`
+1. compare multiple retrieval approaches and use the best-performing one;
+2. compare multiple LLM approaches and use the best-performing one.
 
-- [ ] Define a structured LLM response containing the answer and cited chunk IDs
-- [ ] Validate cited chunk IDs against the retrieved context
-- [ ] Render only cited sources, grouped by document with sorted page references
-- [ ] Answer only from retrieved context
-- [ ] Refuse unsupported questions
-- [ ] Avoid inventing prices and opening hours
-- [ ] Answer in English
-- [ ] Version prompt changes
+Runtime guardrails, citation enforcement, CI gates, and broader end-to-end RAG quality
+evaluation are tracked separately and do not block this milestone.
+
+### [P0] Build the offline evaluation runner
+
+**Labels:** `evaluation`, `developer-experience`
+
+Create a reproducible offline evaluation entry point that can execute retrieval and LLM
+experiments against versioned datasets and persist comparable results.
+
+The evaluation runner is a development tool, not a long-running application service. It
+should reuse the same retrieval and LLM application components used by the agent, but
+run experiments independently from the Gradio interface and HTTP API.
+
+The primary developer interface should be `make` targets, following the same pattern as
+`make init-db`: the command should be simple to run, while Docker Compose can remain an
+implementation detail when it provides the right database, network, and dependency
+environment. If a Compose entry is added for evaluation, it should be a short-lived tool
+service behind an evaluation profile, not an always-on application service.
+
+- [ ] Add an `ai_tour_guide.evaluation` package with retrieval and LLM evaluation entry
+  points
+- [ ] Add a CLI command for retrieval evaluation
+- [ ] Add a CLI command for LLM evaluation
+- [ ] Add `make eval-retrieval` and `make eval-llm` shortcuts for the evaluation
+  commands
+- [ ] Allow evaluation commands to run against an isolated PostgreSQL schema, for
+  example `DB_SCHEMA=evaluation`
+- [ ] Allow an experiment/configuration name to be recorded with each run
+- [ ] Persist machine-readable results for every run
+- [ ] Produce a concise human-readable comparison table or Markdown report
+- [ ] Record the dataset version, retrieval configuration, prompt version, model, and
+  key parameters used by each experiment
+- [ ] Make repeated runs with the same dataset and deterministic configuration
+  comparable
+
+**Suggested interface**
+
+```text
+make eval-retrieval
+make eval-llm
+uv run python -m ai_tour_guide.evaluation retrieval --dataset evals/retrieval.jsonl
+uv run python -m ai_tour_guide.evaluation llm --dataset evals/llm.jsonl
+```
+
+This is a proposed interface for the new evaluation module. It follows the project's
+existing `uv run` workflow without adding an unrelated project-specific command.
+
+**Deliverables**
+
+- `evals/` — versioned evaluation datasets and experiment definitions
+- offline evaluation runner/CLI — executes retrieval and LLM experiments
+- `results/` or equivalent generated artifacts — JSON/CSV metrics plus a Markdown
+  summary
+- documented winning retrieval configuration
+- documented winning LLM/prompt configuration
+- README section showing the comparison and explaining why each winner was selected
 
 **Acceptance criteria**
 
-- [ ] Unsupported questions produce a clear limitation message
-- [ ] Answers contain valid, verified citations
-- [ ] Prompt versions are documented and compared
-
-**Citation contract**
-
-The LLM must return stable retrieved `chunk_id` values alongside its answer. The
-application validates that each cited ID belongs to the retrieved context, discards
-invalid IDs, and presents only the remaining sources with grouped, sorted pages.
+- [ ] Retrieval and LLM evaluations can be executed without the chat UI
+- [ ] The runner uses production retrieval and LLM components rather than duplicate
+  implementations
+- [ ] Every experiment records enough configuration to reproduce the comparison
+- [ ] Results from multiple approaches can be compared in one report
+- [ ] The selected retrieval and LLM configurations are applied to the application
 
 **Tools**
 
-- Plain prompt templates
-- OpenAI-compatible client
+- Python
+- Click
+- JSONL
+
+______________________________________________________________________
 
 ### [P0] Create retrieval evaluation dataset
 
-**Labels:** `evaluation`, `data`
+**Labels:** `evaluation`, `data`, `retrieval`
 
-- [ ] Create 40–60 questions
-- [ ] Include English answerable and unsupported questions
-- [ ] Record expected pages or topics
-- [ ] Include misspellings and paraphrases
+Create a manually reviewed golden dataset for measuring whether the retrieval layer
+finds the evidence needed to answer representative Brittany tourism questions.
+
+- [ ] Create 40–60 representative questions
+- [ ] Record stable document/page evidence for each answerable question
+- [ ] Treat retrieved `chunk_id` values as generated run details, not as the primary
+  golden labels
+- [ ] Include exact place-name queries
+- [ ] Include paraphrases and common misspellings
+- [ ] Include questions where lexical matching should be useful
+- [ ] Include questions where semantic matching should be useful
+- [ ] Keep unsupported questions in the LLM dataset unless they have a specific
+  retrieval expectation
+
+**Dataset shape**
+
+Each case should contain enough information to evaluate retrieval without calling the
+LLM, for example:
+
+```json
+{
+  "id": "retrieval_001",
+  "question": "Which places are recommended for families with children?",
+  "expected_documents": ["guide-to-the-region-of-brittany"],
+  "expected_pages": [18, 19],
+  "expected_answer_topics": ["family activities", "children"],
+  "notes": "Chunk IDs may change when parsing or chunking strategies change."
+}
+```
 
 **Acceptance criteria**
 
 - [ ] Dataset is versioned
-- [ ] Expected results are manually reviewed
+- [ ] Expected document/page evidence is manually reviewed
+- [ ] Dataset labels remain stable when chunk IDs change
+- [ ] Cases cover both lexical and semantic retrieval strengths
+- [ ] The same dataset is used for all compared retrieval approaches
 
 **Tools**
 
@@ -600,95 +678,179 @@ ______________________________________________________________________
 
 **Labels:** `evaluation`, `retrieval`
 
-- [ ] Evaluate vector search
-- [ ] Evaluate full-text search
-- [ ] Evaluate hybrid search
-- [ ] Compare chunking configurations
-- [ ] Measure latency
+Compare the retrieval approaches already implemented in Milestone 3 under the same
+dataset, `top_k`, and scoring procedure.
 
-**Metrics**
+**Approaches to compare**
+
+- [ ] Vector search
+- [ ] PostgreSQL full-text search
+- [ ] Hybrid search with reciprocal rank fusion
+- [ ] Optionally compare a small number of justified hybrid configurations if needed to
+  select the final weights or RRF rank constant
+
+Chunking changes, query rewriting, reranking, and other pipeline changes are excluded
+from the core Milestone 5 comparison so that the retrieval experiment has a clear
+independent variable.
+
+**Primary metrics**
 
 - [ ] Hit Rate at K
 - [ ] Recall at K
 - [ ] Mean Reciprocal Rank
-- [ ] Mean latency
+
+**Secondary metrics**
+
+- [ ] Mean retrieval latency
+
+Recall at K is the primary quality metric because the generation stage cannot use
+evidence that retrieval failed to provide. Ranking metrics and latency should be used to
+break ties or explain tradeoffs.
+
+**Experiment rules**
+
+- [ ] Use the same evaluation dataset for every approach
+- [ ] Use the same `top_k` when comparing approaches
+- [ ] Keep embedding model and indexed corpus fixed
+- [ ] Record all retrieval settings used by each run
+- [ ] Do not select the winner from anecdotal examples alone
 
 **Acceptance criteria**
 
-- [ ] Results are reproducible
-- [ ] Best retrieval configuration is selected
-- [ ] Results table is included in documentation
+- [ ] At least two materially different retrieval approaches are evaluated
+- [ ] Vector, full-text, and hybrid retrieval are compared if all three remain available
+- [ ] Results are reproducible from the evaluation runner
+- [ ] A results table compares all approaches using the same metrics
+- [ ] The best-performing retrieval configuration is selected and used by the
+  application
+- [ ] The selection rationale is documented, including any quality/latency tradeoff
 
 **Tools**
 
 - Pandas
-- pytest
-- Matplotlib or Plotly
+- PostgreSQL with pgvector and full-text search
+- Matplotlib or Plotly optional
 
 ______________________________________________________________________
 
-### [P1] Evaluate LLM answers
+### [P0] Create LLM evaluation dataset
 
-**Labels:** `evaluation`, `llm`
+**Labels:** `evaluation`, `data`, `llm`
 
-- [ ] Compare at least two prompts
-- [ ] Evaluate correctness
-- [ ] Evaluate groundedness
-- [ ] Evaluate citation accuracy
-- [ ] Evaluate refusal quality
-- [ ] Evaluate English-language responses
+Create a versioned set of final-answer cases for comparing alternative prompts or other
+LLM-generation configurations.
+
+The retrieval input must be controlled during prompt comparison. Each LLM approach
+should receive the same question and the same retrieved context so that prompt quality
+can be compared independently from retrieval quality.
+
+- [ ] Include representative answerable questions
+- [ ] Include unsupported questions
+- [ ] Include questions about prices or opening hours when the retrieved context does
+  not contain that information
+- [ ] Include questions requiring synthesis across multiple retrieved chunks
+- [ ] Record the retrieved context used for each evaluation case, or freeze it from the
+  selected retrieval configuration
+- [ ] Define the expected answer behaviour for each case
+- [ ] Version the dataset independently from prompt versions
+
+**Expected behaviour may include**
+
+- answer should be supported by the supplied context;
+- answer should not introduce unsupported facts;
+- unsupported questions should produce a clear limitation;
+- answer should be in English;
+- cited or referenced evidence should correspond to supplied context where the evaluated
+  prompt includes citations.
 
 **Acceptance criteria**
 
-- [ ] Multiple approaches are compared
-- [ ] Best configuration is selected
-- [ ] Manual review is included
+- [ ] Dataset is versioned
+- [ ] Expected behaviour is manually reviewed
+- [ ] Every compared LLM approach receives equivalent input context
+- [ ] Cases include both answerable and unsupported questions
 
 **Tools**
 
-- pytest
-- Pandas
+- JSONL
+
+______________________________________________________________________
+
+### [P0] Evaluate LLM approaches
+
+**Labels:** `evaluation`, `llm`, `prompt-engineering`
+
+Compare at least two materially different prompt or generation approaches using the same
+LLM evaluation cases and fixed retrieved context.
+
+**Suggested approaches**
+
+- [ ] Prompt v1 — baseline RAG instruction
+- [ ] Prompt v2 — stricter grounding and unsupported-question behaviour
+- [ ] Prompt v3 — optional structured/citation-aware variant if implemented during this
+  milestone
+
+The comparison should test meaningful prompt changes rather than minor wording
+variations.
+
+**Evaluation dimensions**
+
+- [ ] Answer correctness
+- [ ] Groundedness / faithfulness to the supplied context
+- [ ] Unsupported-question handling
+- [ ] Unsupported-fact avoidance, especially prices and opening hours
+- [ ] English-language compliance
+- [ ] Citation accuracy if citations are part of an evaluated approach
+- [ ] Manual review of representative successes and failures
+
+Automated LLM-as-a-judge tooling is optional. A small, clearly documented manual rubric
+is acceptable for the core milestone as long as every prompt is evaluated consistently.
+
+**Experiment rules**
+
+- [ ] Use the same LLM evaluation dataset for every approach
+- [ ] Use the same retrieved context for every compared prompt
+- [ ] Keep model and generation settings fixed unless they are explicitly the variable
+  being evaluated
+- [ ] Version every compared prompt
+- [ ] Record evaluation criteria before selecting the winner
+
+**Acceptance criteria**
+
+- [ ] At least two materially different LLM approaches are evaluated
+- [ ] A comparison table summarizes the evaluation results
+- [ ] Representative failures are documented instead of reporting only aggregate scores
+- [ ] The best-performing prompt/configuration is selected and used by the application
+- [ ] The selection rationale is documented
+- [ ] Prompt versions and evaluation results are linked in project documentation
+
+**Tools**
+
+- Plain prompt templates
+- OpenAI API client
 - Ragas or DeepEval optional
 
 ______________________________________________________________________
 
-### [P2] Evaluate query rewriting
+### [P1] Document the evaluation methodology and results
 
-**Labels:** `rag`, `best-practice`
+**Labels:** `evaluation`, `documentation`
 
-- [ ] Rewrite follow-up questions while preserving the original question
-- [ ] Correct common place-name spelling errors
-- [ ] Compare rewritten and original retrieval results
-
-**Acceptance criteria**
-
-- [ ] Query rewriting is optional and configurable
-- [ ] It is kept only if evaluation improves retrieval
-
-**Tools**
-
-- OpenAI-compatible client
-- Lightweight prompt chain
-
-______________________________________________________________________
-
-### [P2] Evaluate document reranking
-
-**Labels:** `retrieval`, `best-practice`
-
-- [ ] Retrieve a larger candidate set
-- [ ] Rerank candidates
-- [ ] Keep only the best chunks
-- [ ] Measure quality and latency impact
+- [ ] Explain how the retrieval golden set was labeled
+- [ ] Explain which retrieval approaches were compared
+- [ ] Explain how LLM outputs were evaluated
+- [ ] Document prompt versions and controlled variables
+- [ ] Include retrieval comparison results
+- [ ] Include LLM comparison results
+- [ ] Identify the winning retrieval and LLM configurations
+- [ ] Explain limitations of the evaluation dataset and methodology
 
 **Acceptance criteria**
 
-- [ ] Reranking is evaluated
-- [ ] It is kept only if it improves retrieval within the latency budget
-
-**Tools**
-
-- sentence-transformers CrossEncoder
+- [ ] A reviewer can see evidence for both project evaluation criteria
+- [ ] The documented winner matches the configuration used by the application
+- [ ] Evaluation limitations are explicit
+- [ ] Results can be regenerated with the offline evaluation runner
 
 ______________________________________________________________________
 
@@ -698,10 +860,13 @@ ______________________________________________________________________
 
 Ships when **Milestone 5** passes its exit criteria:
 
-- Golden dataset
-- Full-text search comparison
-- Hybrid search
-- Validated citations and prompt evaluation
+- Versioned retrieval evaluation dataset
+- Vector, full-text, and hybrid retrieval comparison
+- Selected retrieval configuration used by the application
+- Versioned LLM evaluation dataset
+- Multiple prompt/LLM approaches compared under fixed retrieval context
+- Selected LLM/prompt configuration used by the application
+- Reproducible offline evaluation runner and documented results
 
 ______________________________________________________________________
 
@@ -971,6 +1136,100 @@ ______________________________________________________________________
 - OpenAI tool calling
 - Open-Meteo
 - Public tourism or transport APIs
+
+### [P3] Evaluate end-to-end RAG answer quality
+
+**Labels:** `evaluation`, `rag`, `quality`
+
+Extend the component-level Milestone 5 evaluation into an end-to-end RAG evaluation
+where retrieval and generation run together exactly as they do in the application.
+
+- [ ] Define an end-to-end golden set with questions and expected answer behaviour
+- [ ] Measure answer correctness and groundedness using live retrieved context
+- [ ] Measure whether final answers use the relevant retrieved evidence
+- [ ] Measure unsupported-question refusal quality
+- [ ] Analyze failures by stage: retrieval failure, context-selection failure, or
+  generation failure
+- [ ] Compare end-to-end quality before and after major RAG changes
+
+**Acceptance criteria**
+
+- [ ] End-to-end results are reproducible
+- [ ] Failures can be attributed to retrieval or generation where possible
+- [ ] The report includes representative failure cases, not only aggregate scores
+
+**Tools**
+
+- Existing offline evaluation runner
+- Ragas, DeepEval, or a documented manual rubric
+
+______________________________________________________________________
+
+### [P3] Evaluate RAG robustness
+
+**Labels:** `evaluation`, `rag`, `robustness`
+
+Test whether the selected RAG flow remains useful when user questions are noisy or
+differ from the clean evaluation examples.
+
+- [ ] Evaluate paraphrases of known questions
+- [ ] Evaluate common misspellings and place-name variants
+- [ ] Evaluate underspecified and ambiguous questions
+- [ ] Evaluate conversational follow-up questions
+- [ ] Evaluate distractor or irrelevant retrieved chunks
+- [ ] Measure quality degradation relative to the clean baseline
+
+**Acceptance criteria**
+
+- [ ] Robustness cases are versioned
+- [ ] The project documents known failure modes
+- [ ] Changes such as query rewriting are kept only when they improve measured
+  robustness
+
+______________________________________________________________________
+
+### [P3] Evaluate RAG efficiency and cost
+
+**Labels:** `evaluation`, `performance`, `cost`
+
+Measure the operational tradeoffs of the selected RAG configuration without turning
+performance into a Milestone 5 scoring requirement.
+
+- [ ] Measure retrieval latency
+- [ ] Measure end-to-end answer latency
+- [ ] Record retrieved context size
+- [ ] Record LLM input and output token usage
+- [ ] Estimate per-request LLM cost for evaluated configurations
+- [ ] Compare quality/latency/cost tradeoffs for major configuration changes
+
+**Acceptance criteria**
+
+- [ ] Measurements are collected with a documented methodology
+- [ ] The project can explain the main quality-versus-cost tradeoffs
+- [ ] Performance measurements do not replace the quality metrics from Milestone 5
+
+______________________________________________________________________
+
+### [P3] Add human RAG quality evaluation
+
+**Labels:** `evaluation`, `human-review`, `quality`
+
+Add a lightweight human-review protocol for qualities that automated metrics may not
+capture reliably.
+
+- [ ] Define a short reviewer rubric
+- [ ] Score usefulness, clarity, correctness, groundedness, and refusal quality
+- [ ] Review a representative sample of end-to-end answers
+- [ ] Record reviewer notes for systematic failure patterns
+- [ ] Compare human judgments with automated evaluation results
+
+**Acceptance criteria**
+
+- [ ] Review criteria are documented before scoring
+- [ ] Reviewed examples and aggregate results are retained
+- [ ] Disagreements between automated and human evaluation are discussed
+
+______________________________________________________________________
 
 ### [P3] Deploy to the cloud
 

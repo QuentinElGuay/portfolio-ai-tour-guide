@@ -1,7 +1,9 @@
 """Configuration for connecting to the knowledge-base database."""
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+POSTGRES_IDENTIFIER_PATTERN = r'^[a-z_][a-z0-9_]*$'
 
 
 class DatabaseSettings(BaseSettings):
@@ -19,6 +21,11 @@ class DatabaseSettings(BaseSettings):
     host: str = 'localhost'
     port: int = Field(default=5432, gt=0)
     name: str
+    schema_name: str = Field(
+        default='public',
+        validation_alias=AliasChoices('schema_name', 'DB_SCHEMA'),
+        pattern=POSTGRES_IDENTIFIER_PATTERN,
+    )
 
 
-__all__ = ['DatabaseSettings']
+__all__ = ['POSTGRES_IDENTIFIER_PATTERN', 'DatabaseSettings']
