@@ -443,7 +443,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# 🔄 Milestone 4 — RAG Application
+# ✅ Milestone 4 — RAG Application
 
 ## [P0] Implement the RAG pipeline
 
@@ -454,9 +454,7 @@ ______________________________________________________________________
 - [x] Build the prompt
 - [x] Call the LLM through a provider-neutral client
 - [x] Return answer and retrieved sources
-- [ ] Define a structured LLM response containing the answer and cited chunk IDs
-- [ ] Validate cited chunk IDs against the retrieved context
-- [ ] Render only cited sources, grouped by document with sorted page references
+- [x] Deduplicate displayed retrieved sources and their page numbers
 
 **Current implementation decisions**
 
@@ -473,107 +471,111 @@ on OpenAI settings or credentials.
 - [x] Add configuration for the direct model/provider
 - [x] Expose the RAG pipeline through an HTTP API
 - [x] Connect the Gradio chat to the agent API
+- [x] Return a clear configuration-required response when no LLM API key is available
 
 **Acceptance criteria**
 
-- [ ] Answers use retrieved context
-- [ ] Sources include page numbers only for chunks cited by the LLM
-- [ ] Components can be tested independently
+- [x] Answers use retrieved context
+- [x] Components can be tested independently
 
-**Citation contract**
+**Current source behaviour**
 
-The LLM must return stable retrieved `chunk_id` values alongside its answer. The
-application owns citation validation and presentation: invalid IDs are discarded,
-duplicate document/page references are merged, and pages are sorted. Until this contract
-is implemented, the CLI can only display all retrieved context sources and cannot
-reliably distinguish sources the LLM actually used.
+The application displays all retrieved sources, grouped by document with deduplicated
+page numbers. These context references are not yet citations selected and validated from
+the LLM response.
 
 **Tools**
 
 - Python
-- Ollama
 - OpenAI-compatible client
 
 ______________________________________________________________________
 
-## [P0] Add grounded answer rules
+## [P0] Add a basic chat interface
 
-**Labels:** `prompt-engineering`, `safety`
+**Labels:** `frontend`, `gradio`
 
-- [ ] Answer only from retrieved context
-- [ ] Refuse unsupported questions
-- [ ] Avoid inventing prices and opening hours
-- [ ] Answer in English
-- [ ] Cite relevant pages
+- [x] Add chat input
+- [x] Display conversation history
+- [x] Show loading state
+- [x] Display retrieved sources and page numbers
+- [x] Add reset conversation button
+- [x] Add suggested questions
 
 **Acceptance criteria**
 
-- [ ] Unsupported questions produce a clear limitation message
-- [ ] Answers contain valid citations
-- [ ] Prompt is versioned in the repository
+- [x] Users can complete a full conversation
+- [x] Retrieved sources are visible
+- [x] Errors are displayed clearly
 
 **Tools**
 
-- Plain prompt templates
-- Jinja2 optional
+- Gradio
 
 ______________________________________________________________________
 
-## [P2] Add conversation-aware query rewriting
+## 🔄 Milestone 4 follow-up
 
-**Labels:** `rag`, `best-practice`
+The v0.2.0 MVP is shipped. These hardening tasks are intentionally deferred to the
+evaluation milestone and do not change its delivered scope:
 
-- [ ] Rewrite follow-up questions
-- [ ] Preserve original query
-- [ ] Correct common place-name spelling errors
-- [ ] Evaluate rewritten versus original queries
-
-**Acceptance criteria**
-
-- [ ] Rewriting is optional and configurable
-- [ ] Evaluation shows whether it improves retrieval
-
-**Tools**
-
-- Ollama
-- Lightweight prompt chain
-
-______________________________________________________________________
-
-## [P2] Add document reranking
-
-**Labels:** `retrieval`, `best-practice`
-
-- [ ] Retrieve a larger candidate set
-- [ ] Rerank candidates
-- [ ] Keep only the best chunks
-- [ ] Measure quality and latency impact
-
-**Acceptance criteria**
-
-- [ ] Reranking is evaluated
-- [ ] It is kept only if results improve
-
-**Tools**
-
-- sentence-transformers CrossEncoder
+- [ ] **P0 — Validate answer behaviour.** Verify grounded answers, clear unsupported
+  question responses, English-only responses, and protection against invented prices or
+  opening hours.
+- [ ] **P0 — Add verified citations.** Require cited `chunk_id` values in a structured
+  LLM response, validate them against retrieved context, and display only valid sources.
+- [ ] **P1 — Record prompt versions.** Version prompt changes before comparing them.
+- [ ] **P2 — Evaluate query rewriting.** Preserve the original question and keep it only
+  if evaluation improves retrieval.
+- [ ] **P2 — Evaluate reranking.** Retrieve more candidates, rerank them, and keep the
+  approach only if it improves quality within an acceptable latency budget.
 
 ______________________________________________________________________
 
 ## 🚀 Release v0.2.0 — RAG MVP
 
-> [!NOTE]
-> **🗓️ Planned release — not shipped**
+> [!IMPORTANT]
+> **📦 Shipped**
 >
-> Ships when **Milestone 4** passes its exit criteria.
+> Delivers the first end-to-end RAG experience for the Brittany guide.
 >
 > - Grounded answers
-> - Citations
-> - Gradio interface
+> - Retrieved source pages
+> - Basic Gradio interface
 
 ______________________________________________________________________
 
 # ⏳ Milestone 5 — Evaluation
+
+## [P0] Validate generated answers and citations
+
+**Labels:** `rag`, `validation`, `prompt-engineering`
+
+- [ ] Define a structured LLM response containing the answer and cited chunk IDs
+- [ ] Validate cited chunk IDs against the retrieved context
+- [ ] Render only cited sources, grouped by document with sorted page references
+- [ ] Answer only from retrieved context
+- [ ] Refuse unsupported questions
+- [ ] Avoid inventing prices and opening hours
+- [ ] Answer in English
+- [ ] Version prompt changes
+
+**Acceptance criteria**
+
+- [ ] Unsupported questions produce a clear limitation message
+- [ ] Answers contain valid, verified citations
+- [ ] Prompt versions are documented and compared
+
+**Citation contract**
+
+The LLM must return stable retrieved `chunk_id` values alongside its answer. The
+application validates that each cited ID belongs to the retrieved context, discards
+invalid IDs, and presents only the remaining sources with grouped, sorted pages.
+
+**Tools**
+
+- Plain prompt templates
+- OpenAI-compatible client
 
 ## [P0] Create retrieval evaluation dataset
 
@@ -652,6 +654,46 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## [P2] Evaluate query rewriting
+
+**Labels:** `rag`, `best-practice`
+
+- [ ] Rewrite follow-up questions while preserving the original question
+- [ ] Correct common place-name spelling errors
+- [ ] Compare rewritten and original retrieval results
+
+**Acceptance criteria**
+
+- [ ] Query rewriting is optional and configurable
+- [ ] It is kept only if evaluation improves retrieval
+
+**Tools**
+
+- OpenAI-compatible client
+- Lightweight prompt chain
+
+______________________________________________________________________
+
+## [P2] Evaluate document reranking
+
+**Labels:** `retrieval`, `best-practice`
+
+- [ ] Retrieve a larger candidate set
+- [ ] Rerank candidates
+- [ ] Keep only the best chunks
+- [ ] Measure quality and latency impact
+
+**Acceptance criteria**
+
+- [ ] Reranking is evaluated
+- [ ] It is kept only if it improves retrieval within the latency budget
+
+**Tools**
+
+- sentence-transformers CrossEncoder
+
+______________________________________________________________________
+
 ## 🚀 Release v0.3.0 — Evaluation
 
 > [!NOTE]
@@ -662,34 +704,11 @@ ______________________________________________________________________
 > - Golden dataset
 > - Full-text search comparison
 > - Hybrid search
-> - Prompt evaluation
+> - Validated citations and prompt evaluation
 
 ______________________________________________________________________
 
-# ⏳ Milestone 6 — User Interface
-
-## [P0] Build the chat interface
-
-**Labels:** `frontend`, `streamlit`
-
-- [ ] Add chat input
-- [ ] Display conversation history
-- [ ] Show loading state
-- [ ] Display sources and page numbers
-- [ ] Add reset conversation button
-- [ ] Add suggested questions
-
-**Acceptance criteria**
-
-- [ ] Users can complete a full conversation
-- [ ] Sources are visible
-- [ ] Errors are displayed clearly
-
-**Tools**
-
-- Streamlit
-
-______________________________________________________________________
+# ⏳ Milestone 6 — User Feedback
 
 ## [P1] Add user feedback
 
@@ -708,7 +727,7 @@ ______________________________________________________________________
 **Tools**
 
 - SQLite
-- Streamlit
+- Gradio
 
 ______________________________________________________________________
 
@@ -781,7 +800,7 @@ ______________________________________________________________________
 
 **Tools**
 
-- Streamlit
+- Gradio
 - Plotly
 - Pandas
 
@@ -806,17 +825,17 @@ ______________________________________________________________________
 
 **Labels:** `docker`, `deployment`
 
-- [ ] Create application Dockerfile
-- [ ] Add Qdrant service
-- [ ] Add Ollama service or document external setup
-- [ ] Add persistent volumes
-- [ ] Add health checks
+- [x] Create application Dockerfiles
+- [x] Add persistent PostgreSQL volume
+- [x] Add service health checks and startup dependencies
+- [x] Run database, ingestion, agent API, and chat services through Docker Compose
+- [ ] Document or add optional local LLM provider support
 
 **Acceptance criteria**
 
-- [ ] Application runs through Docker Compose
-- [ ] Data survives container restart
-- [ ] Services start in the correct order
+- [x] Application runs through Docker Compose
+- [x] Data survives container restart
+- [x] Services start in the correct order
 
 **Tools**
 
@@ -831,21 +850,21 @@ ______________________________________________________________________
 
 - [x] Explain the problem
 - [x] Document the data source
-- [ ] Add architecture diagram
-- [ ] Explain ingestion and retrieval
+- [x] Add architecture diagram
+- [x] Explain ingestion and retrieval
 - [ ] Include evaluation results
 - [ ] Include screenshots
-- [ ] Add setup and usage instructions
-- [ ] Add configuration guide
-- [ ] Add ingestion command examples
-- [ ] Add chat usage examples
-- [ ] Document limitations
+- [x] Add setup and usage instructions
+- [x] Add configuration guide
+- [x] Add ingestion command examples
+- [x] Add chat usage examples
+- [x] Document limitations
 
 **Acceptance criteria**
 
-- [ ] A new user can run the project
+- [x] A new user can run the project
 - [ ] Every evaluation criterion has visible evidence
-- [ ] Dependency versions are locked
+- [x] Dependency versions are locked
 
 **Tools**
 
@@ -859,9 +878,9 @@ ______________________________________________________________________
 
 **Labels:** `testing`, `ci`
 
-- [ ] Test PDF extraction
-- [ ] Test chunk metadata
-- [ ] Test retrieval
+- [x] Test PDF extraction
+- [x] Test chunk metadata
+- [x] Test retrieval
 - [ ] Test citation generation
 - [ ] Test unsupported-question handling
 - [ ] Run tests on pull requests
@@ -869,7 +888,7 @@ ______________________________________________________________________
 **Acceptance criteria**
 
 - [ ] CI passes on the main branch
-- [ ] Core pipeline has automated coverage
+- [x] Core pipeline has automated coverage
 
 **Tools**
 
@@ -895,7 +914,6 @@ ______________________________________________________________________
 
 **Tools**
 
-- Streamlit recording
 - Loom
 - OBS Studio
 
