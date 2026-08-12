@@ -215,7 +215,7 @@ A complete submission should demonstrate the following features:
   query rewriting.
 - ⏳ Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
 
-### Delivery status
+##### Delivery status
 
 - **✅ Passed / core complete** — the milestone's core deliverable is usable; remaining
   items are polish or follow-up
