@@ -4,352 +4,210 @@
 
 Degemer mat ("Welcome" in Breton)!
 
-This project builds an AI tour guide for Brittany, France, using **Retrieval-Augmented
-Generation (RAG)** to answer travelers' questions from official tourism guides.
+An AI tour guide for Brittany, France. It uses **Retrieval-Augmented Generation (RAG)**
+to answer travellers' questions from an indexed tourism guide.
 
 > [!IMPORTANT]
-> 🚧 This project is under **<ins>active development</ins>.**
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Data source](#data-source)
-- [Prerequisites](#prerequisites)
-- [Quick start](#quick-start)
-- [Document input](#document-input)
-- [Using the ingestion pipeline](#using-the-ingestion-pipeline)
-- [Using the chat application](#using-the-chat-application)
-- [Makefile commands](#makefile-commands)
-- [Configuration](#configuration)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+> 🚧 This project is under **<ins>active development</ins>**.
 
 ## Overview
 
-This project was created as the capstone project for the
-[LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp)
-[DataTalks.Club](https://datatalks.club).
+Created as a capstone project for
+[LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) by
+[DataTalks.Club](https://datatalks.club), this project turns a Brittany tourism guide
+into a question-answering experience that helps travellers explore the region. It
+processes the guide into searchable passages, uses **vector embeddings** and
+**PostgreSQL with pgvector** to retrieve relevant context, then asks an LLM to generate
+an answer based on that context.
 
-This project demonstrates how to build an end-to-end RAG application following modern
-LLM engineering practices. It indexes a tourism guide for Brittany and allows users to
-ask natural-language questions about the region's culture, history, geography, and
-attractions while grounding every answer in the source document.
+The project is designed as a focused portfolio demonstration of the full RAG workflow:
 
-The project covers document ingestion, chunking, embeddings, vector search, retrieval
-evaluation, prompt engineering, monitoring, and a Gradio user interface.
+- Document ingestion
+- Retrieval and prompt construction
+- LLM integration
+- A browser chat interface
+
+The project also focuses on the practices that make RAG applications reliable:
+
+- Keeping answers grounded in retrieved context
+- Validating citations
+- Evaluating retrieval and answer quality
+- Adding guardrails for unsupported or overly specific questions
+
+## Architecture
+
+The ingestion pipeline indexes the tourism guide in PostgreSQL with pgvector. The chat
+interface sends questions to the agent API, which retrieves context and calls OpenAI to
+generate an answer.
+
+```mermaid
+flowchart LR
+    PDF[Tourism guide PDF] --> Ingestion[Ingestion pipeline]
+    Ingestion --> KB[(PostgreSQL + pgvector)]
+    User --> Chat[Chat]
+    Chat --> Agent[Agent API]
+    Agent <--> KB
+    Agent <--> OpenAI[OpenAI API]
+    Agent --> Chat
+```
+
+## Question scope
+
+The project supports English questions about Brittany's regions, geography and natural
+landscapes, climate, transport, cost of living, real estate, family relocation and
+education, outdoor recreation, history and heritage, and Breton culture, food,
+festivals, and local life.
+
+Supported examples:
+
+- ✅ “What are the main places to visit in Brittany?”
+- ✅ “What is special about Breton culture?”
+
+Unsupported questions include:
+
+- ❌ “What are the best places to visit in Normandy?” — another destination.
+- ❌ “What is the weather in Brest today?” — current information absent from the guide.
+- ❌ “Can you book a hotel in Saint-Malo for this weekend?” — booking, availability, or
+  reservation requests.
+- ❌ “Should I invest in renewable-energy stocks?” — an unrelated finance topic.
+- ❌ “How does quantum entanglement work?” — an unrelated science topic.
+
+> [!NOTE]
+> English is the only supported language. This keeps the demonstration lightweight and
+> suitable for a smaller model.
+
+## Documentation
+
+- [Ingestion guide](src/ai_tour_guide/ingestion/README.md): document definitions,
+  pipeline stages, artifacts, and ingestion configuration.
+- [Agent guide](src/ai_tour_guide/agent/README.md): RAG flow, CLI, HTTP API, and agent
+  configuration.
+- [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
+  integration.
+- [Roadmap](roadmap.md): delivered work and planned validation, evaluation, and
+  monitoring.
 
 ## Data source
 
-This project uses the freely available
+The project indexes the freely available
 *[Discovering Brittany](https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf)*
-guide published by [Ibanista](https://www.ibanista.com/).
-
-The guide is used solely for educational purposes and remains the property of its
-respective copyright holder. It is not redistributed as part of this repository.
+guide published by [Ibanista](https://www.ibanista.com/). It is used for educational
+purposes only and is not redistributed in this repository.
 
 ## Prerequisites
 
-> [!NOTE]
-> Running the project directly in `Github Codespaces` allow for an execution without any
-> installation.
+The recommended workflow requires Git, Docker with Docker Compose, and GNU Make.
 
-The recommended Docker workflow requires:
-
-- Git
-- Docker with Docker Compose
-- GNU Make
-
-To run the Python commands directly, also install:
-
-- Python 3.14 or newer
-- [uv](https://docs.astral.sh/uv/)
+For direct Python commands, install Python 3.14 or newer and
+[uv](https://docs.astral.sh/uv/). GitHub Codespaces can run the project without local
+installation.
 
 ## Quick start
 
-Clone the repository, create the local environment file, initialize the database, and
-run the example ingestion:
+Clone the repository and create your environment file:
 
 ```bash
 git clone https://github.com/QuentinElGuay/portfolio-ai-tour-guide.git
 cd portfolio-ai-tour-guide
 cp .env.template .env
-make init-db
-make ingest
 ```
 
-`make init-db` starts PostgreSQL, enables pgvector, and creates the application tables.
-`make ingest` downloads and processes every document in `source_files.json`, then
-inserts each document and its chunks in one database transaction.
-
-The embedding model may be downloaded the first time ingestion runs. An existing source
-URL is rejected instead of replacing its document and chunks. Use `make reset-db` when
-you intentionally want to recreate the development database and ingest the same source
-again.
-
-To run the RAG application, add an OpenAI API key to `.env`, then start the agent API
-and chat interface:
+Set an OpenAI API key in `.env` to generate answers:
 
 ```dotenv
 AGENT_OPENAI_API_KEY=your-api-key
 ```
 
+Initialize the database, ingest the bundled source definitions, and start the app:
+
 ```bash
+make init-db
+make ingest
 make app
 ```
 
-Open `http://localhost:7860`. The Gradio service sends questions to the agent API, which
-retrieves relevant chunks, generates a grounded answer, and returns its source pages.
+Open `http://localhost:7860` to use the chat. The agent API is available at
+`http://localhost:8000`; its interactive API documentation is at
+`http://localhost:8000/docs`.
 
-## Document input
-
-The complete `run` command accepts either one JSON object or an array of objects. Each
-independent stage accepts exactly one document.
-
-The mandatory fields are `title` and `source_url`:
-
-```json
-{
-  "title": "Guide to the Region of Brittany",
-  "source_url": "https://example.com/brittany-guide.pdf",
-  "collection": "Regional Guides",
-  "publisher": "Example publisher",
-  "keywords": ["Tourism", "Brittany", "France"],
-  "excluded_leading_pages": 4,
-  "excluded_trailing_pages": 2,
-  "ignored_text_patterns": ["example\\.com"]
-}
-```
-
-`collection` and the remaining metadata and parsing options are optional. See
-[`source_files.json`](source_files.json) for the input used by the default Makefile
-command.
-
-## Using the ingestion pipeline
-
-### End-to-end ingestion
-
-The `run` command executes download, parsing, chunking, embedding, and database loading
-sequentially. Intermediate values stay in memory.
-
-The complete pipeline requires the database settings, `EMBEDDING_MODEL_NAME`, and
-`EMBEDDING_DIMENSIONS` in the process environment. The Docker and Makefile workflows set
-these automatically. When running locally against the Compose database, set them to
-values matching `.env`; for example:
-
-```bash
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=postgres
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export EMBEDDING_MODEL_NAME=BAAI/bge-small-en-v1.5
-export EMBEDDING_DIMENSIONS=384
-```
-
-Install the project and run the complete pipeline:
-
-```bash
-uv sync
-uv run portfolio-ai-tour-guide-ingestion run source_files.json
-```
-
-Enable debug mode to retain every intermediate artifact:
-
-```bash
-uv run portfolio-ai-tour-guide-ingestion run \
-  --debug \
-  --artifact-dir tmp \
-  source_files.json
-```
-
-For each source, debug mode creates:
-
-- `<stem>.pdf`
-- `<stem>.parsed.txt`
-- `<stem>.parsed.md`
-- `<stem>.parsed.json`
-- `<stem>.chunked.json`
-- `<stem>.embedded.json`
-
-### Independent stages
-
-Each pipeline boundary is also callable independently, making the flow usable from
-Airflow or another workflow orchestrator:
-
-```bash
-uv run portfolio-ai-tour-guide-ingestion download \
-  document.json \
-  --output tmp/guide.pdf
-
-uv run portfolio-ai-tour-guide-ingestion parse \
-  document.json \
-  tmp/guide.pdf \
-  --output tmp/guide.parsed.json
-
-uv run portfolio-ai-tour-guide-ingestion chunk \
-  tmp/guide.parsed.json \
-  --output tmp/guide.chunked.json
-
-uv run portfolio-ai-tour-guide-ingestion embed \
-  tmp/guide.chunked.json \
-  --output tmp/guide.embedded.json
-
-uv run portfolio-ai-tour-guide-ingestion load \
-  tmp/guide.embedded.json
-```
-
-The parsed, chunked, and embedded outputs are versioned JSON artifacts. The chunked and
-embedded artifacts contain both document metadata and chunks, so the following task
-needs only one input file.
-
-Run the command help to see stage-specific options such as HTTP timeout, chunk size,
-batch size, and vector normalization. The embedding model is configured with
-`EMBEDDING_MODEL_NAME`:
-
-```bash
-uv run portfolio-ai-tour-guide-ingestion --help
-uv run portfolio-ai-tour-guide-ingestion chunk --help
-```
-
-The pipeline architecture and function flow are documented in
-[`docs/pdf/parsing-flow.md`](docs/pdf/parsing-flow.md).
-
-## Using the chat application
-
-The application runs as two services:
-
-- `agent` owns retrieval, prompt construction, and the OpenAI client, and exposes
-  `POST /ask` on port `8000`.
-- `chat` serves the Gradio interface on port `7860` and communicates with the agent over
-  HTTP.
-
-Start both services with `make app`. This separation keeps the interface independent
-from the LLM provider and prevents provider credentials from being passed to the chat
-container. The database must already be initialized and ingested as described in
-[Quick start](#quick-start).
-
-## Makefile commands
-
-Run `make` or `make help` to list the available shortcuts.
-
-| Command                              | Description                                                            |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| `make init-db`                       | Start PostgreSQL and initialize the pgvector schema.                   |
-| `make reset-db`                      | Delete the PostgreSQL volume, then create a fresh database and schema. |
-| `make ingest`                        | Ingest the documents from `source_files.json`.                         |
-| `make ingest DEBUG=1`                | Ingest and retain intermediate files in `tmp/`.                        |
-| `make ingest SOURCE_FILES=path.json` | Ingest a different document definition file.                           |
-| `make export-csv`                    | Export the ingestion tables to CSV files in `tmp/`.                    |
-| `make export-csv CSV_LIMIT=100`      | Limit each CSV export to 100 data rows.                                |
-| `make export-csv EXPORT_DIR=path`    | Write the CSV exports to another directory.                            |
-| `make vector_search QUESTION='...'`  | Embed a question and search for the nearest document chunks.           |
-| `make text_search QUESTION='...'`    | Search document chunks with PostgreSQL full-text search.               |
-| `make ask QUESTION='...'`            | Answer a question using retrieved context and show its sources.        |
-| `make app`                           | Start the agent API and Gradio chat interface.                         |
+The first ingestion or image build can download the configured embedding model. To
+recreate the local database and ingest the same source URL again, use `make reset-db`.
 
 > [!WARNING]
-> `make reset-db` runs `docker compose down --volumes` and permanently deletes the
-> project's PostgreSQL volume.
+> `make reset-db` permanently deletes the project's PostgreSQL volume.
 
-CSV export creates `embedding_models.csv`, `documents.csv`, and `document_chunks.csv`.
-The database service must be running before `make export-csv` is called.
+## Common commands
 
-The Makefile variables can be combined:
+Run `make help` for every available shortcut.
 
-```bash
-make ingest SOURCE_FILES=data/another-source.json DEBUG=1
-make export-csv EXPORT_DIR=tmp/evaluation CSV_LIMIT=250
-make vector_search QUESTION='Where is the Brittany coast?' K=10
-make text_search QUESTION='Brittany coast'
-make ask QUESTION='What are the best places to visit in Brittany?' K=5
-```
+| Command                             | Description                                          |
+| ----------------------------------- | ---------------------------------------------------- |
+| `make init-db`                      | Start PostgreSQL and initialise the pgvector schema. |
+| `make ingest`                       | Ingest documents defined in `source_files.json`.     |
+| `make vector_search QUESTION='...'` | Search chunks semantically.                          |
+| `make text_search QUESTION='...'`   | Search chunks with PostgreSQL full-text search.      |
+| `make ask QUESTION='...'`           | Generate an answer from retrieved context.           |
+| `make app`                          | Start the agent API and Gradio chat interface.       |
 
-## Configuration
-
-Copy `.env.template` to `.env` before using Docker Compose. The main ingestion settings
-are:
-
-| Variable               | Purpose                                  | Template value              |
-| ---------------------- | ---------------------------------------- | --------------------------- |
-| `AGENT_OPENAI_API_KEY` | OpenAI credential used by the agent      | Empty                       |
-| `AGENT_OPENAI_MODEL`   | OpenAI model used to generate answers    | `gpt-4.1-mini`              |
-| `AGENT_PORT`           | Host port for the agent API              | `8000`                      |
-| `CHAT_API_URL`         | Agent endpoint used by a local chat      | `http://localhost:8000/ask` |
-| `CHAT_HOST`            | Host interface for a local Gradio server | `127.0.0.1`                 |
-| `CHAT_PORT`            | Host port for the Gradio interface       | `7860`                      |
-| `CHAT_TITLE`           | Gradio page title                        | `Brittany AI Tour Guide`    |
-| `DB_HOST`              | Database host                            | `localhost`                 |
-| `DB_PORT`              | Database port                            | `5432`                      |
-| `DB_NAME`              | PostgreSQL database name                 | `postgres`                  |
-| `DB_USER`              | PostgreSQL user                          | `postgres`                  |
-| `DB_PASSWORD`          | PostgreSQL password                      | `postgres`                  |
-| `EMBEDDING_MODEL_NAME` | FastEmbed model for document vectors     | `BAAI/bge-small-en-v1.5`    |
-| `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the schema  | `384`                       |
-| `EMBEDDING_BATCH_SIZE` | Chunks embedded per inference batch      | `32`                        |
-| `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized | `true`                      |
-| `EMBEDDING_CACHE_DIR`  | Optional FastEmbed model cache directory | FastEmbed default           |
-| `INGESTION_DEBUG`      | Retain intermediate artifacts            | `false`                     |
-| `INGESTION_TIMEOUT`    | PDF download timeout in seconds          | `30`                        |
-| `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                       |
-
-The direct Python CLI reads `AGENT_OPENAI_*`, `EMBEDDING_*`, and `INGESTION_*` settings
-from `.env`. Docker Compose gives the OpenAI credentials only to the agent service and
-configures the chat service to call it over the internal Compose network.
-
-The Docker agent and ingestion images preload `EMBEDDING_MODEL_NAME` during their build,
-so vector searches do not download the embedding model at runtime. Rebuild the images
-after intentionally changing the model configuration.
-
-`EMBEDDING_DIMENSIONS` must match the selected model. Changing it after the database has
-been initialized requires recreating the schema, which can be done in development with
-`make reset-db`.
+See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
+[agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python
+workflows.
 
 ## Roadmap
 
-### Last release — v0.1.0: Retrieval prototype
+The complete plan, including milestones and deferred work, is maintained in
+[roadmap.md](roadmap.md).
 
-This first release validates the end-to-end ingestion and retrieval workflow for the
-knowledge base. It does not use an LLM yet; information is retrieved through the CLI
-using full-text and vector search.
+### Current release — v0.2.0: RAG MVP
 
-**Features:**
-
-- PDF text extraction
-- Structure-aware chunking
-- Embedding generation
-- Full-text search
-- Vector similarity search
-- CLI-based information retrieval
-
-### Next release — v0.2.0: RAG MVP
-
-The next release will add a conversational layer on top of the retrieval prototype.
-
-**Planned features:**
+This release delivers the first end-to-end RAG experience for the Brittany guide:
 
 - Grounded answers generated from retrieved context
-- Source citations, including page references
-- Gradio chat interface
+- Retrieved source references with deduplicated page numbers
+- A basic Gradio chat interface
 
-See the project's [roadmap](roadmap.md) *(work in progress)*.
+### Next release — v0.3.0: Evaluation
+
+The next goal is to validate and measure answer quality: build a reviewed evaluation
+dataset, compare retrieval and prompt configurations, and introduce verified citations
+based on LLM-returned chunk identifiers.
+
+## Capstone success criteria
+
+The project follows the LLM Zoomcamp capstone evaluation criteria. A complete submission
+should demonstrate the following, in delivery order:
+
+- A clearly defined tourism problem, target users, supported questions, and limitations.
+- An accessible source dataset and reproducible instructions for running the project.
+- Automated ingestion from source documents into a searchable knowledge base.
+- A RAG flow that retrieves relevant context from the knowledge base before an LLM
+  generates an answer.
+- Retrieval evaluation that compares multiple approaches and adopts the strongest
+  configuration.
+- LLM-answer evaluation that compares multiple prompt or generation approaches and
+  selects the best one.
+- A usable interface for asking questions, such as the chat application and HTTP API.
+- Monitoring through user feedback and a dashboard that makes application behaviour
+  visible.
+- Containerised services, pinned dependency versions, and clear setup instructions for a
+  reproducible local run.
+- Retrieval best practices evaluated for their value: hybrid search, reranking, and
+  query rewriting.
+- Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
 
 ## Contributing
 
-This repository is maintained as a personal portfolio and learning project. While
-external contributions are not currently accepted, feedback, bug reports, and
-suggestions are always welcome through GitHub Issues.
+This is a personal portfolio and learning project. External contributions are not
+currently accepted, but feedback, bug reports, and suggestions are welcome through
+GitHub Issues.
 
-### Local quality checks
-
-After running `uv sync`, install the Git hooks once:
+After `uv sync`, install the local quality hooks once:
 
 ```bash
 uv run pre-commit install
 ```
 
-The pre-commit hook formats staged Python and Markdown files with Ruff and mdformat. Run
-every hook manually with:
+Run all checks manually with:
 
 ```bash
 uv run pre-commit run --all-files
@@ -358,12 +216,10 @@ uv run pre-commit run --all-files
 ## License
 
 This repository is publicly available for educational, portfolio, and evaluation
-purposes.
+purposes. You may browse and clone it to review the implementation, but its source code
+is **not licensed for reuse**. All rights are reserved unless stated otherwise; copying,
+modifying, redistributing, or incorporating this code into other projects requires prior
+written permission.
 
-You may browse and clone this repository to review the implementation, but the source
-code is **not licensed for reuse**. Unless otherwise stated, all rights are reserved by
-the author. Copying, modifying, redistributing, or incorporating this code into other
-projects requires prior written permission.
-
-The tourism guide used as the knowledge source remains the property of its respective
-copyright holder and is not redistributed as part of this repository.
+The tourism guide used as the knowledge source remains the property of its copyright
+holder and is not redistributed as part of this repository.

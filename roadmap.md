@@ -51,16 +51,16 @@ ______________________________________________________________________
 **Labels:** `planning`, `documentation`
 
 - [x] Define target users
-- [ ] Define supported questions
-- [ ] Define unsupported questions
-- [ ] Define supported languages
-- [ ] Define success criteria
+- [x] Define supported questions
+- [x] Define unsupported questions
+- [x] Define supported languages
+- [x] Define success criteria
 
 **Acceptance criteria**
 
 - [x] Scope is documented in `README.md`
-- [ ] Limitations are explicit
-- [ ] Five example use cases are included
+- [x] Limitations are explicit
+- [x] Example use cases are included
 
 **Tools**
 
@@ -503,7 +503,7 @@ ______________________________________________________________________
 - [ ] Answer only from retrieved context
 - [ ] Refuse unsupported questions
 - [ ] Avoid inventing prices and opening hours
-- [ ] Answer in the user's language
+- [ ] Answer in English
 - [ ] Cite relevant pages
 
 **Acceptance criteria**
@@ -580,8 +580,7 @@ ______________________________________________________________________
 **Labels:** `evaluation`, `data`
 
 - [ ] Create 40–60 questions
-- [ ] Include French and English questions
-- [ ] Include answerable and unanswerable questions
+- [ ] Include English answerable and unsupported questions
 - [ ] Record expected pages or topics
 - [ ] Include misspellings and paraphrases
 
@@ -637,7 +636,7 @@ ______________________________________________________________________
 - [ ] Evaluate groundedness
 - [ ] Evaluate citation accuracy
 - [ ] Evaluate refusal quality
-- [ ] Evaluate language consistency
+- [ ] Evaluate English-language responses
 
 **Acceptance criteria**
 
