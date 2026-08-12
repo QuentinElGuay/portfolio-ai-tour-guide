@@ -422,22 +422,21 @@ tuned through evaluation before becoming user-facing options.
 
 ______________________________________________________________________
 
-## 🚀 Release v0.1.0 — Retrieval prototype
+# 🚀 Release v0.1.0 — Retrieval prototype
 
-> [!NOTE]
-> **📦 Shipped**
->
-> The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items are
-> tracked as polish, hardening, and follow-up work.
->
-> This release includes:
->
-> - PDF extraction
-> - Chunking
-> - Embedding
-> - Full-text search
-> - Vector search
-> - CLI information retrieval
+**📦 Shipped**
+
+The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items are
+tracked as polish, hardening, and follow-up work.
+
+This release includes:
+
+- PDF extraction
+- Chunking
+- Embedding
+- Full-text search
+- Vector search
+- CLI information retrieval
 
 ______________________________________________________________________
 
@@ -532,16 +531,15 @@ evaluation milestone and do not change its delivered scope:
 
 ______________________________________________________________________
 
-## 🚀 Release v0.2.0 — RAG MVP
+# 🚀 Release v0.2.0 — RAG MVP
 
-> [!IMPORTANT]
-> **📦 Shipped**
->
-> Delivers the first end-to-end RAG experience for the Brittany guide.
->
-> - Grounded answers
-> - Retrieved source pages
-> - Basic Gradio interface
+**📦 Shipped**
+
+Delivers the first end-to-end RAG experience for the Brittany guide:
+
+- Grounded answers
+- Retrieved source pages
+- Basic Gradio interface
 
 ______________________________________________________________________
 
@@ -694,17 +692,16 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🚀 Release v0.3.0 — Evaluation
+# 🚀 Release v0.3.0 — Evaluation
 
-> [!NOTE]
-> **🗓️ Planned release — not shipped**
->
-> Ships when **Milestone 5** passes its exit criteria.
->
-> - Golden dataset
-> - Full-text search comparison
-> - Hybrid search
-> - Validated citations and prompt evaluation
+**🗓️ Planned release — not shipped**
+
+Ships when **Milestone 5** passes its exit criteria:
+
+- Golden dataset
+- Full-text search comparison
+- Hybrid search
+- Validated citations and prompt evaluation
 
 ______________________________________________________________________
 
@@ -806,16 +803,15 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🚀 Release v0.4.0 — Monitoring
+# 🚀 Release v0.4.0 — Monitoring
 
-> [!NOTE]
-> **🗓️ Planned release — not shipped**
->
-> Ships when **Milestone 7** passes its exit criteria.
->
-> - Feedback
-> - Logs
-> - Dashboard
+**🗓️ Planned release — not shipped**
+
+Ships when **Milestone 7** passes its exit criteria:
+
+- Feedback
+- Logs
+- Dashboard
 
 ______________________________________________________________________
 
@@ -919,17 +915,16 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🚀 Release v1.0.0 — Final submission
+# 🚀 Release v1.0.0 — Final submission
 
-> [!NOTE]
-> **🗓️ Planned release — not shipped**
->
-> Ships when **Milestone 8** passes its exit criteria.
->
-> - Docker Compose
-> - Tests and CI
-> - Documentation
-> - Demo video
+**🗓️ Planned release — not shipped**
+
+Ships when **Milestone 8** passes its exit criteria:
+
+- Docker Compose
+- Tests and CI
+- Documentation
+- Demo video
 
 ______________________________________________________________________
 
