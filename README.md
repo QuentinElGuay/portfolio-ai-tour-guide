@@ -191,29 +191,36 @@ The next goal is to validate and measure answer quality: build a reviewed evalua
 dataset, compare retrieval and prompt configurations, and introduce verified citations
 based on LLM-returned chunk identifiers.
 
-## Capstone success criteria
+### Capstone success criteria
 
 The project follows the
 [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
 A complete submission should demonstrate the following features:
 
-- A clearly defined problem, target users, supported questions, and limitations.
-- An accessible source dataset and reproducible instructions for running the project.
-- Automated ingestion from source documents into a searchable knowledge base.
-- A RAG flow that retrieves relevant context from the knowledge base before an LLM
+- ✅ A clearly defined problem, target users, supported questions, and limitations.
+- ✅ An accessible source dataset and reproducible instructions for running the project.
+- ✅ Automated ingestion from source documents into a searchable knowledge base.
+- ✅ A RAG flow that retrieves relevant context from the knowledge base before an LLM
   generates an answer.
-- Retrieval evaluation that compares multiple approaches and adopts the strongest
+- ✅ Retrieval evaluation that compares multiple approaches and adopts the strongest
   configuration.
-- LLM-answer evaluation that compares multiple prompt or generation approaches and
+- ⏳ LLM-answer evaluation that compares multiple prompt or generation approaches and
   selects the best one.
-- A usable interface for asking questions, such as the chat application and HTTP API.
-- Monitoring through user feedback and a dashboard that makes application behaviour
+- ✅ A usable interface for asking questions, such as the chat application and HTTP API.
+- ⏳ Monitoring through user feedback and a dashboard that makes application behaviour
   visible.
-- Containerised services, pinned dependency versions, and clear setup instructions for a
-  reproducible local run.
-- Retrieval best practices evaluated for their value: hybrid search, reranking, and
+- 🔄 Containerised services, pinned dependency versions, and clear setup instructions for
+  a reproducible local run.
+- ⏳ Retrieval best practices evaluated for their value: hybrid search, reranking, and
   query rewriting.
-- Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
+- ⏳ Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
+
+### Delivery status
+
+- **✅ Passed / core complete** — the milestone's core deliverable is usable; remaining
+  items are polish or follow-up
+- **🔄 In progress** — work has started, but the milestone is not complete
+- **⏳ Planned** — work has not started yet
 
 ## Contributing
 
