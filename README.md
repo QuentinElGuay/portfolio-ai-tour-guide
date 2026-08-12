@@ -10,6 +10,21 @@ to answer travellers' questions from an indexed tourism guide.
 > [!IMPORTANT]
 > 🚧 This project is under **<ins>active development</ins>**.
 
+## Table of contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Question scope](#question-scope)
+- [Documentation](#documentation)
+- [Data source](#data-source)
+- [Prerequisites](#prerequisites)
+- [Quick start](#quick-start)
+- [Common commands](#common-commands)
+- [Roadmap](#roadmap)
+- [Capstone success criteria](#capstone-success-criteria)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Overview
 
 Created as a capstone project for
@@ -99,8 +114,8 @@ purposes only and is not redistributed in this repository.
 The recommended workflow requires _Git_, _Docker_ with _Docker Compose_, and _GNU Make_.
 
 For direct Python commands, install _Python 3.14_ or newer and
-_[uv](https://docs.astral.sh/uv/)_. _GitHub Codespaces_ can run the project without local
-installation.
+_[uv](https://docs.astral.sh/uv/)_. _GitHub Codespaces_ can run the project without
+local installation.
 
 ## Quick start
 
@@ -174,7 +189,8 @@ based on LLM-returned chunk identifiers.
 
 ## Capstone success criteria
 
-The project follows the [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
+The project follows the
+[LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
 A complete submission should demonstrate the following features:
 
 - A clearly defined problem, target users, supported questions, and limitations.
