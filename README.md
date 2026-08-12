@@ -96,10 +96,10 @@ purposes only and is not redistributed in this repository.
 
 ## Prerequisites
 
-The recommended workflow requires Git, Docker with Docker Compose, and GNU Make.
+The recommended workflow requires _Git_, _Docker_ with _Docker Compose_, and _GNU Make_.
 
-For direct Python commands, install Python 3.14 or newer and
-[uv](https://docs.astral.sh/uv/). GitHub Codespaces can run the project without local
+For direct Python commands, install _Python 3.14_ or newer and
+_[uv](https://docs.astral.sh/uv/)_. _GitHub Codespaces_ can run the project without local
 installation.
 
 ## Quick start
