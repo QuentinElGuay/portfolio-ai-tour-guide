@@ -4,6 +4,9 @@ The Gradio chat is the user interface for the RAG agent. It does not retrieve do
 or access an LLM provider directly. Instead, it sends each question to the agent's HTTP
 API and displays the grounded answer with its source pages.
 
+Return to the [project overview](../../../../README.md) or the
+[agent guide](../README.md).
+
 ## Run with Docker
 
 After initializing and ingesting the database, set `AGENT_OPENAI_API_KEY` in `.env` and
