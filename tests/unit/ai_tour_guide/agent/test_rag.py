@@ -56,7 +56,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
         )
     ]
     backend = MagicMock()
-    backend.generate = AsyncMock(return_value='It opens at ten.')
+    backend.generate_reply = AsyncMock(return_value='It opens at ten.')
     create_backend.return_value = backend
 
     result = answer_question('When does it open?', mode='text', k=3)
@@ -86,7 +86,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
         ],
     )
     retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
-    messages = backend.generate.call_args.args[0]
+    messages = backend.generate_reply.call_args.args[0]
     assert 'chunk-123' in messages[1]['content']
     assert 'The museum opens at ten.' in messages[1]['content']
     assert 'When does it open?' in messages[1]['content']

@@ -1,21 +1,28 @@
-"""Configuration for direct OpenAI language-model calls."""
+"""Shared and provider-specific language-model settings."""
+
+from abc import ABC
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class OpenAISettings(BaseSettings):
-    """Settings loaded from the ``AGENT_OPENAI_*`` environment variables."""
+class LLMSettings(BaseSettings, ABC):
+    """Provider-neutral settings shared by language-model clients."""
 
     model_config = SettingsConfigDict(
-        env_prefix='AGENT_OPENAI_',
         env_file='.env',
         env_file_encoding='utf-8',
         extra='ignore',
     )
 
-    api_key: SecretStr = Field(description='OpenAI API token')
-    model: str = 'gpt-4.1-mini'
+    api_key: SecretStr = Field(description='Language-model API token')
+    model: str = Field(description='Language-model identifier')
 
 
-__all__ = ['OpenAISettings']
+class OpenAISettings(LLMSettings):
+    """Settings loaded from the ``AGENT_OPENAI_*`` environment variables."""
+
+    model_config = SettingsConfigDict(env_prefix='AGENT_OPENAI_')
+
+
+__all__ = ['LLMSettings', 'OpenAISettings']

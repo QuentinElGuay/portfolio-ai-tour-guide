@@ -5,23 +5,19 @@ from collections.abc import Sequence
 from typing import Protocol
 
 import httpx
-from pydantic import ValidationError
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.agent.llm.client import OpenAIClient
-from ai_tour_guide.agent.llm.settings import OpenAISettings
+from ai_tour_guide.agent.llm.factory import create_default_llm_client
+from ai_tour_guide.agent.llm.interfaces import LLMClient
 
 
 # Backend Factory
 def create_backend() -> ChatBackend:
     """Create the configured chat backend for agent applications."""
-    try:
-        openai_settings = OpenAISettings()
-    except ValidationError:
-        openai_settings = None
+    client = create_default_llm_client()
 
-    if openai_settings is not None:
-        return LocalBackend(settings=openai_settings)
+    if client is not None:
+        return LocalBackend(client=client)
 
     api_url = os.getenv('CHAT_API_URL')
 
@@ -37,25 +33,20 @@ class ChatBackend(Protocol):
 
 
 class LocalBackend:
-    """Generate responses directly without a separate application server."""
+    """Generate responses through an injected language-model client."""
 
-    def __init__(
-        self,
-        client: OpenAIClient | None = None,
-        *,
-        settings: OpenAISettings | None = None,
-    ) -> None:
-        self.client = client or OpenAIClient(settings)
+    def __init__(self, client: LLMClient) -> None:
+        self.client = client
 
     async def generate_reply(self, messages: Sequence[Message]) -> str:
         """Delegate generation to the configured direct LLM client."""
-        return await self.client.generate(messages)
+        return await self.client.generate_reply(messages)
 
 
 class DemoBackend:
     """Local backend that makes the UI runnable without an LLM provider."""
 
-    async def generate(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         latest = messages[-1]['content']
 
         return (
@@ -72,7 +63,7 @@ class HttpChatBackend:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
-    async def generate(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
