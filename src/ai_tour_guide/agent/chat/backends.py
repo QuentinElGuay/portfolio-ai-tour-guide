@@ -32,7 +32,7 @@ def create_backend() -> ChatBackend:
 
 
 class ChatBackend(Protocol):
-    async def generate(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         """Return an assistant response for the complete conversation."""
 
 
@@ -47,7 +47,7 @@ class LocalBackend:
     ) -> None:
         self.client = client or OpenAIClient(settings)
 
-    async def generate(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         """Delegate generation to the configured direct LLM client."""
         return await self.client.generate(messages)
 

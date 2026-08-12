@@ -70,7 +70,7 @@ def test_local_backend_delegates_to_the_llm_client() -> None:
         {'role': 'user', 'content': 'What should I visit?'},
     ]
 
-    result = asyncio.run(LocalBackend(client=client).generate(messages))
+    result = asyncio.run(LocalBackend(client=client).generate_reply(messages))
 
     assert result == 'A direct answer.'
     client.generate.assert_awaited_once_with(messages)

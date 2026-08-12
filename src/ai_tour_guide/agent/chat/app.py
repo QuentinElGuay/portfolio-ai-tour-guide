@@ -39,7 +39,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
         messages.append({'role': 'user', 'content': message})
 
         try:
-            return await selected_backend.generate(messages)
+            return await selected_backend.generate_reply(messages)
         except RuntimeError as exc:
             return f'**Backend error:** {exc}'
 

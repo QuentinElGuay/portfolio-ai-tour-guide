@@ -23,7 +23,7 @@ class OpenAIClient:
             api_key=selected_settings.api_key.get_secret_value(),
         )
 
-    async def generate(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         """Generate one assistant response for the supplied messages."""
         try:
             response = await self._client.responses.create(
