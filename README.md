@@ -52,8 +52,8 @@ The project also focuses on the practices that make RAG applications reliable:
 ## Architecture
 
 The ingestion pipeline indexes the tourism guide in PostgreSQL with pgvector. The chat
-interface sends questions to the agent API, which retrieves context and calls OpenAI to
-generate an answer.
+interface sends questions to the agent API, which retrieves context and calls an LLM API
+to generate an answer.
 
 ```mermaid
 flowchart LR
@@ -62,7 +62,7 @@ flowchart LR
     User --> Chat[Chat]
     Chat --> Agent[Agent API]
     Agent <--> KB
-    Agent <--> OpenAI[OpenAI API]
+    Agent <--> LLM[LLM API]
     Agent --> Chat
 ```
 
@@ -132,6 +132,10 @@ Set an OpenAI API key in `.env` to generate answers:
 ```dotenv
 AGENT_OPENAI_API_KEY=your-api-key
 ```
+
+> [!NOTE]
+> OpenAI is the only currently supported LLM provider at the moment but more might be
+> added in the future.
 
 Initialize the database, ingest the bundled source definitions, and start the app:
 

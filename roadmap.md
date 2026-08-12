@@ -929,37 +929,33 @@ ______________________________________________________________________
 - [ ] Remove or exclude stale chunks from retrieval
 - [ ] Test concurrent and repeated document updates
 
-## [P2] Add OCR fallback
+## [P2] Add agentic routing and live tools
 
-- [ ] Detect image-only pages
-- [ ] Run OCR only when required
-- [ ] Record OCR confidence
+- [ ] Classify questions as knowledge-base, live-information, or unsupported requests
+- [ ] Decide whether retrieval is needed before answering
+- [ ] Select an appropriate retrieval mode when searching the knowledge base
+- [ ] Use a static workflow for deterministic actions, such as input validation,
+  unsupported-question responses, and source formatting
+- [ ] Allow the agent to select from approved live-information tools only when needed
+- [ ] Return a clear limitation when no knowledge-base result or approved tool can
+  answer the question
 
-**Tools**
+### Live-information tools
 
-- Tesseract
-- pytesseract
+- [ ] Weather service
+- [ ] Public transport service
+- [ ] Current opening-information service
 
-## [P3] Add map visualization
+**Acceptance criteria**
 
-- [ ] Extract destinations
-- [ ] Geocode locations
-- [ ] Show results on a map
-
-**Tools**
-
-- OpenStreetMap
-- Nominatim
-- Folium
-
-## [P3] Add live information tools
-
-- [ ] Weather
-- [ ] Public transport
-- [ ] Current opening information
+- [ ] Deterministic actions do not depend on an LLM decision
+- [ ] Tool calls are limited to an explicit allowlist
+- [ ] The selected route and tool use are observable
 
 **Tools**
 
+- Static Python workflow
+- OpenAI tool calling
 - Open-Meteo
 - Public tourism or transport APIs
 
