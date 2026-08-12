@@ -40,6 +40,9 @@ indent-style = "space"
 wrap = 88
 end_of_line = "lf"
 
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
 [dependency-groups]
 dev = [
     "mdformat>=1.0.0",
