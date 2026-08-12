@@ -1,0 +1,45 @@
+flowchart TD
+    Q[Question]
+
+    Q --> RET[retrieve]
+    RET --> RC[RetrievedChunk tuple\ncomplete ranked retrieval trace]
+
+    RC --> CTX[build_context]
+    CTX --> LLM[LLMClient.answer_question]
+    LLM --> GA[GeneratedAnswer]
+    GA --> CIT[LLMCitation tuple]
+
+    CIT --> VAL[Validate and normalize citations]
+    RC --> VAL
+
+    VAL --> SRC[SourceReference tuple\none per source_url + version\nsorted pages]
+    VAL --> INV[InvalidCitation tuple\noriginal citation + reason + metadata]
+
+    GA --> RAG[RAGResult]
+    RC --> RAG
+    SRC --> RAG
+    INV --> RAG
+
+    RAG --> SER[Serialize RAGResult]
+    SER --> EVAL[Future evaluation]
+
+    RAG --> CLI[CLI ask]
+    RAG --> API[API adapter]
+    API --> JSON[AskResponse JSON\nanswer + validated sources only]
+    JSON --> HTTP[HttpChatBackend.ask]
+    HTTP --> DICT[Validated JSON dictionary]
+    DICT --> UI[Gradio chat rendering]
+
+    classDef input fill:#e8f1fb,stroke:#2563eb,stroke-width:1.5px;
+    classDef retrieval fill:#eefcf3,stroke:#2f9e44,stroke-width:1.5px;
+    classDef generation fill:#fff7e6,stroke:#d99000,stroke-width:1.5px;
+    classDef validation fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef result fill:#e6fffb,stroke:#0891b2,stroke-width:2px;
+    classDef output fill:#f8f9fa,stroke:#495057,stroke-width:1.5px;
+
+    class Q input;
+    class RET,RC,CTX retrieval;
+    class LLM,GA,CIT generation;
+    class VAL,SRC,INV validation;
+    class RAG,SER,EVAL result;
+    class CLI,API,JSON,HTTP,DICT,UI output;

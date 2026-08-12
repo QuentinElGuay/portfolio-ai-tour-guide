@@ -4,13 +4,18 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.rag.models import GeneratedAnswer
+
+
+class GenerationError(RuntimeError):
+    """An expected provider or structured-output failure."""
 
 
 class LLMClient(Protocol):
     """Generate a reply from a complete conversation."""
 
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
-        """Return the generated reply for ``messages``."""
+    async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
+        """Return a structured answer for ``messages``."""
 
 
-__all__ = ['LLMClient']
+__all__ = ['GenerationError', 'LLMClient']

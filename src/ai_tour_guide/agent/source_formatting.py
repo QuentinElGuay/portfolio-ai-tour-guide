@@ -1,9 +1,15 @@
 """Formatting shared by terminal output and RAG source context."""
 
-from ai_tour_guide.knowledge_base.models import DocumentChunkRow
+from collections.abc import Sequence
+from typing import Protocol
 
 
-def format_page_range(chunk: DocumentChunkRow) -> str:
+class HasPageRange(Protocol):
+    page_start: int | None
+    page_end: int | None
+
+
+def format_page_range(chunk: HasPageRange) -> str:
     """Render a chunk's source-page range when it is available."""
     if chunk.page_start is None:
         return 'page unavailable'
@@ -12,4 +18,14 @@ def format_page_range(chunk: DocumentChunkRow) -> str:
     return f'pages {chunk.page_start}-{chunk.page_end}'
 
 
-__all__ = ['format_page_range']
+def format_pages(pages: Sequence[int]) -> str:
+    """Render sorted page numbers in natural language."""
+    numbers = [str(page) for page in pages]
+    if len(numbers) == 1:
+        return f'page {numbers[0]}'
+    if len(numbers) == 2:
+        return f'pages {numbers[0]} and {numbers[1]}'
+    return f'pages {", ".join(numbers[:-1])} and {numbers[-1]}'
+
+
+__all__ = ['format_page_range', 'format_pages']

@@ -250,7 +250,9 @@ documents = Table(
     ),
     UniqueConstraint(
         'source_url',
-        name='uq_documents_source_url',
+        'version',
+        name='uq_documents_source_url_version',
+        postgresql_nulls_not_distinct=True,
     ),
     CheckConstraint(
         "collection IS NULL OR btrim(collection) <> ''",

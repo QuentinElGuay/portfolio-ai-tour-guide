@@ -1,9 +1,13 @@
 """HTTP API exposing the tour-guide RAG pipeline."""
 
+from datetime import date
+
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 
 from ai_tour_guide.agent.rag.pipeline import answer_question
+
+ASK_RESPONSE_SCHEMA_VERSION = 1
 
 
 class AskRequest(BaseModel):
@@ -23,14 +27,19 @@ class AskRequest(BaseModel):
 class SourceResponse(BaseModel):
     """Source reference displayed alongside an answer."""
 
+    source_url: str
+    version: str | None
     title: str
-    page_start: int | None
-    page_end: int | None
+    publisher: str | None
+    collection: str | None
+    publication_date: date | None
+    pages: list[int]
 
 
 class AskResponse(BaseModel):
     """Grounded answer and the sources used to produce it."""
 
+    schema_version: int = ASK_RESPONSE_SCHEMA_VERSION
     answer: str
     sources: list[SourceResponse]
 
@@ -48,12 +57,5 @@ def health() -> dict[str, str]:
 def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
     result = answer_question(request.question)
-    sources = [
-        SourceResponse(
-            title=retrieved.source.title,
-            page_start=retrieved.source.page_start,
-            page_end=retrieved.source.page_end,
-        )
-        for retrieved in result.retrieved
-    ]
+    sources = [SourceResponse(**source.to_dict()) for source in result.sources]
     return AskResponse(answer=result.answer, sources=sources)

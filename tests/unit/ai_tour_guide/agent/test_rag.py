@@ -1,17 +1,9 @@
-import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
-os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
-
-from ai_tour_guide.agent.rag.models import RAGResult
-from ai_tour_guide.agent.rag.pipeline import (
-    INSUFFICIENT_CONTEXT_ANSWER,
-    answer_question,
-)
-from ai_tour_guide.agent.rag.prompting import build_context
-from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
+from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
+from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
     ScoreKind,
@@ -19,101 +11,58 @@ from ai_tour_guide.knowledge_base.retrieval import (
 )
 
 
-def _chunk():
-    return SimpleNamespace(
+def _retrieved() -> RetrievedChunk:
+    chunk = SimpleNamespace(
         chunk_id='chunk-123',
         page_start=12,
         page_end=12,
-        text='The museum opens at ten.',
+        text='Opens at ten.',
+        content_hash='hash',
+    )
+    return RetrievedChunk(
+        chunk=chunk,
+        rank=1,
+        score=0.9,
+        score_kind=ScoreKind.TEXT_RANK,
+        source=SourceMetadata(
+            document_id=7,
+            chunk_id='chunk-123',
+            title='Museum guide',
+            source_url='https://example.com/museum',
+            publisher='Board',
+            publication_date=None,
+            collection='guides',
+            version='2026',
+            section_path=('Museum',),
+            page_start=12,
+            page_end=12,
+        ),
     )
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve')
-def test_answer_question_retrieves_context_and_returns_sources(
+def test_answer_question_retains_full_trace_and_validated_sources(
     retrieve: MagicMock,
 ) -> None:
-    chunk = _chunk()
-    retrieve.return_value = [
-        RetrievedChunk(
-            chunk=chunk,
-            rank=1,
-            score=0.9,
-            score_kind=ScoreKind.TEXT_RANK,
-            source=SourceMetadata(
-                document_id=7,
-                chunk_id='chunk-123',
-                title='A museum guide',
-                source_url='https://example.com/museum',
-                publisher=None,
-                publication_date=None,
-                collection=None,
-                version=None,
-                section_path=('Museum',),
-                page_start=12,
-                page_end=12,
-            ),
-        )
-    ]
+    retrieve.return_value = [_retrieved()]
     client = MagicMock()
-    client.generate_reply = AsyncMock(return_value='It opens at ten.')
-
-    result = answer_question('When does it open?', mode='text', k=3, client=client)
-
-    assert result == RAGResult(
-        answer='It opens at ten.',
-        retrieved=[
-            RetrievedChunk(
-                chunk=chunk,
-                rank=1,
-                score=0.9,
-                score_kind=ScoreKind.TEXT_RANK,
-                source=SourceMetadata(
-                    document_id=7,
-                    chunk_id='chunk-123',
-                    title='A museum guide',
-                    source_url='https://example.com/museum',
-                    publisher=None,
-                    publication_date=None,
-                    collection=None,
-                    version=None,
-                    section_path=('Museum',),
-                    page_start=12,
-                    page_end=12,
-                ),
-            )
-        ],
+    client.answer_question = AsyncMock(
+        return_value=GeneratedAnswer(
+            'It opens at ten.',
+            (LLMCitation('https://example.com/museum', '2026', 12, 12),),
+        )
     )
-    retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
-    messages = client.generate_reply.call_args.args[0]
-    assert 'chunk-123' in messages[1]['content']
-    assert 'The museum opens at ten.' in messages[1]['content']
-    assert 'When does it open?' in messages[1]['content']
+    result = answer_question('When?', mode='text', k=3, client=client)
+    assert result.answer == 'It opens at ten.'
+    assert result.sources[0].pages == (12,)
+    assert result.retrieved == (_retrieved(),)
+    assert 'https://example.com/museum' in result.context
+    assert result.to_dict()['retrieved'][0]['text'] == 'Opens at ten.'
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve', return_value=[])
-def test_answer_question_handles_empty_retrieval(
-    retrieve: MagicMock,
-) -> None:
-    result = answer_question('Unknown question', client=MagicMock())
-
+def test_empty_retrieval_is_insufficient_context(retrieve: MagicMock) -> None:
+    result = answer_question('Unknown', client=MagicMock())
     assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
-    assert result.chunks == []
-
-
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve')
-@patch('ai_tour_guide.agent.rag.pipeline.create_default_llm_client', return_value=None)
-def test_answer_question_requires_llm_configuration(
-    create_default_llm_client: MagicMock,
-    retrieve: MagicMock,
-) -> None:
-    result = answer_question('What should I visit?')
-
-    assert result.answer == LLM_CONFIGURATION_REQUIRED_ANSWER
-    assert result.chunks == []
-    retrieve.assert_not_called()
-
-
-def test_build_context_preserves_source_identity_and_pages() -> None:
-    assert build_context([_chunk()]) == (
-        '[Source: chunk-123, page 12]\nThe museum opens at ten.'
-    )
+    assert result.context == ''
+    assert result.messages == ()

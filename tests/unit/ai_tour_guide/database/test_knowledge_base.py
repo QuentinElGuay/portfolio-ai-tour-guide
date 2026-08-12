@@ -1,18 +1,13 @@
-import os
 from datetime import UTC, date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
-
-os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
-os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
-
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 from ai_tour_guide.knowledge_base.init_db import initialize_database
 from ai_tour_guide.knowledge_base.insert import (
     DocumentAlreadyExistsError,
