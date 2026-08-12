@@ -553,6 +553,54 @@ project submission:
 Runtime guardrails, citation enforcement, CI gates, and broader end-to-end RAG quality
 evaluation are tracked separately and do not block this milestone.
 
+______________________________________________________________________
+
+### [P0] Create retrieval evaluation dataset
+
+**Labels:** `evaluation`, `data`, `retrieval`
+
+Create a manually reviewed golden dataset for measuring whether the retrieval layer
+finds the evidence needed to answer representative Brittany tourism questions.
+
+- [ ] Create 40–60 representative questions
+- [ ] Record stable document/page evidence for each answerable question
+- [ ] Include exact place-name queries
+- [ ] Include paraphrases and common misspellings
+- [ ] Include questions where lexical matching should be useful
+- [ ] Include questions where semantic matching should be useful
+- [ ] Keep unsupported questions in the LLM dataset unless they have a specific
+  retrieval expectation
+
+**Dataset shape**
+
+Each case should contain enough information to evaluate retrieval without calling the
+LLM, for example:
+
+```json
+{
+  "id": "retrieval_001",
+  "question": "Which places are recommended for families with children?",
+  "expected_documents": ["guide-to-the-region-of-brittany"],
+  "expected_pages": [18, 19],
+  "expected_answer_topics": ["family activities", "children"]
+}
+```
+
+**Acceptance criteria**
+
+- [ ] Dataset is versioned
+- [ ] Expected document/page evidence is manually reviewed
+- [ ] Dataset labels remain stable when chunk IDs change
+- [ ] Cases cover both lexical and semantic retrieval strengths
+- [ ] The same dataset is used for all compared retrieval approaches
+
+**Tools**
+
+- JSONL
+- Pandas
+
+______________________________________________________________________
+
 ### [P0] Build the offline evaluation runner
 
 **Labels:** `evaluation`, `developer-experience`
@@ -589,10 +637,8 @@ service behind an evaluation profile, not an always-on application service.
 **Suggested interface**
 
 ```text
-make eval-retrieval
-make eval-llm
-uv run python -m ai_tour_guide.evaluation retrieval --dataset evals/retrieval.jsonl
-uv run python -m ai_tour_guide.evaluation llm --dataset evals/llm.jsonl
+make eval-retrieval -> uv run python -m ai_tour_guide.evaluation retrieval --dataset evals/retrieval.jsonl
+make eval-llm -> uv run python -m ai_tour_guide.evaluation llm --dataset evals/llm.jsonl
 ```
 
 This is a proposed interface for the new evaluation module. It follows the project's
@@ -622,55 +668,6 @@ existing `uv run` workflow without adding an unrelated project-specific command.
 - Python
 - Click
 - JSONL
-
-______________________________________________________________________
-
-### [P0] Create retrieval evaluation dataset
-
-**Labels:** `evaluation`, `data`, `retrieval`
-
-Create a manually reviewed golden dataset for measuring whether the retrieval layer
-finds the evidence needed to answer representative Brittany tourism questions.
-
-- [ ] Create 40–60 representative questions
-- [ ] Record stable document/page evidence for each answerable question
-- [ ] Treat retrieved `chunk_id` values as generated run details, not as the primary
-  golden labels
-- [ ] Include exact place-name queries
-- [ ] Include paraphrases and common misspellings
-- [ ] Include questions where lexical matching should be useful
-- [ ] Include questions where semantic matching should be useful
-- [ ] Keep unsupported questions in the LLM dataset unless they have a specific
-  retrieval expectation
-
-**Dataset shape**
-
-Each case should contain enough information to evaluate retrieval without calling the
-LLM, for example:
-
-```json
-{
-  "id": "retrieval_001",
-  "question": "Which places are recommended for families with children?",
-  "expected_documents": ["guide-to-the-region-of-brittany"],
-  "expected_pages": [18, 19],
-  "expected_answer_topics": ["family activities", "children"],
-  "notes": "Chunk IDs may change when parsing or chunking strategies change."
-}
-```
-
-**Acceptance criteria**
-
-- [ ] Dataset is versioned
-- [ ] Expected document/page evidence is manually reviewed
-- [ ] Dataset labels remain stable when chunk IDs change
-- [ ] Cases cover both lexical and semantic retrieval strengths
-- [ ] The same dataset is used for all compared retrieval approaches
-
-**Tools**
-
-- JSONL
-- Pandas
 
 ______________________________________________________________________
 
