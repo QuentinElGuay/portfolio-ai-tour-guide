@@ -1,121 +1,68 @@
-# Gradio Chat MVP
+# Chat interface
 
-A minimal local chat UI for an LLM portfolio.
+The Gradio chat is the user interface for the RAG agent. It does not retrieve documents
+or access an LLM provider directly. Instead, it sends each question to the agent's HTTP
+API and displays the grounded answer with its source pages.
 
-It includes:
+## Run with Docker
 
-- a new-message input;
-- visible conversation history;
-- Markdown and code-block rendering;
-- a clear-chat button;
-- a swappable backend;
-- an HTTP adapter for a separate Python API.
+After initializing and ingesting the database, set `AGENT_OPENAI_API_KEY` in `.env` and
+run:
+
+```bash
+make app
+```
+
+Open `http://localhost:7860`. Docker Compose starts:
+
+- the agent API at `http://localhost:8000`, with database and OpenAI access;
+- the Gradio interface at `http://localhost:7860`, configured to call the agent.
 
 ## Run locally
 
-With `uv`:
+Start the API and chat in separate terminals:
 
 ```bash
-uv sync
-uv run chat-ui
+uv run uvicorn ai_tour_guide.agent.api:app --host 127.0.0.1 --port 8000
 ```
-
-Or with `pip`:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
-chat-ui
+uv run python -m ai_tour_guide.agent.chat.app
 ```
 
-Open <http://127.0.0.1:7860>.
+The defaults in `.env.template` configure the chat to call `http://localhost:8000/ask`.
+`CHAT_API_URL`, `CHAT_HOST`, `CHAT_PORT`, and `CHAT_TITLE` can be changed for another
+environment.
 
-By default, the app uses a small demo backend so it works without an LLM
-provider or API key.
+`CHAT_API_URL` is required when starting the chat service. The application does not use
+a local fallback in production. The agent returns the LLM-configuration-required
+response without querying the knowledge base when no OpenAI API key is configured.
 
-## Connect your Python backend
+`create_app()` uses `DemoBackend` only when no backend is injected. This keeps UI tests
+and local interface development independent of the agent API; the demo response only
+explains that an LLM configuration is required.
 
-Configure the endpoint:
+## HTTP contract
 
-```bash
-# Linux/macOS
-export CHAT_API_URL=http://localhost:8000/chat
-
-# PowerShell
-$env:CHAT_API_URL = "http://localhost:8000/chat"
-
-uv run chat-ui
-```
-
-The UI sends:
+The chat sends the latest user question:
 
 ```json
 {
-  "messages": [
-    {"role": "user", "content": "Previous question"},
-    {"role": "assistant", "content": "Previous answer"},
-    {"role": "user", "content": "Current question"}
+  "question": "What should I visit in Brittany?"
+}
+```
+
+The agent returns its answer and retrieved source references:
+
+```json
+{
+  "answer": "The guide recommends ...",
+  "sources": [
+    {
+      "title": "Guide to the Region of Brittany",
+      "page_start": 12,
+      "page_end": 13
+    }
   ]
 }
-```
-
-The API should return:
-
-```json
-{
-  "message": {
-    "role": "assistant",
-    "content": "The generated answer"
-  }
-}
-```
-
-A minimal FastAPI endpoint could be:
-
-```python
-from typing import Literal
-
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-
-class Message(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
-
-
-class ChatRequest(BaseModel):
-    messages: list[Message]
-
-
-class ChatResponse(BaseModel):
-    message: Message
-
-
-app = FastAPI()
-
-
-@app.post("/chat")
-async def chat(request: ChatRequest) -> ChatResponse:
-    latest_message = request.messages[-1].content
-
-    # Replace this with your provider or application service.
-    answer = f"Your backend received: {latest_message}"
-
-    return ChatResponse(
-        message=Message(role="assistant", content=answer)
-    )
-```
-
-## Project structure
-
-```text
-.
-├── pyproject.toml
-└── src/
-    └── ai_tour_guide.agent.chat/
-        ├── app.py
-        ├── backends.py
-        └── models.py
 ```

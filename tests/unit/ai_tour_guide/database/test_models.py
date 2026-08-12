@@ -6,16 +6,17 @@ from sqlalchemy import inspect
 from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
-from ai_tour_guide.knowledge_base.models import (
-    DocumentChunkRow,
-    DocumentRow,
-    ModelFactory,
-)
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import (
     DocumentMetadata,
     DocumentRecord,
+)
+from ai_tour_guide.knowledge_base.models import (
+    DocumentChunkRow,
+    DocumentRow,
+    ModelFactory,
 )
 
 

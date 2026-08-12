@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from enum import StrEnum
+from typing import TypedDict
 
 
-Role = Literal["user", "assistant", "system"]
+class Role(StrEnum):
+    """Roles supported by the agent chat protocol."""
+
+    USER = 'user'
+    ASSISTANT = 'assistant'
+    SYSTEM = 'system'
 
 
 class Message(TypedDict):

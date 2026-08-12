@@ -7,49 +7,58 @@ from typing import Protocol
 import httpx
 
 from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
 
 
 def create_backend() -> ChatBackend:
-    """Create the configured chat backend for agent applications."""
+    """Create the HTTP backend configured for the running chat service."""
     api_url = os.getenv('CHAT_API_URL')
 
     if api_url:
         return HttpChatBackend(api_url=api_url)
 
-    return DemoBackend()
+    raise RuntimeError(
+        'CHAT_API_URL is required to run the chat service. '
+        'Inject DemoBackend when developing the interface.'
+    )
 
 
 class ChatBackend(Protocol):
-    async def reply(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
         """Return an assistant response for the complete conversation."""
 
 
 class DemoBackend:
-    """Local backend that makes the UI runnable without an LLM provider."""
+    """Development backend used only when no backend is injected."""
 
-    async def reply(self, messages: Sequence[Message]) -> str:
-        latest = messages[-1]['content']
-
-        return (
-            'This is the local demo backend.\n\n'
-            f'You said: **{latest}**\n\n'
-            'Set `CHAT_API_URL` to connect this interface to your Python API.'
-        )
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
+        return LLM_CONFIGURATION_REQUIRED_ANSWER
 
 
 class HttpChatBackend:
-    """Adapter for a separate HTTP chat API."""
+    """Adapter from the chat interface to the agent HTTP API."""
 
     def __init__(self, api_url: str, timeout_seconds: float = 60.0) -> None:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
-    async def reply(self, messages: Sequence[Message]) -> str:
+    async def generate_reply(self, messages: Sequence[Message]) -> str:
+        question = next(
+            (
+                message['content']
+                for message in reversed(messages)
+                if message['role'] == 'user'
+            ),
+            '',
+        )
+        if not question.strip():
+            raise RuntimeError('The conversation does not contain a user question.')
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     self.api_url,
-                    json={'messages': list(messages)},
+                    json={'question': question},
                 )
                 response.raise_for_status()
         except httpx.ConnectError as exc:
@@ -67,15 +76,61 @@ class HttpChatBackend:
 
         try:
             payload = response.json()
-            message = payload['message']
-            content = message['content']
+            answer = payload['answer']
+            sources = payload.get('sources', [])
         except (ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(
-                'Invalid API response. Expected '
-                "{'message': {'role': 'assistant', 'content': '...'}}."
+                "Invalid API response. Expected {'answer': '...', 'sources': [...]}."
             ) from exc
 
-        if not isinstance(content, str) or not content.strip():
+        if not isinstance(answer, str) or not answer.strip():
             raise RuntimeError('The chat API returned an empty response.')
+        if not isinstance(sources, list):
+            raise RuntimeError(  # noqa: TRY004
+                'The chat API returned invalid sources.'
+            )
 
-        return content
+        return _format_answer(answer, sources)
+
+
+def _format_answer(answer: str, sources: list[object]) -> str:
+    source_pages: dict[str, set[int]] = {}
+    sources_without_pages: list[str] = []
+
+    for source in sources:
+        if not isinstance(source, dict) or not isinstance(source.get('title'), str):
+            raise RuntimeError(  # noqa: TRY004
+                'The chat API returned an invalid source.'
+            )
+
+        title = source['title']
+        page_start = source.get('page_start')
+        page_end = source.get('page_end')
+        if isinstance(page_start, int) and isinstance(page_end, int):
+            pages = source_pages.setdefault(title, set())
+            pages.update(range(page_start, page_end + 1))
+        elif isinstance(page_start, int):
+            source_pages.setdefault(title, set()).add(page_start)
+        elif title not in source_pages and title not in sources_without_pages:
+            sources_without_pages.append(title)
+
+    formatted_sources = [
+        f'{title} ({_format_pages(sorted(pages))})'
+        for title, pages in source_pages.items()
+    ]
+    formatted_sources.extend(sources_without_pages)
+
+    if not formatted_sources:
+        return answer
+
+    return f'{answer}\n\n**Sources**\n\n' + '\n'.join(formatted_sources)
+
+
+def _format_pages(pages: list[int]) -> str:
+    page_numbers = [str(page) for page in pages]
+    if len(page_numbers) == 1:
+        return f'page {page_numbers[0]}'
+    if len(page_numbers) == 2:
+        return f'pages {page_numbers[0]} and {page_numbers[1]}'
+
+    return f'pages {", ".join(page_numbers[:-1])} and {page_numbers[-1]}'

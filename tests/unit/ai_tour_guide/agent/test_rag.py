@@ -1,5 +1,9 @@
+import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+
+os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
+os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.agent.rag.models import RAGResult
 from ai_tour_guide.agent.rag.pipeline import (
@@ -7,6 +11,7 @@ from ai_tour_guide.agent.rag.pipeline import (
     answer_question,
 )
 from ai_tour_guide.agent.rag.prompting import build_context
+from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
 from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
     ScoreKind,
@@ -23,11 +28,9 @@ def _chunk():
     )
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.create_backend')
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve')
 def test_answer_question_retrieves_context_and_returns_sources(
     retrieve: MagicMock,
-    create_backend: MagicMock,
 ) -> None:
     chunk = _chunk()
     retrieve.return_value = [
@@ -51,11 +54,10 @@ def test_answer_question_retrieves_context_and_returns_sources(
             ),
         )
     ]
-    backend = MagicMock()
-    backend.reply = AsyncMock(return_value='It opens at ten.')
-    create_backend.return_value = backend
+    client = MagicMock()
+    client.generate_reply = AsyncMock(return_value='It opens at ten.')
 
-    result = answer_question('When does it open?', mode='text', k=3)
+    result = answer_question('When does it open?', mode='text', k=3, client=client)
 
     assert result == RAGResult(
         answer='It opens at ten.',
@@ -82,23 +84,33 @@ def test_answer_question_retrieves_context_and_returns_sources(
         ],
     )
     retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
-    messages = backend.reply.call_args.args[0]
+    messages = client.generate_reply.call_args.args[0]
     assert 'chunk-123' in messages[1]['content']
     assert 'The museum opens at ten.' in messages[1]['content']
     assert 'When does it open?' in messages[1]['content']
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.create_backend')
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve', return_value=[])
 def test_answer_question_handles_empty_retrieval(
     retrieve: MagicMock,
-    create_backend: MagicMock,
 ) -> None:
-    result = answer_question('Unknown question')
+    result = answer_question('Unknown question', client=MagicMock())
 
     assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
     assert result.chunks == []
-    create_backend.assert_not_called()
+
+
+@patch('ai_tour_guide.agent.rag.pipeline.retrieve')
+@patch('ai_tour_guide.agent.rag.pipeline.create_default_llm_client', return_value=None)
+def test_answer_question_requires_llm_configuration(
+    create_default_llm_client: MagicMock,
+    retrieve: MagicMock,
+) -> None:
+    result = answer_question('What should I visit?')
+
+    assert result.answer == LLM_CONFIGURATION_REQUIRED_ANSWER
+    assert result.chunks == []
+    retrieve.assert_not_called()
 
 
 def test_build_context_preserves_source_identity_and_pages() -> None:

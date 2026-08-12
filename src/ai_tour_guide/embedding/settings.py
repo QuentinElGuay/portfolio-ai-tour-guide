@@ -20,6 +20,10 @@ class EmbeddingSettings(BaseSettings):
     )
 
     model_name: str
+    dimensions: int = Field(gt=0)
     batch_size: int = Field(default=DEFAULT_BATCH_SIZE, gt=0)
     normalize: bool = DEFAULT_NORMALIZE
     cache_dir: Path | None = None
+
+
+__all__ = ['EmbeddingSettings']

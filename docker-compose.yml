@@ -3,9 +3,9 @@ name: ai-tour-guide
 x-app-environment: &app-environment
   DB_HOST: database
   DB_PORT: "5432"
-  DB_NAME: "${POSTGRES_DB:?POSTGRES_DB is required}"
-  DB_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
-  DB_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+  DB_NAME: "${DB_NAME:?DB_NAME is required}"
+  DB_USER: "${DB_USER:?DB_USER is required}"
+  DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
   EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:?EMBEDDING_DIMENSIONS is required}"
   EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
   EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:-true}"
@@ -15,12 +15,12 @@ services:
     image: pgvector/pgvector:pg17
 
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
-      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      POSTGRES_DB: "${DB_NAME:?DB_NAME is required}"
+      POSTGRES_USER: "${DB_USER:?DB_USER is required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
 
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${DB_PORT:-5432}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -116,15 +116,64 @@ services:
 
     profiles:
       - agent
+      - app
 
     environment:
       <<: *app-environment
+      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
+      AGENT_OPENAI_MODEL: "${AGENT_OPENAI_MODEL:-gpt-4.1-mini}"
 
     ports:
       - "${AGENT_PORT:-8000}:8000"
 
     depends_on:
       database:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
+    networks:
+      - ai-tour-guide
+
+  chat:
+    image: ai-tour-guide-agent:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+
+    profiles:
+      - app
+
+    environment:
+      CHAT_API_URL: http://agent:8000/ask
+      CHAT_HOST: 0.0.0.0
+      CHAT_PORT: "7860"
+      CHAT_TITLE: "${CHAT_TITLE:-Brittany AI Tour Guide}"
+
+    command: ["python", "-m", "ai_tour_guide.agent.chat.app"]
+
+    ports:
+      - "${CHAT_PORT:-7860}:7860"
+
+    depends_on:
+      agent:
         condition: service_healthy
 
     restart: unless-stopped

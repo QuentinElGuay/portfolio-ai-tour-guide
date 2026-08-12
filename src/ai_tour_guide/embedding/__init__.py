@@ -10,6 +10,7 @@ from ai_tour_guide.embedding.interfaces import (
     EmbeddingError,
     EmbeddingMetadata,
 )
+from ai_tour_guide.embedding.settings import EmbeddingSettings
 
 __all__ = [
     'DEFAULT_BATCH_SIZE',
@@ -17,5 +18,6 @@ __all__ = [
     'Embedder',
     'EmbeddingError',
     'EmbeddingMetadata',
+    'EmbeddingSettings',
     'FastEmbedder',
 ]
