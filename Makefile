@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 
 COMPOSE ?= docker compose
+DB_SCHEMA ?= public
 SOURCE_FILES ?= source_files.json
 EXPORT_DIR ?= tmp
 CSV_LIMIT ?= 1000
@@ -9,12 +10,15 @@ QUESTION ?=
 K ?= 5
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 
-.PHONY: help init-db reset-db ingest export-csv vector_search text_search ask app
+export DB_SCHEMA
+
+.PHONY: help init-db reset-db ingest export-csv validate-db-schema vector_search text_search ask app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
 	@echo "  make init-db                         Initialize the PostgreSQL schema"
 	@echo "  make reset-db                        Delete and recreate the database"
+	@echo "  make init-db DB_SCHEMA=evaluation    Initialize another PostgreSQL schema"
 	@echo "  make ingest                          Ingest source_files.json"
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
@@ -41,20 +45,23 @@ ingest: ## Ingest the documents described by SOURCE_FILES.
 	$(COMPOSE) --profile ingestion run --rm -T ingestion \
 		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) - < "$(SOURCE_FILES)"
 
-export-csv: ## Export ingestion tables as deterministic CSV files.
+validate-db-schema:
+	@case "$(DB_SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "DB_SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
+
+export-csv: validate-db-schema ## Export ingestion tables as deterministic CSV files.
 	@case "$(CSV_LIMIT)" in *[!0-9]*|'') echo "CSV_LIMIT must be a positive integer" >&2; exit 1;; esac
 	@test "$(CSV_LIMIT)" -gt 0 || (echo "CSV_LIMIT must be greater than zero" >&2; exit 1)
 	@mkdir -p "$(EXPORT_DIR)"
 	@$(COMPOSE) exec -T database sh -c \
-		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM public.embedding_models ORDER BY embedding_model_id LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
+		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM $(DB_SCHEMA).embedding_models ORDER BY embedding_model_id LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
 		> "$(EXPORT_DIR)/embedding_models.csv.tmp"
 	@mv "$(EXPORT_DIR)/embedding_models.csv.tmp" "$(EXPORT_DIR)/embedding_models.csv"
 	@$(COMPOSE) exec -T database sh -c \
-		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM public.documents ORDER BY document_id LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
+		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM $(DB_SCHEMA).documents ORDER BY document_id LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
 		> "$(EXPORT_DIR)/documents.csv.tmp"
 	@mv "$(EXPORT_DIR)/documents.csv.tmp" "$(EXPORT_DIR)/documents.csv"
 	@$(COMPOSE) exec -T database sh -c \
-		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM public.document_chunks ORDER BY document_id, chunk_index LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
+		'psql --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "\copy (SELECT * FROM $(DB_SCHEMA).document_chunks ORDER BY document_id, chunk_index LIMIT $(CSV_LIMIT)) TO STDOUT WITH (FORMAT CSV, HEADER true)"' \
 		> "$(EXPORT_DIR)/document_chunks.csv.tmp"
 	@mv "$(EXPORT_DIR)/document_chunks.csv.tmp" "$(EXPORT_DIR)/document_chunks.csv"
 	@echo "Exported up to $(CSV_LIMIT) data rows per table to $(EXPORT_DIR)/"

@@ -62,7 +62,8 @@ Document titles in the same input must produce unique filenames. See
 
 For local ingestion, `.env` must define the database connection (`DB_NAME`, `DB_USER`,
 and `DB_PASSWORD`) and embedding settings (`EMBEDDING_MODEL_NAME` and
-`EMBEDDING_DIMENSIONS`). `DB_HOST` and `DB_PORT` default to `localhost` and `5432`.
+`EMBEDDING_DIMENSIONS`). `DB_HOST`, `DB_PORT`, and `DB_SCHEMA` default to `localhost`,
+`5432`, and `public`.
 
 Install the project and run the pipeline:
 
@@ -136,6 +137,7 @@ The PDF parsing flow is documented in
 | `DB_NAME`              | PostgreSQL database name                 | `postgres`               |
 | `DB_USER`              | PostgreSQL user                          | `postgres`               |
 | `DB_PASSWORD`          | PostgreSQL password                      | `postgres`               |
+| `DB_SCHEMA`            | PostgreSQL schema used by the pipeline   | `public`                 |
 | `EMBEDDING_MODEL_NAME` | FastEmbed model for document vectors     | `BAAI/bge-small-en-v1.5` |
 | `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the schema  | `384`                    |
 | `EMBEDDING_BATCH_SIZE` | Chunks embedded per inference batch      | `32`                     |
@@ -145,8 +147,10 @@ The PDF parsing flow is documented in
 | `INGESTION_TIMEOUT`    | PDF download timeout in seconds          | `30`                     |
 | `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                    |
 
-`EMBEDDING_DIMENSIONS` must match the selected model. Changing it after database
-initialisation requires recreating the schema, for example with `make reset-db`.
+`DB_SCHEMA` can isolate another knowledge base in the same PostgreSQL database, for
+example `DB_SCHEMA=evaluation make init-db`. `EMBEDDING_DIMENSIONS` must match the
+selected model. Changing it after database initialisation requires recreating the
+schema, for example with `make reset-db`.
 
 The Docker images preload `EMBEDDING_MODEL_NAME` during their build. Rebuild the images
 after intentionally changing the model configuration.

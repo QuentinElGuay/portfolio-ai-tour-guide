@@ -130,6 +130,10 @@ These are retrieved sources supplied as context, not model-validated citations.
 | `DB_*`                 | Database connection used for retrieval | See `.env.template` |
 | `EMBEDDING_*`          | Query embedding configuration          | See `.env.template` |
 
+`DB_SCHEMA` selects the PostgreSQL schema used for retrieval. It defaults to `public`;
+use the same value for schema initialization, ingestion, and the agent so RAG reads the
+knowledge base you populated.
+
 `AGENT_OPENAI_MODEL` is required by the settings class; `.env.template` provides a
 default. OpenAI is the only provider currently supported by the default client.
 
