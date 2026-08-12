@@ -174,10 +174,10 @@ based on LLM-returned chunk identifiers.
 
 ## Capstone success criteria
 
-The project follows the LLM Zoomcamp capstone evaluation criteria. A complete submission
-should demonstrate the following, in delivery order:
+The project follows the [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
+A complete submission should demonstrate the following features:
 
-- A clearly defined tourism problem, target users, supported questions, and limitations.
+- A clearly defined problem, target users, supported questions, and limitations.
 - An accessible source dataset and reproducible instructions for running the project.
 - Automated ingestion from source documents into a searchable knowledge base.
 - A RAG flow that retrieves relevant context from the knowledge base before an LLM
