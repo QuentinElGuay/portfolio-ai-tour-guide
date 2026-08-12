@@ -1,8 +1,8 @@
 # BreizhGuide Roadmap
 
 > [!note]
-> This roadmap had been created by ChatGPT as a first draft and might evolve
-> over time.
+>
+> This roadmap had been created by ChatGPT as a first draft and might evolve over time.
 
 ## Priority legend
 
@@ -13,7 +13,8 @@
 
 ## Delivery status
 
-- **✅ Passed / core complete** — the milestone's core deliverable is usable; remaining items are polish or follow-up
+- **✅ Passed / core complete** — the milestone's core deliverable is usable; remaining
+  items are polish or follow-up
 - **🔄 In progress** — work has started, but the milestone is not complete
 - **⏳ Planned** — work has not started yet
 - **🟢 Ready to ship** — the release scope is complete; publication is pending
@@ -273,8 +274,8 @@ ______________________________________________________________________
 
 ## 🔄 Milestone 2 follow-up
 
-These are the remaining Milestone 2 hardening tasks. They can be polished after the
-core delivery and do not block the v0.1.0 retrieval prototype:
+These are the remaining Milestone 2 hardening tasks. They can be polished after the core
+delivery and do not block the v0.1.0 retrieval prototype:
 
 - [ ] **P0 — Add focused chunking tests.** Cover section boundaries, page and
   heading-path traceability, deterministic identifiers, reproducible output, labeled
@@ -406,10 +407,10 @@ ______________________________________________________________________
 
 **Current scope decision**
 
-Hybrid tuning is available through typed `HybridSearchSettings` at the retrieval
-API boundary. The vector and text weights default to `1.0`, and the RRF rank
-constant defaults to `60`. These settings are intentionally not CLI flags yet;
-they should be tuned through evaluation before becoming user-facing options.
+Hybrid tuning is available through typed `HybridSearchSettings` at the retrieval API
+boundary. The vector and text weights default to `1.0`, and the RRF rank constant
+defaults to `60`. These settings are intentionally not CLI flags yet; they should be
+tuned through evaluation before becoming user-facing options.
 
 **Acceptance criteria**
 
@@ -425,10 +426,11 @@ ______________________________________________________________________
 ## 🚀 Release v0.1.0 — Retrieval prototype
 
 > [!note]
+>
 > **📦 Shipped**
 >
-> The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items
-> are tracked as polish, hardening, and follow-up work.
+> The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items are
+> tracked as polish, hardening, and follow-up work.
 >
 > This release includes:
 >
@@ -465,11 +467,11 @@ ______________________________________________________________________
 
 **Backend decision**
 
-The first production-oriented chat backend will call the LLM directly from the
-agent process. This keeps the initial RAG application self-contained and avoids
-requiring a separate chat server. The existing HTTP client remains a future
-integration point, but implementing a remote backend and its server is deferred
-until the direct backend is working.
+The first production-oriented chat backend will call the LLM directly from the agent
+process. This keeps the initial RAG application self-contained and avoids requiring a
+separate chat server. The existing HTTP client remains a future integration point, but
+implementing a remote backend and its server is deferred until the direct backend is
+working.
 
 - [x] Implement a direct backend using the existing `ChatBackend` protocol
 - [x] Add configuration for the direct model/provider
@@ -484,11 +486,11 @@ until the direct backend is working.
 
 **Citation contract**
 
-The LLM must return stable retrieved `chunk_id` values alongside its answer.
-The application owns citation validation and presentation: invalid IDs are
-discarded, duplicate document/page references are merged, and pages are sorted.
-Until this contract is implemented, the CLI can only display all retrieved
-context sources and cannot reliably distinguish sources the LLM actually used.
+The LLM must return stable retrieved `chunk_id` values alongside its answer. The
+application owns citation validation and presentation: invalid IDs are discarded,
+duplicate document/page references are merged, and pages are sorted. Until this contract
+is implemented, the CLI can only display all retrieved context sources and cannot
+reliably distinguish sources the LLM actually used.
 
 **Tools**
 
@@ -565,6 +567,7 @@ ______________________________________________________________________
 ## 🚀 Release v0.2.0 — RAG MVP
 
 > [!note]
+>
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 4** passes its exit criteria.
@@ -658,6 +661,7 @@ ______________________________________________________________________
 ## 🚀 Release v0.3.0 — Evaluation
 
 > [!note]
+>
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 5** passes its exit criteria.
@@ -793,6 +797,7 @@ ______________________________________________________________________
 ## 🚀 Release v0.4.0 — Monitoring
 
 > [!note]
+>
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 7** passes its exit criteria.
@@ -907,6 +912,7 @@ ______________________________________________________________________
 ## 🚀 Release v1.0.0 — Final submission
 
 > [!note]
+>
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 8** passes its exit criteria.

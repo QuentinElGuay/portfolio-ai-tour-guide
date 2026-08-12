@@ -8,6 +8,7 @@ This project builds an AI tour guide for Brittany, France, using **Retrieval-Aug
 Generation (RAG)** to answer travelers' questions from official tourism guides.
 
 > [!IMPORTANT]
+>
 > 🚧 This project is under **<ins>active development</ins>.**
 
 ## Table of Contents
@@ -36,7 +37,7 @@ ask natural-language questions about the region's culture, history, geography, a
 attractions while grounding every answer in the source document.
 
 The project covers document ingestion, chunking, embeddings, vector search, retrieval
-evaluation, prompt engineering, monitoring, and a Streamlit user interface.
+evaluation, prompt engineering, monitoring, and a Gradio user interface.
 
 ## Data source
 
@@ -50,7 +51,7 @@ respective copyright holder. It is not redistributed as part of this repository.
 ## Prerequisites
 
 > [!NOTE]
-> Running the project directly in `Docker Codespaces` allow for an execution
+> Running the project directly in `Github Codespaces` allow for an execution
 > without any installation.
 
 The recommended Docker workflow requires:
@@ -117,7 +118,7 @@ command.
 The `run` command executes download, parsing, chunking, embedding, and database loading
 sequentially. Intermediate values stay in memory.
 
-Database loading requires `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and
+The complete pipeline requires the database settings, `EMBEDDING_MODEL_NAME`, and
 `EMBEDDING_DIMENSIONS` in the process environment. The Docker and Makefile workflows set
 these automatically. When running locally against the Compose database, set them to
 values matching `.env`; for example:
@@ -128,6 +129,7 @@ export DB_PORT=5432
 export DB_NAME=postgres
 export DB_USER=postgres
 export DB_PASSWORD=postgres
+export EMBEDDING_MODEL_NAME=BAAI/bge-small-en-v1.5
 export EMBEDDING_DIMENSIONS=384
 ```
 
@@ -188,7 +190,8 @@ embedded artifacts contain both document metadata and chunks, so the following t
 needs only one input file.
 
 Run the command help to see stage-specific options such as HTTP timeout, chunk size,
-embedding model, batch size, and vector normalization:
+batch size, and vector normalization. The embedding model is configured with
+`EMBEDDING_MODEL_NAME`:
 
 ```bash
 uv run portfolio-ai-tour-guide-ingestion --help
@@ -213,11 +216,12 @@ Run `make` or `make help` to list the available shortcuts.
 | `make export-csv CSV_LIMIT=100`      | Limit each CSV export to 100 data rows.                                |
 | `make export-csv EXPORT_DIR=path`    | Write the CSV exports to another directory.                            |
 | `make vector_search QUESTION='...'`  | Embed a question and search for the nearest document chunks.           |
-| `make text_search QUESTION='...'`    | Search document chunks with PostgreSQL full-text search.                |
+| `make text_search QUESTION='...'`    | Search document chunks with PostgreSQL full-text search.               |
 
 > [!WARNING]
-> `make reset-db` runs `docker compose down --volumes` and permanently
-> deletes the project's PostgreSQL volume.
+>
+> `make reset-db` runs `docker compose down --volumes` and permanently deletes the
+> project's PostgreSQL volume.
 
 CSV export creates `embedding_models.csv`, `documents.csv`, and `document_chunks.csv`.
 The database service must be running before `make export-csv` is called.
@@ -236,25 +240,26 @@ make text_search QUESTION='Brittany coast'
 Copy `.env.template` to `.env` before using Docker Compose. The main ingestion settings
 are:
 
-| Variable               | Purpose                                          | Default                  |
-| ---------------------- | ------------------------------------------------ | ------------------------ |
-| `DB_HOST`              | Database host                                    | `localhost`              |
-| `DB_PORT`              | Database port                                    | `5432`                   |
-| `DB_NAME`              | PostgreSQL database name                         | `postgres`               |
-| `DB_USER`              | PostgreSQL user                                  | `postgres`               |
-| `DB_PASSWORD`          | PostgreSQL password                              | `postgres`               |
-| `EMBEDDING_MODEL_NAME` | FastEmbed model used for document vectors        | Required                 |
-| `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the database schema | `384`                    |
-| `EMBEDDING_BATCH_SIZE` | Number of chunks embedded per inference batch    | `32`                     |
-| `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized         | `true`                   |
-| `EMBEDDING_CACHE_DIR`  | Optional local directory for FastEmbed model files | FastEmbed default       |
-| `INGESTION_DEBUG`      | Retain intermediate artifacts                    | `false`                  |
-| `INGESTION_TIMEOUT`    | PDF download timeout in seconds                  | `30`                     |
-| `INGESTION_TMP_FOLDER` | Debug artifact directory                         | `tmp`                    |
+| Variable               | Purpose                                  | Template value           |
+| ---------------------- | ---------------------------------------- | ------------------------ |
+| `DB_HOST`              | Database host                            | `localhost`              |
+| `DB_PORT`              | Database port                            | `5432`                   |
+| `DB_NAME`              | PostgreSQL database name                 | `postgres`               |
+| `DB_USER`              | PostgreSQL user                          | `postgres`               |
+| `DB_PASSWORD`          | PostgreSQL password                      | `postgres`               |
+| `EMBEDDING_MODEL_NAME` | FastEmbed model for document vectors     | `BAAI/bge-small-en-v1.5` |
+| `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the schema  | `384`                    |
+| `EMBEDDING_BATCH_SIZE` | Chunks embedded per inference batch      | `32`                     |
+| `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized | `true`                   |
+| `EMBEDDING_CACHE_DIR`  | Optional FastEmbed model cache directory | FastEmbed default        |
+| `INGESTION_DEBUG`      | Retain intermediate artifacts            | `false`                  |
+| `INGESTION_TIMEOUT`    | PDF download timeout in seconds          | `30`                     |
+| `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                    |
 
 The direct Python CLI reads `EMBEDDING_*` and `INGESTION_*` settings from `.env`. Docker
 Compose forwards the PostgreSQL and embedding settings to application containers; other
-container settings use their application defaults unless explicitly passed to the service.
+container settings use their application defaults unless explicitly passed to the
+service.
 
 The Docker agent and ingestion images preload `EMBEDDING_MODEL_NAME` during their build,
 so vector searches do not download the embedding model at runtime. Rebuild the images
@@ -265,6 +270,31 @@ been initialized requires recreating the schema, which can be done in developmen
 `make reset-db`.
 
 ## Roadmap
+
+### Last release — v0.1.0: Retrieval prototype
+
+This first release validates the end-to-end ingestion and retrieval workflow for the
+knowledge base. It does not use an LLM yet; information is retrieved through the CLI
+using full-text and vector search.
+
+**Features:**
+
+- PDF text extraction
+- Structure-aware chunking
+- Embedding generation
+- Full-text search
+- Vector similarity search
+- CLI-based information retrieval
+
+### Next release — v0.2.0: RAG MVP
+
+The next release will add a conversational layer on top of the retrieval prototype.
+
+**Planned features:**
+
+- Grounded answers generated from retrieved context
+- Source citations, including page references
+- Gradio chat interface
 
 See the project's [roadmap](roadmap.md) *(work in progress)*.
 
