@@ -271,7 +271,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-### 🔄 Milestone 2 follow-up
+## 🔄 Milestone 2 follow-up
 
 These are the remaining Milestone 2 hardening tasks. They can be polished after the core
 delivery and do not block the v0.1.0 retrieval prototype:
@@ -513,7 +513,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-### 🔄 Milestone 4 follow-up
+## 🔄 Milestone 4 follow-up
 
 The v0.2.0 MVP is shipped. These hardening tasks are intentionally deferred to the
 evaluation milestone and do not change its delivered scope:
