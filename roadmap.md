@@ -11,9 +11,18 @@
 - **P2** — Optional improvement
 - **P3** — Stretch goal
 
+## Delivery status
+
+- **✅ Passed / core complete** — the milestone's core deliverable is usable; remaining items are polish or follow-up
+- **🔄 In progress** — work has started, but the milestone is not complete
+- **⏳ Planned** — work has not started yet
+- **🟢 Ready to ship** — the release scope is complete; publication is pending
+- **📦 Shipped** — the release is available
+- **🗓️ Planned release** — the release is not available yet
+
 ______________________________________________________________________
 
-# Milestone 1 — Project Foundation
+# ✅ Milestone 1 — Project Foundation
 
 ## [P0] Create initial README
 
@@ -86,7 +95,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# Milestone 2 — Document Ingestion
+# ✅ Milestone 2 — Document Ingestion
 
 ## [P0] Inspect the tourism brochure
 
@@ -262,9 +271,10 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Remaining before Milestone 3
+## 🔄 Milestone 2 follow-up
 
-These are the Milestone 2 exit tasks. Complete them before starting retrieval work:
+These are the remaining Milestone 2 hardening tasks. They can be polished after the
+core delivery and do not block the v0.1.0 retrieval prototype:
 
 - [ ] **P0 — Add focused chunking tests.** Cover section boundaries, page and
   heading-path traceability, deterministic identifiers, reproducible output, labeled
@@ -290,7 +300,7 @@ The following work is deliberately deferred and is not a Milestone 2 exit criter
 
 ______________________________________________________________________
 
-# Milestone 3 — Knowledge Base and Retrieval
+# ✅ Milestone 3 — Knowledge Base and Retrieval
 
 ## [P0] Generate lightweight English embeddings
 
@@ -412,7 +422,28 @@ they should be tuned through evaluation before becoming user-facing options.
 
 ______________________________________________________________________
 
-# Milestone 4 — RAG Application
+## 🚀 Release v0.1.0 — Retrieval prototype
+
+> [!note]
+> **📦 Shipped**
+>
+> The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items
+> are tracked as polish, hardening, and follow-up work.
+>
+> This release includes:
+>
+> - PDF extraction
+> - Chunking
+> - Embedding
+> - Full-text search
+> - Vector search
+> - CLI information retrieval
+
+______________________________________________________________________
+
+______________________________________________________________________
+
+# 🔄 Milestone 4 — RAG Application
 
 ## [P0] Implement the RAG pipeline
 
@@ -520,7 +551,20 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# Milestone 5 — Evaluation
+## 🚀 Release v0.2.0 — RAG MVP
+
+> [!note]
+> **🗓️ Planned release — not shipped**
+>
+> Ships when **Milestone 4** passes its exit criteria.
+>
+> - Grounded answers
+> - Citations
+> - Streamlit interface
+
+______________________________________________________________________
+
+# ⏳ Milestone 5 — Evaluation
 
 ## [P0] Create retrieval evaluation dataset
 
@@ -600,7 +644,21 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# Milestone 6 — User Interface
+## 🚀 Release v0.3.0 — Evaluation
+
+> [!note]
+> **🗓️ Planned release — not shipped**
+>
+> Ships when **Milestone 5** passes its exit criteria.
+>
+> - Golden dataset
+> - Full-text search comparison
+> - Hybrid search
+> - Prompt evaluation
+
+______________________________________________________________________
+
+# ⏳ Milestone 6 — User Interface
 
 ## [P0] Build the chat interface
 
@@ -646,7 +704,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# Milestone 7 — Monitoring
+# ⏳ Milestone 7 — Monitoring
 
 ## [P1] Log application interactions
 
@@ -721,7 +779,20 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# Milestone 8 — Reproducibility and Delivery
+## 🚀 Release v0.4.0 — Monitoring
+
+> [!note]
+> **🗓️ Planned release — not shipped**
+>
+> Ships when **Milestone 7** passes its exit criteria.
+>
+> - Feedback
+> - Logs
+> - Dashboard
+
+______________________________________________________________________
+
+# 🔄 Milestone 8 — Reproducibility and Delivery
 
 ## [P0] Containerize the application
 
@@ -822,6 +893,20 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## 🚀 Release v1.0.0 — Final submission
+
+> [!note]
+> **🗓️ Planned release — not shipped**
+>
+> Ships when **Milestone 8** passes its exit criteria.
+>
+> - Docker Compose
+> - Tests and CI
+> - Documentation
+> - Demo video
+
+______________________________________________________________________
+
 # Stretch Goals
 
 ## [P2] Ingest multiple brochures
@@ -876,40 +961,3 @@ ______________________________________________________________________
 - [ ] Configure secrets
 - [ ] Add deployment documentation
 - [ ] Verify public demo
-
-______________________________________________________________________
-
-# Suggested release plan
-
-## v0.1.0 — Retrieval prototype
-
-- PDF extraction
-- Chunking
-- Vector search
-- CLI question answering
-
-## v0.2.0 — RAG MVP
-
-- Grounded answers
-- Citations
-- Streamlit interface
-
-## v0.3.0 — Evaluation
-
-- Golden dataset
-- Full-text search comparison
-- Hybrid search
-- Prompt evaluation
-
-## v0.4.0 — Monitoring
-
-- Feedback
-- Logs
-- Dashboard
-
-## v1.0.0 — Final submission
-
-- Docker Compose
-- Tests and CI
-- Documentation
-- Demo video
