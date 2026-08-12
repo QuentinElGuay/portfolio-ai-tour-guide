@@ -22,9 +22,9 @@
 
 ______________________________________________________________________
 
-# ✅ Milestone 1 — Project Foundation
+## ✅ Milestone 1 — Project Foundation
 
-## [P0] Create initial README
+### [P0] Create initial README
 
 **Labels:** `documentation`
 
@@ -46,7 +46,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Define project scope
+### [P0] Define project scope
 
 **Labels:** `planning`, `documentation`
 
@@ -70,7 +70,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Create project structure
+### [P0] Create project structure
 
 **Labels:** `setup`, `developer-experience`
 
@@ -95,9 +95,9 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# ✅ Milestone 2 — Document Ingestion
+## ✅ Milestone 2 — Document Ingestion
 
-## [P0] Inspect the tourism brochure
+### [P0] Inspect the tourism brochure
 
 **Labels:** `data`, `research`
 
@@ -118,7 +118,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Extract structured PDF content
+### [P0] Extract structured PDF content
 
 **Labels:** `ingestion`, `pdf`
 
@@ -145,7 +145,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Preserve document hierarchy
+### [P0] Preserve document hierarchy
 
 **Labels:** `ingestion`, `document-model`
 
@@ -167,7 +167,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Implement document chunking
+### [P0] Implement document chunking
 
 **Labels:** `ingestion`, `rag`
 
@@ -196,7 +196,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Create ingestion interfaces and a CLI
+### [P1] Create ingestion interfaces and a CLI
 
 **Labels:** `ingestion`, `cli`
 
@@ -243,7 +243,7 @@ Version-aware replacement is postponed to the document lifecycle stretch goal.
 
 ______________________________________________________________________
 
-## [P0] Persist documents and chunks in PostgreSQL
+### [P0] Persist documents and chunks in PostgreSQL
 
 **Labels:** `database`, `ingestion`, `pgvector`
 
@@ -300,9 +300,9 @@ The following work is deliberately deferred and is not a Milestone 2 exit criter
 
 ______________________________________________________________________
 
-# ✅ Milestone 3 — Knowledge Base and Retrieval
+## ✅ Milestone 3 — Knowledge Base and Retrieval
 
-## [P0] Generate lightweight English embeddings
+### [P0] Generate lightweight English embeddings
 
 **Labels:** `embeddings`, `rag`
 
@@ -350,7 +350,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Implement vector search
+### [P0] Implement vector search
 
 **Labels:** `retrieval`, `vector-search`
 
@@ -374,7 +374,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Implement PostgreSQL full-text search
+### [P1] Implement PostgreSQL full-text search
 
 **Labels:** `retrieval`, `search`
 
@@ -394,7 +394,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Implement hybrid search
+### [P1] Implement hybrid search
 
 **Labels:** `retrieval`, `best-practice`
 
@@ -422,7 +422,7 @@ tuned through evaluation before becoming user-facing options.
 
 ______________________________________________________________________
 
-# 🚀 Release v0.1.0 — Retrieval prototype
+## 🚀 Release v0.1.0 — Retrieval prototype
 
 **📦 Shipped**
 
@@ -442,9 +442,9 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# ✅ Milestone 4 — RAG Application
+## ✅ Milestone 4 — RAG Application
 
-## [P0] Implement the RAG pipeline
+### [P0] Implement the RAG pipeline
 
 **Labels:** `rag`, `backend`
 
@@ -490,7 +490,7 @@ the LLM response.
 
 ______________________________________________________________________
 
-## [P0] Add a basic chat interface
+### [P0] Add a basic chat interface
 
 **Labels:** `frontend`, `gradio`
 
@@ -531,7 +531,7 @@ evaluation milestone and do not change its delivered scope:
 
 ______________________________________________________________________
 
-# 🚀 Release v0.2.0 — RAG MVP
+## 🚀 Release v0.2.0 — RAG MVP
 
 **📦 Shipped**
 
@@ -543,9 +543,9 @@ Delivers the first end-to-end RAG experience for the Brittany guide:
 
 ______________________________________________________________________
 
-# ⏳ Milestone 5 — Evaluation
+## ⏳ Milestone 5 — Evaluation
 
-## [P0] Validate generated answers and citations
+### [P0] Validate generated answers and citations
 
 **Labels:** `rag`, `validation`, `prompt-engineering`
 
@@ -575,7 +575,7 @@ invalid IDs, and presents only the remaining sources with grouped, sorted pages.
 - Plain prompt templates
 - OpenAI-compatible client
 
-## [P0] Create retrieval evaluation dataset
+### [P0] Create retrieval evaluation dataset
 
 **Labels:** `evaluation`, `data`
 
@@ -596,7 +596,7 @@ invalid IDs, and presents only the remaining sources with grouped, sorted pages.
 
 ______________________________________________________________________
 
-## [P0] Evaluate retrieval approaches
+### [P0] Evaluate retrieval approaches
 
 **Labels:** `evaluation`, `retrieval`
 
@@ -627,7 +627,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Evaluate LLM answers
+### [P1] Evaluate LLM answers
 
 **Labels:** `evaluation`, `llm`
 
@@ -652,7 +652,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P2] Evaluate query rewriting
+### [P2] Evaluate query rewriting
 
 **Labels:** `rag`, `best-practice`
 
@@ -672,7 +672,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P2] Evaluate document reranking
+### [P2] Evaluate document reranking
 
 **Labels:** `retrieval`, `best-practice`
 
@@ -692,7 +692,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# 🚀 Release v0.3.0 — Evaluation
+## 🚀 Release v0.3.0 — Evaluation
 
 **🗓️ Planned release — not shipped**
 
@@ -705,9 +705,9 @@ Ships when **Milestone 5** passes its exit criteria:
 
 ______________________________________________________________________
 
-# ⏳ Milestone 6 — User Feedback
+## ⏳ Milestone 6 — User Feedback
 
-## [P1] Add user feedback
+### [P1] Add user feedback
 
 **Labels:** `monitoring`, `feedback`
 
@@ -728,9 +728,9 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# ⏳ Milestone 7 — Monitoring
+## ⏳ Milestone 7 — Monitoring
 
-## [P1] Log application interactions
+### [P1] Log application interactions
 
 **Labels:** `monitoring`, `observability`
 
@@ -754,7 +754,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P2] Add ingestion observability
+### [P2] Add ingestion observability
 
 **Labels:** `ingestion`, `monitoring`, `operations`
 
@@ -779,7 +779,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Build monitoring dashboard
+### [P1] Build monitoring dashboard
 
 **Labels:** `monitoring`, `dashboard`
 
@@ -803,7 +803,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# 🚀 Release v0.4.0 — Monitoring
+## 🚀 Release v0.4.0 — Monitoring
 
 **🗓️ Planned release — not shipped**
 
@@ -815,9 +815,9 @@ Ships when **Milestone 7** passes its exit criteria:
 
 ______________________________________________________________________
 
-# 🔄 Milestone 8 — Reproducibility and Delivery
+## 🔄 Milestone 8 — Reproducibility and Delivery
 
-## [P0] Containerize the application
+### [P0] Containerize the application
 
 **Labels:** `docker`, `deployment`
 
@@ -840,7 +840,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P0] Complete project documentation
+### [P0] Complete project documentation
 
 **Labels:** `documentation`
 
@@ -870,7 +870,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Add automated tests and CI
+### [P1] Add automated tests and CI
 
 **Labels:** `testing`, `ci`
 
@@ -893,7 +893,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## [P1] Record project demo
+### [P1] Record project demo
 
 **Labels:** `documentation`, `demo`
 
@@ -915,7 +915,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# 🚀 Release v1.0.0 — Final submission
+## 🚀 Release v1.0.0 — Final submission
 
 **🗓️ Planned release — not shipped**
 
@@ -930,7 +930,7 @@ ______________________________________________________________________
 
 # Stretch Goals
 
-## [P2] Ingest multiple brochures
+### [P2] Ingest multiple brochures
 
 - [ ] Add document filters
 - [ ] Add region and topic metadata
@@ -942,7 +942,7 @@ ______________________________________________________________________
 - [ ] Remove or exclude stale chunks from retrieval
 - [ ] Test concurrent and repeated document updates
 
-## [P2] Add agentic routing and live tools
+### [P2] Add agentic routing and live tools
 
 - [ ] Classify questions as knowledge-base, live-information, or unsupported requests
 - [ ] Decide whether retrieval is needed before answering
@@ -972,7 +972,7 @@ ______________________________________________________________________
 - Open-Meteo
 - Public tourism or transport APIs
 
-## [P3] Deploy to the cloud
+### [P3] Deploy to the cloud
 
 - [ ] Select hosting provider
 - [ ] Configure secrets
