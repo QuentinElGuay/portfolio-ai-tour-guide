@@ -6,6 +6,14 @@ content, creates embeddings, and loads the result into PostgreSQL in one transac
 
 Return to the [project overview](../../../README.md).
 
+## Table of contents
+
+- [Run the complete pipeline](#run-the-complete-pipeline)
+- [Document definitions](#document-definitions)
+- [Local Python workflow](#local-python-workflow)
+- [Pipeline stages and artifacts](#pipeline-stages-and-artifacts)
+- [Configuration](#configuration)
+
 ## Run the complete pipeline
 
 The Docker workflow is the recommended path:

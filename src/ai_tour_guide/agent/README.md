@@ -6,6 +6,14 @@ the [chat guide](chat/README.md).
 
 Return to the [project overview](../../../README.md).
 
+## Table of contents
+
+- [Request flow](#request-flow)
+- [Run the services](#run-the-services)
+- [CLI](#cli)
+- [HTTP API](#http-api)
+- [Configuration](#configuration)
+
 ## Request flow
 
 1. The agent receives a question through the CLI or `POST /ask`.

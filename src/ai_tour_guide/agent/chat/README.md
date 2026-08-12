@@ -7,6 +7,12 @@ API and displays the grounded answer with its source pages.
 Return to the [project overview](../../../../README.md) or the
 [agent guide](../README.md).
 
+## Table of contents
+
+- [Run with Docker](#run-with-docker)
+- [Run locally](#run-locally)
+- [HTTP contract](#http-contract)
+
 ## Run with Docker
 
 After initializing and ingesting the database, set `AGENT_OPENAI_API_KEY` in `.env` and
