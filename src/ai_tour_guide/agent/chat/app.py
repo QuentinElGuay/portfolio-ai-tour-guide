@@ -7,6 +7,7 @@ import gradio as gr
 
 from ai_tour_guide.agent.chat.backends import (
     ChatBackend,
+    DemoBackend,
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import Message
@@ -29,7 +30,8 @@ def normalize_history(history: Sequence[dict[str, object]]) -> list[Message]:
 
 
 def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
-    selected_backend = backend or create_backend()
+    """Create the UI with an injected backend or its development fallback."""
+    selected_backend = backend or DemoBackend()
 
     async def respond(
         message: str,
@@ -48,8 +50,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
         chatbot=gr.Chatbot(
             height=560,
             placeholder=(
-                '<h2>Start a conversation</h2>'
-                '<p>Send a message to test the chat application.</p>'
+                '<h2>Explore Brittany</h2>'
+                '<p>Ask a question grounded in the tourism guide.</p>'
             ),
         ),
         textbox=gr.Textbox(
@@ -59,18 +61,18 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
         ),
         title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
         description=(
-            'A minimal Gradio interface connected to a replaceable Python chat backend.'
+            'Ask questions about Brittany and receive answers grounded in the guide.'
         ),
         examples=[
-            'What can this portfolio application do?',
-            'Show me a small Python example.',
+            'What are the main places to visit in Brittany?',
+            'What is special about Breton culture?',
         ],
         cache_examples=False,
     )
 
 
 def main() -> None:
-    app = create_app()
+    app = create_app(create_backend())
     app.launch(
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),

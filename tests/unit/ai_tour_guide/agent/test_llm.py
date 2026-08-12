@@ -1,10 +1,9 @@
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from pydantic import SecretStr
 
-from ai_tour_guide.agent.chat.backends import LocalBackend, create_backend
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.agent.llm.client import OpenAIClient
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
@@ -68,29 +67,8 @@ def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> 
     assert client.model == 'test-model'
 
 
-@patch('ai_tour_guide.agent.chat.backends.create_default_llm_client')
-@patch('ai_tour_guide.agent.chat.backends.LocalBackend')
-def test_create_backend_prefers_local_backend_when_openai_is_configured(
-    local_backend: MagicMock,
-    create_default_llm_client: MagicMock,
-) -> None:
-    client = MagicMock()
-    create_default_llm_client.return_value = client
+def test_default_llm_client_is_unavailable_when_api_key_is_empty(monkeypatch) -> None:
+    monkeypatch.setenv('AGENT_OPENAI_API_KEY', '')
+    monkeypatch.setenv('AGENT_OPENAI_MODEL', 'test-model')
 
-    result = create_backend()
-
-    assert result is local_backend.return_value
-    local_backend.assert_called_once_with(client=client)
-
-
-def test_local_backend_delegates_to_the_llm_client() -> None:
-    client = MagicMock()
-    client.generate_reply = AsyncMock(return_value='A direct answer.')
-    messages: list[Message] = [
-        {'role': 'user', 'content': 'What should I visit?'},
-    ]
-
-    result = asyncio.run(LocalBackend(client=client).generate_reply(messages))
-
-    assert result == 'A direct answer.'
-    client.generate_reply.assert_awaited_once_with(messages)
+    assert create_default_llm_client() is None

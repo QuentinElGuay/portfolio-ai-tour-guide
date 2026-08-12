@@ -9,7 +9,7 @@ QUESTION ?=
 K ?= 5
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 
-.PHONY: help init-db reset-db ingest export-csv vector_search text_search
+.PHONY: help init-db reset-db ingest export-csv vector_search text_search ask app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -23,6 +23,8 @@ help: ## Show the available commands.
 	@echo "  make export-csv CSV_LIMIT=100        Limit each export to 100 data rows"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
+	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
+	@echo "  make app                             Start the agent API and Gradio chat"
 	@echo "  make vector_search QUESTION='...' K=10  Return up to 10 semantic matches"
 
 init-db: ## Start PostgreSQL and initialize its schema.
@@ -66,3 +68,11 @@ text_search: ## Search chunks lexically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make text_search QUESTION='Brittany coast'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent search --mode text --k "$(K)" "$(QUESTION)"
+
+ask: ## Answer a QUESTION using retrieved context and optional K.
+	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent ask --k "$(K)" "$(QUESTION)"
+
+app: ## Start the agent API and Gradio chat interface.
+	$(COMPOSE) --profile app up --build

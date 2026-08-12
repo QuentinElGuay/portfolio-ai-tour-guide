@@ -8,7 +8,6 @@ This project builds an AI tour guide for Brittany, France, using **Retrieval-Aug
 Generation (RAG)** to answer travelers' questions from official tourism guides.
 
 > [!IMPORTANT]
->
 > 🚧 This project is under **<ins>active development</ins>.**
 
 ## Table of Contents
@@ -19,6 +18,7 @@ Generation (RAG)** to answer travelers' questions from official tourism guides.
 - [Quick start](#quick-start)
 - [Document input](#document-input)
 - [Using the ingestion pipeline](#using-the-ingestion-pipeline)
+- [Using the chat application](#using-the-chat-application)
 - [Makefile commands](#makefile-commands)
 - [Configuration](#configuration)
 - [Roadmap](#roadmap)
@@ -51,8 +51,8 @@ respective copyright holder. It is not redistributed as part of this repository.
 ## Prerequisites
 
 > [!NOTE]
-> Running the project directly in `Github Codespaces` allow for an execution
-> without any installation.
+> Running the project directly in `Github Codespaces` allow for an execution without any
+> installation.
 
 The recommended Docker workflow requires:
 
@@ -86,6 +86,20 @@ The embedding model may be downloaded the first time ingestion runs. An existing
 URL is rejected instead of replacing its document and chunks. Use `make reset-db` when
 you intentionally want to recreate the development database and ingest the same source
 again.
+
+To run the RAG application, add an OpenAI API key to `.env`, then start the agent API
+and chat interface:
+
+```dotenv
+AGENT_OPENAI_API_KEY=your-api-key
+```
+
+```bash
+make app
+```
+
+Open `http://localhost:7860`. The Gradio service sends questions to the agent API, which
+retrieves relevant chunks, generates a grounded answer, and returns its source pages.
 
 ## Document input
 
@@ -201,6 +215,20 @@ uv run portfolio-ai-tour-guide-ingestion chunk --help
 The pipeline architecture and function flow are documented in
 [`docs/pdf/parsing-flow.md`](docs/pdf/parsing-flow.md).
 
+## Using the chat application
+
+The application runs as two services:
+
+- `agent` owns retrieval, prompt construction, and the OpenAI client, and exposes
+  `POST /ask` on port `8000`.
+- `chat` serves the Gradio interface on port `7860` and communicates with the agent over
+  HTTP.
+
+Start both services with `make app`. This separation keeps the interface independent
+from the LLM provider and prevents provider credentials from being passed to the chat
+container. The database must already be initialized and ingested as described in
+[Quick start](#quick-start).
+
 ## Makefile commands
 
 Run `make` or `make help` to list the available shortcuts.
@@ -217,9 +245,10 @@ Run `make` or `make help` to list the available shortcuts.
 | `make export-csv EXPORT_DIR=path`    | Write the CSV exports to another directory.                            |
 | `make vector_search QUESTION='...'`  | Embed a question and search for the nearest document chunks.           |
 | `make text_search QUESTION='...'`    | Search document chunks with PostgreSQL full-text search.               |
+| `make ask QUESTION='...'`            | Answer a question using retrieved context and show its sources.        |
+| `make app`                           | Start the agent API and Gradio chat interface.                         |
 
 > [!WARNING]
->
 > `make reset-db` runs `docker compose down --volumes` and permanently deletes the
 > project's PostgreSQL volume.
 
@@ -233,6 +262,7 @@ make ingest SOURCE_FILES=data/another-source.json DEBUG=1
 make export-csv EXPORT_DIR=tmp/evaluation CSV_LIMIT=250
 make vector_search QUESTION='Where is the Brittany coast?' K=10
 make text_search QUESTION='Brittany coast'
+make ask QUESTION='What are the best places to visit in Brittany?' K=5
 ```
 
 ## Configuration
@@ -240,26 +270,32 @@ make text_search QUESTION='Brittany coast'
 Copy `.env.template` to `.env` before using Docker Compose. The main ingestion settings
 are:
 
-| Variable               | Purpose                                  | Template value           |
-| ---------------------- | ---------------------------------------- | ------------------------ |
-| `DB_HOST`              | Database host                            | `localhost`              |
-| `DB_PORT`              | Database port                            | `5432`                   |
-| `DB_NAME`              | PostgreSQL database name                 | `postgres`               |
-| `DB_USER`              | PostgreSQL user                          | `postgres`               |
-| `DB_PASSWORD`          | PostgreSQL password                      | `postgres`               |
-| `EMBEDDING_MODEL_NAME` | FastEmbed model for document vectors     | `BAAI/bge-small-en-v1.5` |
-| `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the schema  | `384`                    |
-| `EMBEDDING_BATCH_SIZE` | Chunks embedded per inference batch      | `32`                     |
-| `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized | `true`                   |
-| `EMBEDDING_CACHE_DIR`  | Optional FastEmbed model cache directory | FastEmbed default        |
-| `INGESTION_DEBUG`      | Retain intermediate artifacts            | `false`                  |
-| `INGESTION_TIMEOUT`    | PDF download timeout in seconds          | `30`                     |
-| `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                    |
+| Variable               | Purpose                                  | Template value              |
+| ---------------------- | ---------------------------------------- | --------------------------- |
+| `AGENT_OPENAI_API_KEY` | OpenAI credential used by the agent      | Empty                       |
+| `AGENT_OPENAI_MODEL`   | OpenAI model used to generate answers    | `gpt-4.1-mini`              |
+| `AGENT_PORT`           | Host port for the agent API              | `8000`                      |
+| `CHAT_API_URL`         | Agent endpoint used by a local chat      | `http://localhost:8000/ask` |
+| `CHAT_HOST`            | Host interface for a local Gradio server | `127.0.0.1`                 |
+| `CHAT_PORT`            | Host port for the Gradio interface       | `7860`                      |
+| `CHAT_TITLE`           | Gradio page title                        | `Brittany AI Tour Guide`    |
+| `DB_HOST`              | Database host                            | `localhost`                 |
+| `DB_PORT`              | Database port                            | `5432`                      |
+| `DB_NAME`              | PostgreSQL database name                 | `postgres`                  |
+| `DB_USER`              | PostgreSQL user                          | `postgres`                  |
+| `DB_PASSWORD`          | PostgreSQL password                      | `postgres`                  |
+| `EMBEDDING_MODEL_NAME` | FastEmbed model for document vectors     | `BAAI/bge-small-en-v1.5`    |
+| `EMBEDDING_DIMENSIONS` | Vector dimension enforced by the schema  | `384`                       |
+| `EMBEDDING_BATCH_SIZE` | Chunks embedded per inference batch      | `32`                        |
+| `EMBEDDING_NORMALIZE`  | Whether stored vectors are L2-normalized | `true`                      |
+| `EMBEDDING_CACHE_DIR`  | Optional FastEmbed model cache directory | FastEmbed default           |
+| `INGESTION_DEBUG`      | Retain intermediate artifacts            | `false`                     |
+| `INGESTION_TIMEOUT`    | PDF download timeout in seconds          | `30`                        |
+| `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                       |
 
-The direct Python CLI reads `EMBEDDING_*` and `INGESTION_*` settings from `.env`. Docker
-Compose forwards the PostgreSQL and embedding settings to application containers; other
-container settings use their application defaults unless explicitly passed to the
-service.
+The direct Python CLI reads `AGENT_OPENAI_*`, `EMBEDDING_*`, and `INGESTION_*` settings
+from `.env`. Docker Compose gives the OpenAI credentials only to the agent service and
+configures the chat service to call it over the internal Compose network.
 
 The Docker agent and ingestion images preload `EMBEDDING_MODEL_NAME` during their build,
 so vector searches do not download the embedding model at runtime. Rebuild the images
@@ -303,6 +339,21 @@ See the project's [roadmap](roadmap.md) *(work in progress)*.
 This repository is maintained as a personal portfolio and learning project. While
 external contributions are not currently accepted, feedback, bug reports, and
 suggestions are always welcome through GitHub Issues.
+
+### Local quality checks
+
+After running `uv sync`, install the Git hooks once:
+
+```bash
+uv run pre-commit install
+```
+
+The pre-commit hook formats staged Python and Markdown files with Ruff and mdformat. Run
+every hook manually with:
+
+```bash
+uv run pre-commit run --all-files
+```
 
 ## License
 

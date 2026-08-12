@@ -1,7 +1,6 @@
 # BreizhGuide Roadmap
 
-> [!note]
->
+> [!NOTE]
 > This roadmap had been created by ChatGPT as a first draft and might evolve over time.
 
 ## Priority legend
@@ -425,8 +424,7 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.1.0 — Retrieval prototype
 
-> [!note]
->
+> [!NOTE]
 > **📦 Shipped**
 >
 > The core retrieval prototype is released in **v0.1.0**. Remaining unchecked items are
@@ -451,11 +449,11 @@ ______________________________________________________________________
 
 **Labels:** `rag`, `backend`
 
-- [ ] Accept a user question
-- [ ] Retrieve relevant chunks
-- [ ] Build the prompt
-- [ ] Call the LLM through a direct backend
-- [ ] Return answer and sources
+- [x] Accept a user question
+- [x] Retrieve relevant chunks
+- [x] Build the prompt
+- [x] Call the LLM through a provider-neutral client
+- [x] Return answer and retrieved sources
 - [ ] Define a structured LLM response containing the answer and cited chunk IDs
 - [ ] Validate cited chunk IDs against the retrieved context
 - [ ] Render only cited sources, grouped by document with sorted page references
@@ -465,18 +463,16 @@ ______________________________________________________________________
 - [x] Keep retrieved chunks, scores, and source metadata together in one result list
 - [x] Expose `RAGResult.chunks` as a derived convenience property
 
-**Backend decision**
+**Service decision**
 
-The first production-oriented chat backend will call the LLM directly from the agent
-process. This keeps the initial RAG application self-contained and avoids requiring a
-separate chat server. The existing HTTP client remains a future integration point, but
-implementing a remote backend and its server is deferred until the direct backend is
-working.
+The agent process owns retrieval and the provider-neutral `LLMClient`. The Gradio chat
+is a separate interface service and calls the agent over HTTP, so it has no dependency
+on OpenAI settings or credentials.
 
-- [x] Implement a direct backend using the existing `ChatBackend` protocol
+- [x] Inject an `LLMClient` into the RAG pipeline
 - [x] Add configuration for the direct model/provider
-- [x] Use the direct backend from the RAG pipeline and chat application
-- [ ] Defer remote HTTP backend/server implementation
+- [x] Expose the RAG pipeline through an HTTP API
+- [x] Connect the Gradio chat to the agent API
 
 **Acceptance criteria**
 
@@ -566,15 +562,14 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.2.0 — RAG MVP
 
-> [!note]
->
+> [!NOTE]
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 4** passes its exit criteria.
 >
 > - Grounded answers
 > - Citations
-> - Streamlit interface
+> - Gradio interface
 
 ______________________________________________________________________
 
@@ -660,8 +655,7 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.3.0 — Evaluation
 
-> [!note]
->
+> [!NOTE]
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 5** passes its exit criteria.
@@ -796,8 +790,7 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.4.0 — Monitoring
 
-> [!note]
->
+> [!NOTE]
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 7** passes its exit criteria.
@@ -911,8 +904,7 @@ ______________________________________________________________________
 
 ## 🚀 Release v1.0.0 — Final submission
 
-> [!note]
->
+> [!NOTE]
 > **🗓️ Planned release — not shipped**
 >
 > Ships when **Milestone 8** passes its exit criteria.
