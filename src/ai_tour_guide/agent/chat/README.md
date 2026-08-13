@@ -44,12 +44,12 @@ The defaults in `.env.template` configure the chat to call `http://localhost:800
 environment.
 
 `CHAT_API_URL` is required when starting the chat service. The application does not use
-a local fallback in production. The agent returns the LLM-configuration-required
-response without querying the knowledge base when no OpenAI API key is configured.
+a local fallback in production. The agent service raises a configuration error when no
+OpenAI API key is configured.
 
 `create_app()` uses `DemoBackend` only when no backend is injected. This keeps UI tests
-and local interface development independent of the agent API; the demo response only
-explains that an LLM configuration is required.
+and local interface development independent of the agent API; the demo response says
+that no backend is available.
 
 ## HTTP contract
 
@@ -61,17 +61,26 @@ The chat sends the latest user question:
 }
 ```
 
-The agent returns its answer and retrieved source references:
+The agent returns its answer and validated source references:
 
 ```json
 {
+  "schema_version": 1,
   "answer": "The guide recommends ...",
   "sources": [
     {
+      "source_url": "https://example.com/brittany-guide.pdf",
+      "version": "2026",
       "title": "Guide to the Region of Brittany",
-      "page_start": 12,
-      "page_end": 13
+      "publisher": "Regional Tourism Board",
+      "collection": "Tour Guides",
+      "publication_date": "2026-01-01",
+      "pages": [12, 13]
     }
   ]
 }
 ```
+
+`HttpChatBackend` validates the schema version and passes this dictionary to Gradio.
+Gradio controls presentation; its default view renders the answer followed by each
+source title and its pages in parentheses.

@@ -6,9 +6,11 @@ SOURCE_FILES ?= source_files.json
 EXPORT_DIR ?= tmp
 CSV_LIMIT ?= 1000
 DEBUG ?= 0
+VERBOSE ?= 0
 QUESTION ?=
 K ?= 5
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
+ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
@@ -28,6 +30,7 @@ help: ## Show the available commands.
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
+	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
 	@echo "  make app                             Start the agent API and Gradio chat"
 	@echo "  make vector_search QUESTION='...' K=10  Return up to 10 semantic matches"
 
@@ -79,7 +82,7 @@ text_search: ## Search chunks lexically using QUESTION and optional K.
 ask: ## Answer a QUESTION using retrieved context and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
-		portfolio-ai-tour-guide-agent ask --k "$(K)" "$(QUESTION)"
+		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
 
 app: ## Start the agent API and Gradio chat interface.
 	$(COMPOSE) --profile app up --build

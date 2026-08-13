@@ -168,6 +168,7 @@ Run `make help` for every available shortcut.
 | `make vector_search QUESTION='...'` | Search chunks semantically.                          |
 | `make text_search QUESTION='...'`   | Search chunks with PostgreSQL full-text search.      |
 | `make ask QUESTION='...'`           | Generate an answer from retrieved context.           |
+| `make ask QUESTION='...' VERBOSE=1` | Print the complete serialized RAG trace.             |
 | `make app`                          | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
