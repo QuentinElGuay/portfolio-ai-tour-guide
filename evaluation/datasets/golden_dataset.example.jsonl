@@ -9,7 +9,8 @@
       {
         "source_url": "https://example.com/brittany-guide.pdf",
         "version": null,
-        "pages": [8]
+        "pages": [8],
+        "section_paths": [["Climate and seasonal weather"]]
       }
     ]
   }

@@ -17,7 +17,10 @@ in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
       {
         "source_url": "https://example.com/brittany-guide.pdf",
         "version": null,
-        "pages": [8]
+        "pages": [8],
+        "section_paths": [
+          ["Climate and seasonal weather"]
+        ]
       }
     ]
   }
@@ -27,3 +30,8 @@ in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
 Use `answerable: false`, `reference_answer: null`, and `relevant_sources: []` for an
 intentional insufficient-context case. Do not include expected provider, database, or
 parsing errors here; those are operational-failure tests, not corpus-ground-truth data.
+
+`pages` and `section_paths` identify expected provenance. Section paths are more
+specific than pages when available, but neither one alone proves that a chunk contains
+the answer. Retrieval evaluation should treat an exact section-and-page match as the
+strongest signal, a section-only match as weaker, and a page-only match as the weakest.

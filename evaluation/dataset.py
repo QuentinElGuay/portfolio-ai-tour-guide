@@ -13,6 +13,7 @@ class SourceExpectation:
     source_url: str
     version: str | None
     pages: tuple[int, ...]
+    section_paths: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,10 @@ def load_golden_dataset(
                         source_url=source['source_url'],
                         version=source['version'],
                         pages=tuple(source['pages']),
+                        section_paths=tuple(
+                            tuple(section_path)
+                            for section_path in source.get('section_paths', [])
+                        ),
                     )
                     for source in expected['relevant_sources']
                 )
