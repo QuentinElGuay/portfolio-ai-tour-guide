@@ -161,15 +161,17 @@ when isolating future evaluation data from local development data.
 
 Run `make help` for every available shortcut.
 
-| Command                             | Description                                          |
-| ----------------------------------- | ---------------------------------------------------- |
-| `make init-db`                      | Start PostgreSQL and initialise the pgvector schema. |
-| `make ingest`                       | Ingest documents defined in `source_files.json`.     |
-| `make vector_search QUESTION='...'` | Search chunks semantically.                          |
-| `make text_search QUESTION='...'`   | Search chunks with PostgreSQL full-text search.      |
-| `make ask QUESTION='...'`           | Generate an answer from retrieved context.           |
-| `make ask QUESTION='...' VERBOSE=1` | Print the complete serialized RAG trace.             |
-| `make app`                          | Start the agent API and Gradio chat interface.       |
+| Command                                 | Description                                          |
+| --------------------------------------- | ---------------------------------------------------- |
+| `make init-db`                          | Start PostgreSQL and initialise the pgvector schema. |
+| `make ingest`                           | Ingest documents defined in `source_files.json`.     |
+| `make export-corpus`                    | Overwrite the current knowledge-base corpus export.  |
+| `make load-corpus DB_SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
+| `make vector_search QUESTION='...'`     | Search chunks semantically.                          |
+| `make text_search QUESTION='...'`       | Search chunks with PostgreSQL full-text search.      |
+| `make ask QUESTION='...'`               | Generate an answer from retrieved context.           |
+| `make ask QUESTION='...' VERBOSE=1`     | Print the complete serialized RAG trace.             |
+| `make app`                              | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
 [agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python

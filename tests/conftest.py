@@ -1,7 +1,5 @@
 """Shared pytest fixtures for knowledge-base tests."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 
@@ -24,7 +22,7 @@ def empty_knowledge_base() -> Iterator[None]:
 
 @pytest.fixture
 def corpus_knowledge_base() -> Callable[[int], AbstractContextManager[None]]:
-    """Return a factory for loading any versioned corpus in a test context.
+    """Return a factory for loading the current corpus in a test context.
 
     Example::
 
@@ -34,4 +32,4 @@ def corpus_knowledge_base() -> Callable[[int], AbstractContextManager[None]]:
     """
     # TODO: Add a hard guard for an isolated test database before enabling this
     # fixture in CI or local test runs.
-    return lambda version: corpus_context(version)
+    return lambda: corpus_context()

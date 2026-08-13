@@ -1,7 +1,5 @@
 """Immutable RAG contracts and JSON-safe serialization."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import date, datetime

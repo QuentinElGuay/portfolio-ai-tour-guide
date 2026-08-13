@@ -9,12 +9,14 @@ DEBUG ?= 0
 VERBOSE ?= 0
 QUESTION ?=
 K ?= 5
+ANNOTATOR_ARGS ?=
+CORPUS_ROOT ?= fixtures/corpus
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db ingest export-csv validate-db-schema vector_search text_search ask app
+.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus validate-db-schema vector_search text_search ask annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -27,10 +29,15 @@ help: ## Show the available commands.
 	@echo "  make export-csv                      Export ingestion tables to CSV"
 	@echo "  make export-csv EXPORT_DIR=path      Export CSV files to another directory"
 	@echo "  make export-csv CSV_LIMIT=100        Limit each export to 100 data rows"
+	@echo "  make export-corpus                   Overwrite the current corpus export"
+	@echo "  make load-corpus                     Replace the public database corpus"
+	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
+	@echo "  make annotate-dataset                Fill answers and source pages interactively"
+	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
 	@echo "  make app                             Start the agent API and Gradio chat"
 	@echo "  make vector_search QUESTION='...' K=10  Return up to 10 semantic matches"
 
@@ -69,6 +76,12 @@ export-csv: validate-db-schema ## Export ingestion tables as deterministic CSV f
 	@mv "$(EXPORT_DIR)/document_chunks.csv.tmp" "$(EXPORT_DIR)/document_chunks.csv"
 	@echo "Exported up to $(CSV_LIMIT) data rows per table to $(EXPORT_DIR)/"
 
+export-corpus: ## Overwrite the current knowledge-base corpus export.
+	uv run python scripts/export_corpus.py --root "$(CORPUS_ROOT)"
+
+load-corpus: ## Replace the knowledge-base corpus in the selected DB_SCHEMA.
+	uv run python scripts/setup_corpus.py --root "$(CORPUS_ROOT)" --schema "$(DB_SCHEMA)" --allow-destructive
+
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
@@ -83,6 +96,9 @@ ask: ## Answer a QUESTION using retrieved context and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
+
+annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
+	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
 app: ## Start the agent API and Gradio chat interface.
 	$(COMPOSE) --profile app up --build

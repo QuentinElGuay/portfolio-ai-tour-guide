@@ -6,8 +6,6 @@ vector space. PostgreSQL-generated columns such as ``search_vector`` are not
 exported; PostgreSQL recreates them when rows are restored.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -15,18 +13,22 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 
 from ai_tour_guide.knowledge_base.connection import create_database_engine
-from ai_tour_guide.knowledge_base.init_db import initialize_database
+from ai_tour_guide.knowledge_base.init_db import (
+    SUPPORTED_SCHEMA_NAMES,
+    initialize_database,
+)
+from ai_tour_guide.knowledge_base.settings import DatabaseSettings
 
 _COPY_OPTIONS = "FORMAT CSV, DELIMITER E'\\x01', QUOTE E'\\x02'"
 
 CORPUS_FILES = (
-    "embedding_models.jsonl",
-    "documents.jsonl",
-    "document_chunks.jsonl",
+    'embedding_models.jsonl',
+    'documents.jsonl',
+    'document_chunks.jsonl',
 )
 
 _EXPORTS = {
-    "embedding_models.jsonl": """
+    'embedding_models.jsonl': """
         SELECT jsonb_build_object(
             'embedding_model_id', embedding_model_id,
             'provider', provider,
@@ -43,7 +45,7 @@ _EXPORTS = {
         FROM embedding_models
         ORDER BY embedding_model_id
     """,
-    "documents.jsonl": """
+    'documents.jsonl': """
         SELECT jsonb_build_object(
             'document_id', document_id,
             'embedding_model_id', embedding_model_id,
@@ -78,7 +80,7 @@ _EXPORTS = {
         FROM documents
         ORDER BY document_id
     """,
-    "document_chunks.jsonl": """
+    'document_chunks.jsonl': """
         SELECT jsonb_build_object(
             'document_id', document_id,
             'chunk_id', chunk_id,
@@ -230,32 +232,24 @@ _INSERT_DOCUMENT_CHUNKS = """
 """
 
 
-
-DEFAULT_CORPUS_ROOT = Path("fixtures/corpus")
-
-
-def corpus_directory(version: int, *, root: Path = DEFAULT_CORPUS_ROOT) -> Path:
-    """Return the directory for one versioned corpus fixture."""
-    if version <= 0:
-        raise ValueError("version must be a positive integer")
-    return root / f"v{version}"
+DEFAULT_CORPUS_ROOT = Path('fixtures/corpus')
 
 
 def export_corpus(
-    version: int,
     *,
     root: Path = DEFAULT_CORPUS_ROOT,
     engine: Engine | None = None,
 ) -> Path:
-    """Export the current knowledge-base state to ``root/v{version}``.
+    """Export the current knowledge-base state to ``root``.
 
     Existing files with the same names are replaced. The caller is responsible
     for deciding whether overwriting an existing corpus version is appropriate.
     """
-    output_dir = corpus_directory(version, root=root)
+    output_dir = root
     output_dir.mkdir(parents=True, exist_ok=True)
     owned_engine = engine is None
-    engine = engine or create_database_engine()
+    if engine is None:
+        engine = create_database_engine(DatabaseSettings(schema_name='public'))
 
     try:
         raw_connection = engine.raw_connection()
@@ -263,11 +257,13 @@ def export_corpus(
             with raw_connection.cursor() as cursor:
                 for filename, select_sql in _EXPORTS.items():
                     output_path = output_dir / filename
-                    copy_sql = f"COPY ({select_sql}) TO STDOUT WITH ({_COPY_OPTIONS})"
-                    with output_path.open("wb") as output_file:
-                        with cursor.copy(copy_sql) as copy:
-                            for data in copy:
-                                output_file.write(data)
+                    copy_sql = f'COPY ({select_sql}) TO STDOUT WITH ({_COPY_OPTIONS})'
+                    with (
+                        output_path.open('wb') as output_file,
+                        cursor.copy(copy_sql) as copy,
+                    ):
+                        for data in copy:
+                            output_file.write(data)
         finally:
             raw_connection.close()
     finally:
@@ -277,15 +273,23 @@ def export_corpus(
     return output_dir
 
 
-def clear_knowledge_base(*, engine: Engine | None = None) -> None:
+def clear_knowledge_base(
+    *, engine: Engine | None = None, schema_name: str = 'public'
+) -> None:
     """Delete all persisted knowledge-base rows and reset identity sequences."""
+    if schema_name not in SUPPORTED_SCHEMA_NAMES:
+        choices = ', '.join(SUPPORTED_SCHEMA_NAMES)
+        raise ValueError(
+            f'Unsupported schema {schema_name!r}; choose one of: {choices}'
+        )
     owned_engine = engine is None
-    engine = engine or create_database_engine()
+    if engine is None:
+        engine = create_database_engine(DatabaseSettings(schema_name=schema_name))
     try:
         with engine.begin() as connection:
             connection.exec_driver_sql(
-                "TRUNCATE TABLE document_chunks, documents, embedding_models "
-                "RESTART IDENTITY"
+                'TRUNCATE TABLE document_chunks, documents, embedding_models '
+                'RESTART IDENTITY'
             )
     finally:
         if owned_engine:
@@ -293,56 +297,63 @@ def clear_knowledge_base(*, engine: Engine | None = None) -> None:
 
 
 def load_corpus(
-    version: int,
     *,
     root: Path = DEFAULT_CORPUS_ROOT,
     engine: Engine | None = None,
     clear_first: bool = True,
     initialize_schema: bool = True,
+    schema_name: str = 'public',
 ) -> Path:
-    """Load ``root/v{version}`` into the configured knowledge base."""
-    corpus_dir = corpus_directory(version, root=root)
+    """Load the corpus in ``root`` into the configured knowledge base."""
+    if schema_name not in SUPPORTED_SCHEMA_NAMES:
+        choices = ', '.join(SUPPORTED_SCHEMA_NAMES)
+        raise ValueError(
+            f'Unsupported schema {schema_name!r}; choose one of: {choices}'
+        )
+    corpus_dir = root
     _require_corpus_files(corpus_dir)
 
-    if initialize_schema:
-        # TODO: Refactor initialize_database() to accept an Engine so callers can
-        # reuse one connection pool throughout corpus loading.
-        initialize_database()
-
     owned_engine = engine is None
-    engine = engine or create_database_engine()
+    if engine is None:
+        engine = create_database_engine(DatabaseSettings(schema_name=schema_name))
+
+    if initialize_schema:
+        initialize_database(schema_name, engine=engine)
+
     try:
         raw_connection = engine.raw_connection()
         try:
             with raw_connection.cursor() as cursor:
                 if clear_first:
                     cursor.execute(
-                        "TRUNCATE TABLE document_chunks, documents, embedding_models "
-                        "RESTART IDENTITY"
+                        'TRUNCATE TABLE document_chunks, documents, embedding_models '
+                        'RESTART IDENTITY'
                     )
 
                 cursor.execute(
-                    "CREATE TEMP TABLE corpus_import (data text NOT NULL) ON COMMIT DROP"
+                    'CREATE TEMP TABLE corpus_import (data text NOT NULL) ON COMMIT DROP'
                 )
 
                 _load_corpus_file(
                     cursor,
-                    corpus_dir / "embedding_models.jsonl",
+                    corpus_dir / 'embedding_models.jsonl',
                     _INSERT_EMBEDDING_MODELS,
                 )
                 _load_corpus_file(
                     cursor,
-                    corpus_dir / "documents.jsonl",
+                    corpus_dir / 'documents.jsonl',
                     _INSERT_DOCUMENTS,
                 )
                 _load_corpus_file(
                     cursor,
-                    corpus_dir / "document_chunks.jsonl",
+                    corpus_dir / 'document_chunks.jsonl',
                     _INSERT_DOCUMENT_CHUNKS,
                 )
 
-                _reset_identity_sequence(cursor, "embedding_models", "embedding_model_id")
-                _reset_identity_sequence(cursor, "documents", "document_id")
+                _reset_identity_sequence(
+                    cursor, 'embedding_models', 'embedding_model_id'
+                )
+                _reset_identity_sequence(cursor, 'documents', 'document_id')
 
             raw_connection.commit()
         except Exception:
@@ -359,10 +370,10 @@ def load_corpus(
 
 @contextmanager
 def corpus_context(
-    version: int,
     *,
     root: Path = DEFAULT_CORPUS_ROOT,
     clear_after: bool = True,
+    schema_name: str = 'public',
 ) -> Iterator[None]:
     """Load one corpus for a scoped operation and optionally clear it afterward.
 
@@ -370,29 +381,28 @@ def corpus_context(
     context. It loads the selected corpus and, by default, leaves the knowledge
     base empty on exit.
     """
-    load_corpus(version, root=root)
+    load_corpus(root=root, schema_name=schema_name)
     try:
         yield
     finally:
         if clear_after:
-            clear_knowledge_base()
+            clear_knowledge_base(schema_name=schema_name)
 
 
 def _require_corpus_files(corpus_dir: Path) -> None:
     missing = [name for name in CORPUS_FILES if not (corpus_dir / name).is_file()]
     if missing:
-        joined = ", ".join(missing)
-        raise FileNotFoundError(f"Missing corpus file(s) in {corpus_dir}: {joined}")
+        joined = ', '.join(missing)
+        raise FileNotFoundError(f'Missing corpus file(s) in {corpus_dir}: {joined}')
 
 
 def _copy_jsonl_into_staging(cursor: object, path: Path) -> None:
-    cursor.execute("TRUNCATE TABLE corpus_import")
-    copy_sql = f"COPY corpus_import(data) FROM STDIN WITH ({_COPY_OPTIONS})"
+    cursor.execute('TRUNCATE TABLE corpus_import')
+    copy_sql = f'COPY corpus_import(data) FROM STDIN WITH ({_COPY_OPTIONS})'
 
-    with path.open("rb") as input_file:
-        with cursor.copy(copy_sql) as copy:
-            while data := input_file.read(1024 * 1024):
-                copy.write(data)
+    with path.open('rb') as input_file, cursor.copy(copy_sql) as copy:
+        while data := input_file.read(1024 * 1024):
+            copy.write(data)
 
 
 def _load_corpus_file(cursor: object, path: Path, insert_sql: str) -> None:
@@ -415,11 +425,10 @@ def _reset_identity_sequence(cursor: object, table: str, id_column: str) -> None
 
 
 __all__ = [
-    "CORPUS_FILES",
-    "DEFAULT_CORPUS_ROOT",
-    "clear_knowledge_base",
-    "corpus_context",
-    "corpus_directory",
-    "export_corpus",
-    "load_corpus",
+    'CORPUS_FILES',
+    'DEFAULT_CORPUS_ROOT',
+    'clear_knowledge_base',
+    'corpus_context',
+    'export_corpus',
+    'load_corpus',
 ]
