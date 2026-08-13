@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, ContextManager, Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 
 import pytest
 
@@ -22,7 +23,7 @@ def empty_knowledge_base() -> Iterator[None]:
 
 
 @pytest.fixture
-def corpus_knowledge_base() -> Callable[[int], ContextManager[None]]:
+def corpus_knowledge_base() -> Callable[[int], AbstractContextManager[None]]:
     """Return a factory for loading any versioned corpus in a test context.
 
     Example::
