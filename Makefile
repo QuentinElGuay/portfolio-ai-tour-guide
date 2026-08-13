@@ -11,12 +11,13 @@ QUESTION ?=
 K ?= 5
 ANNOTATOR_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
+EVALUATION ?= retrieval
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus validate-db-schema vector_search text_search ask annotate-dataset app
+.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate validate-db-schema vector_search text_search ask annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -32,6 +33,9 @@ help: ## Show the available commands.
 	@echo "  make export-corpus                   Overwrite the current corpus export"
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
+	@echo "  make evaluate                        Load corpus and run retrieval evaluation"
+	@echo "  make evaluate EVALUATION=rag        Load corpus and run RAG evaluation"
+	@echo "  make evaluate EVALUATION=both       Run both evaluations"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
@@ -80,7 +84,21 @@ export-corpus: ## Overwrite the current knowledge-base corpus export.
 	uv run python scripts/export_corpus.py --root "$(CORPUS_ROOT)"
 
 load-corpus: ## Replace the knowledge-base corpus in the selected DB_SCHEMA.
+	@test -f "$(CORPUS_ROOT)/embedding_models.jsonl" \
+		&& test -f "$(CORPUS_ROOT)/documents.jsonl" \
+		&& test -f "$(CORPUS_ROOT)/document_chunks.jsonl" \
+		|| (echo "Corpus files are missing from $(CORPUS_ROOT). Run 'make export-corpus' first." >&2; exit 1)
 	uv run python scripts/setup_corpus.py --root "$(CORPUS_ROOT)" --schema "$(DB_SCHEMA)" --allow-destructive
+
+evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluations.
+	@case "$(EVALUATION)" in retrieval|rag|both) ;; *) echo "EVALUATION must be retrieval, rag, or both" >&2; exit 1;; esac
+	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
+	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
+		uv run python -m evaluation.retrieval.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+	fi
+	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = both ]; then \
+		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+	fi
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
