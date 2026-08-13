@@ -6,9 +6,10 @@ from typing import Protocol
 
 import httpx
 
-from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
+
+SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
 
 
 def create_backend() -> ChatBackend:
@@ -27,7 +28,7 @@ class DemoBackend:
 
     async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
         return {
-            'schema_version': ASK_RESPONSE_SCHEMA_VERSION,
+            'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
             'answer': NO_BACKEND_AVAILABLE_ANSWER,
             'sources': [],
         }
@@ -65,7 +66,7 @@ class HttpChatBackend:
             payload = response.json()
             if not isinstance(payload, dict):
                 raise TypeError
-            if payload.get('schema_version') != ASK_RESPONSE_SCHEMA_VERSION:
+            if payload.get('schema_version') != SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION:
                 raise RuntimeError(
                     'The chat API returned an unsupported schema version.'
                 )
