@@ -328,10 +328,8 @@ def chunk_document(
             max_chars=text_max_chars,
         ):
             chunk_index = len(chunks)
-            section_chunk_index = None
-            if section_id is not None:
-                section_chunk_index = section_chunk_indexes.get(section_id, 0)
-                section_chunk_indexes[section_id] = section_chunk_index + 1
+            section_chunk_index = section_chunk_indexes.get(section_id, 0)
+            section_chunk_indexes[section_id] = section_chunk_index + 1
             chunks.append(
                 Chunk(
                     chunk_id=f'{slug}:chunk-{chunk_index:04d}',

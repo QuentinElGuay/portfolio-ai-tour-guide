@@ -28,6 +28,7 @@ def _embedding_metadata(*, distance_metric: str = 'cosine') -> EmbeddingMetadata
 
 def test_search_vector_returns_ranked_chunks() -> None:
     chunk = MagicMock(spec=DocumentChunkRow)
+    chunk.section_id = 'brittany-coast'
     session = MagicMock(spec=Session)
     session.execute.return_value.all.return_value = [(chunk, 0.2)]
 
@@ -39,6 +40,7 @@ def test_search_vector_returns_ranked_chunks() -> None:
     )
 
     assert result == [ScoredDocumentChunk(chunk=chunk, score=0.2)]
+    assert result[0].section_id == 'brittany-coast'
     session.execute.assert_called_once()
     statement = session.execute.call_args.args[0]
     statement_sql = str(statement)
@@ -49,12 +51,14 @@ def test_search_vector_returns_ranked_chunks() -> None:
 
 def test_search_text_returns_ranked_chunks() -> None:
     chunk = MagicMock(spec=DocumentChunkRow)
+    chunk.section_id = 'brittany-coast'
     session = MagicMock(spec=Session)
     session.execute.return_value.all.return_value = [(chunk, 0.7)]
 
     result = search_text(session, 'Brittany coast', k=1)
 
     assert result == [ScoredDocumentChunk(chunk=chunk, score=0.7)]
+    assert result[0].section_id == 'brittany-coast'
     session.execute.assert_called_once()
 
 

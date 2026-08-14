@@ -54,6 +54,6 @@ def ask(request: AskRequest) -> AskResponse:
             page_start=retrieved.source.page_start,
             page_end=retrieved.source.page_end,
         )
-        for retrieved in result.retrieved
+        for retrieved in result.chunks
     ]
     return AskResponse(answer=result.answer, sources=sources)

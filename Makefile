@@ -29,7 +29,6 @@ help: ## Show the available commands.
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make app                             Start the agent API and Gradio chat"
-	@echo "  make vector_search QUESTION='...' K=10  Return up to 10 semantic matches"
 
 init-db: ## Start PostgreSQL and initialize its schema.
 	$(COMPOSE) --profile tools run --rm init-db

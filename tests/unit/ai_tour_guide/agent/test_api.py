@@ -9,7 +9,7 @@ os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.agent.api import AskRequest, ask, health
-from ai_tour_guide.agent.rag.models import RAGResult
+from ai_tour_guide.agent.rag.models import Context, RAGResult
 
 
 def test_health_reports_ok() -> None:
@@ -20,15 +20,21 @@ def test_health_reports_ok() -> None:
 def test_ask_returns_the_answer_and_sources(answer_question: MagicMock) -> None:
     answer_question.return_value = RAGResult(
         answer='Visit the museum in the morning.',
-        retrieved=[
-            SimpleNamespace(
-                source=SimpleNamespace(
-                    title='Museum guide',
-                    page_start=4,
-                    page_end=5,
-                )
-            )
-        ],
+        contexts=(
+            Context(
+                section_id='activities-and-things-to-do-top-attractions-in-brittany-museums-and-galleries',
+                text='Museum context',
+                chunks=(
+                    SimpleNamespace(
+                        source=SimpleNamespace(
+                            title='Museum guide',
+                            page_start=4,
+                            page_end=5,
+                        )
+                    ),
+                ),
+            ),
+        ),
     )
 
     response = ask(AskRequest(question='  What should I visit?  '))

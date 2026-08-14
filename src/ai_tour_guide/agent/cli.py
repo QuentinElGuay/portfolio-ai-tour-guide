@@ -79,7 +79,7 @@ def ask_command(question: str, mode: str, k: int) -> None:
         return
 
     references: dict[tuple[int, str], list[RetrievedChunk]] = {}
-    for retrieved in result.retrieved:
+    for retrieved in result.chunks:
         source = retrieved.source
         document = (source.document_id, source.title)
         document_references = references.setdefault(document, [])
@@ -116,7 +116,7 @@ def _format_chunk(result: RetrievedChunk) -> str:
     return (
         f'{chunk.chunk_id} ({format_page_range(chunk)}) '
         f'[rank {result.rank}, score {result.score:.4f} '
-        f'{result.score_kind.value}]\n{chunk.text}'
+        f'{result.score_kind.value}]\n{result.text}'
     )
 
 

@@ -352,6 +352,7 @@ document_chunks = Table(
     Column(
         'section_id',
         Text,
+        nullable=False,
     ),
     Column(
         'section_chunk_index',

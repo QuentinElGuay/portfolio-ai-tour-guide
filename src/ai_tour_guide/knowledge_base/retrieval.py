@@ -1,11 +1,12 @@
 """Reusable retrieval orchestration for the knowledge base."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 from math import isfinite
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ai_tour_guide.embedding import FastEmbedder
@@ -59,6 +60,32 @@ class RetrievedChunk:
     score: float
     score_kind: ScoreKind
     source: SourceMetadata
+    section_id: str | None = None
+    text: str | None = None
+
+    def __post_init__(self) -> None:
+        """Default section metadata to the matched chunk when not expanded."""
+        if self.section_id is None:
+            object.__setattr__(
+                self,
+                'section_id',
+                getattr(self.chunk, 'section_id', None),
+            )
+        if self.text is None:
+            object.__setattr__(self, 'text', self.chunk.text)
+
+
+@dataclass(frozen=True, slots=True)
+class SiblingChunks:
+    """All chunks belonging to one document section in reading order."""
+
+    section_id: str
+    chunks: tuple[DocumentChunkRow, ...]
+
+    @property
+    def text(self) -> str:
+        """Return sibling text in ascending section-local order."""
+        return '\n\n'.join(chunk.text for chunk in self.chunks)
 
 
 DEFAULT_RRF_RANK_CONSTANT = 60
@@ -127,6 +154,52 @@ def _create_source_metadata(chunk: DocumentChunkRow) -> SourceMetadata:
     )
 
 
+def retrieve_siblings(
+    session: Session,
+    chunk: DocumentChunkRow,
+) -> SiblingChunks:
+    """Return a chunk's document-scoped section siblings in reading order."""
+    section_id = chunk.section_id
+    statement = (
+        select(DocumentChunkRow)
+        .where(DocumentChunkRow.document_id == chunk.document_id)
+        .where(DocumentChunkRow.section_id == section_id)
+        .order_by(
+            DocumentChunkRow.section_chunk_index.asc(),
+            DocumentChunkRow.chunk_index.asc(),
+        )
+    )
+    return SiblingChunks(
+        section_id=section_id,
+        chunks=tuple(session.scalars(statement).all()),
+    )
+
+
+def _retrieve_sibling_sections(
+    session: Session,
+    ranked_chunks: Iterable[RetrievedChunk],
+) -> list[RetrievedChunk]:
+    """Expand ranked chunks into one deduplicated result per document section."""
+    sections: list[RetrievedChunk] = []
+    seen: set[tuple[int, str]] = set()
+
+    for result in ranked_chunks:
+        siblings = retrieve_siblings(session, result.chunk)
+        identity = (result.source.document_id, siblings.section_id)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        sections.append(
+            replace(
+                result,
+                section_id=siblings.section_id,
+                text=siblings.text,
+            )
+        )
+
+    return sections
+
+
 def _relevance_score(raw_score: float, distance_metric: str) -> float:
     """Convert a lower-is-better vector distance to a higher-is-better score."""
     if distance_metric == 'cosine':
@@ -186,6 +259,7 @@ def retrieve(
     mode: SearchMode = 'vector',
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
+    retrieve_siblings: bool = True,
 ) -> list[RetrievedChunk]:
     """Retrieve ranked document chunks using the selected search mode.
 
@@ -241,7 +315,11 @@ def retrieve(
                 ]
 
                 if selected_mode is SearchMode.VECTOR:
-                    return vector_chunks
+                    return (
+                        _retrieve_sibling_sections(session, vector_chunks)
+                        if retrieve_siblings
+                        else vector_chunks
+                    )
 
                 text_results = search_text(session, query, k)
                 text_chunks = [
@@ -254,7 +332,7 @@ def retrieve(
                     )
                     for rank, result in enumerate(text_results, start=1)
                 ]
-                return _fuse_rankings(
+                fused_chunks = _fuse_rankings(
                     [
                         (vector_chunks, selected_hybrid_settings.vector_weight),
                         (text_chunks, selected_hybrid_settings.text_weight),
@@ -262,9 +340,14 @@ def retrieve(
                     k=k,
                     rank_constant=selected_hybrid_settings.rank_constant,
                 )
+                return (
+                    _retrieve_sibling_sections(session, fused_chunks)
+                    if retrieve_siblings
+                    else fused_chunks
+                )
 
             text_results = search_text(session, query, k)
-            return [
+            text_chunks = [
                 RetrievedChunk(
                     chunk=result.chunk,
                     rank=rank,
@@ -274,6 +357,11 @@ def retrieve(
                 )
                 for rank, result in enumerate(text_results, start=1)
             ]
+            return (
+                _retrieve_sibling_sections(session, text_chunks)
+                if retrieve_siblings
+                else text_chunks
+            )
     finally:
         engine.dispose()
 
@@ -284,6 +372,8 @@ __all__ = [
     'RetrievedChunk',
     'ScoreKind',
     'SearchMode',
+    'SiblingChunks',
     'SourceMetadata',
     'retrieve',
+    'retrieve_siblings',
 ]

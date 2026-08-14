@@ -21,6 +21,11 @@ class ScoredDocumentChunk:
     chunk: DocumentChunkRow
     score: float
 
+    @property
+    def section_id(self) -> str:
+        """Return the section target associated with this scored chunk."""
+        return self.chunk.section_id
+
 
 type SearchResults = list[ScoredDocumentChunk]
 

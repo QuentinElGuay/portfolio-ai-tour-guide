@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
+from ai_tour_guide.agent.rag.models import Context, RAGResult
+
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
@@ -66,10 +68,15 @@ def test_search_command_prints_chunks(retrieve: MagicMock) -> None:
 def test_ask_command_prints_answer_and_compact_sources(
     answer_question: MagicMock,
 ) -> None:
-    answer_question.return_value = SimpleNamespace(
+    answer_question.return_value = RAGResult(
         answer='The coast is beautiful.',
-        chunks=[_chunk()],
-        retrieved=[_retrieved_chunk()],
+        contexts=(
+            Context(
+                section_id=None,
+                text='The region is known for its stunning coastal scenery.',
+                chunks=(_retrieved_chunk(),),
+            ),
+        ),
     )
 
     result = CliRunner().invoke(
@@ -108,10 +115,15 @@ def test_ask_command_deduplicates_source_references(
             page_end=4,
         ),
     )
-    answer_question.return_value = SimpleNamespace(
+    answer_question.return_value = RAGResult(
         answer='The coast is beautiful.',
-        chunks=[duplicate.chunk, duplicate.chunk, other_page.chunk],
-        retrieved=[duplicate, duplicate, other_page],
+        contexts=(
+            Context(
+                section_id=None,
+                text='The region is known for its stunning coastal scenery.',
+                chunks=(duplicate, duplicate, other_page),
+            ),
+        ),
     )
 
     result = CliRunner().invoke(main, ['ask', 'What is worth seeing?'])
@@ -165,10 +177,15 @@ def test_ask_command_orders_pages(
             page_end=12,
         ),
     )
-    answer_question.return_value = SimpleNamespace(
+    answer_question.return_value = RAGResult(
         answer='The coast is beautiful.',
-        chunks=[first_page.chunk, later_page.chunk, middle_page.chunk],
-        retrieved=[first_page, later_page, middle_page],
+        contexts=(
+            Context(
+                section_id=None,
+                text='The region is known for its stunning coastal scenery.',
+                chunks=(first_page, later_page, middle_page),
+            ),
+        ),
     )
 
     result = CliRunner().invoke(main, ['ask', 'What is worth seeing?'])
