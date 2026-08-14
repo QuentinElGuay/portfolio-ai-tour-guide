@@ -10,7 +10,10 @@ from ai_tour_guide.agent.rag.pipeline import (
     INSUFFICIENT_CONTEXT_ANSWER,
     answer_question,
 )
-from ai_tour_guide.agent.rag.prompting import build_context, build_contexts
+from ai_tour_guide.agent.rag.prompting import (
+    build_context_from_chunks,
+    build_llm_context,
+)
 from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
 from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
@@ -139,9 +142,9 @@ def test_build_context_preserves_source_identity_and_pages() -> None:
             page_end=12,
         ),
     )
-    contexts = build_contexts([retrieved])
+    contexts = build_context_from_chunks([retrieved])
 
-    assert build_context(contexts) == (
+    assert build_llm_context(contexts) == (
         '[Section: unavailable; Retrieved by: chunk-123 '
         '(page 12, rank 1, score 0.9000 text_rank)]\n'
         'The museum opens at ten.'
@@ -197,7 +200,7 @@ def test_build_contexts_deduplicates_a_section_and_keeps_all_retrievals() -> Non
         text='The museum opens at ten.\n\nThe last entry is at five.',
     )
 
-    contexts = build_contexts([first, second])
+    contexts = build_context_from_chunks([first, second])
 
     assert contexts == (
         Context(

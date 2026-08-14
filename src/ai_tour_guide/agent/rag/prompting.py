@@ -17,7 +17,9 @@ Prefer a direct, useful tour-guide-style answer.
 """
 
 
-def build_contexts(retrieved: Sequence[RetrievedChunk]) -> tuple[Context, ...]:
+def build_context_from_chunks(
+    retrieved: Sequence[RetrievedChunk],
+) -> tuple[Context, ...]:
     """Group retrieved chunks into one context entry per document section."""
     contexts: dict[tuple[int, str | None], Context] = {}
 
@@ -41,7 +43,7 @@ def build_contexts(retrieved: Sequence[RetrievedChunk]) -> tuple[Context, ...]:
     return tuple(contexts.values())
 
 
-def build_context(contexts: Sequence[Context]) -> str:
+def build_llm_context(contexts: Sequence[Context]) -> str:
     """Render deduplicated context with the retrievals that support it."""
     return '\n\n'.join(
         (
@@ -66,7 +68,7 @@ def _format_retrievals(retrieved: Sequence[RetrievedChunk]) -> str:
 
 def build_messages(question: str, contexts: Sequence[Context]) -> list[Message]:
     """Build the grounded chat messages sent to the configured backend."""
-    context = build_context(contexts)
+    context = build_llm_context(contexts)
     return [
         {'role': 'system', 'content': SYSTEM_PROMPT},
         {
@@ -78,4 +80,9 @@ def build_messages(question: str, contexts: Sequence[Context]) -> list[Message]:
     ]
 
 
-__all__ = ['SYSTEM_PROMPT', 'build_context', 'build_contexts', 'build_messages']
+__all__ = [
+    'SYSTEM_PROMPT',
+    'build_context_from_chunks',
+    'build_llm_context',
+    'build_messages',
+]

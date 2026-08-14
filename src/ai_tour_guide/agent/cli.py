@@ -99,6 +99,9 @@ def ask_command(question: str, mode: str, k: int) -> None:
                 item.source.page_end or 0,
             )
         )
+
+        # TODO: page formatting should be shared code with ai_tour_guide.agent.chat.backends._format_pages
+        # See src/ai_tour_guide/agent/source_formatting.py
         page_ranges = [format_page_range(item.chunk) for item in document_references]
         if len(page_ranges) == 1:
             pages = page_ranges[0]

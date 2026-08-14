@@ -5,7 +5,7 @@ import asyncio
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
 from ai_tour_guide.agent.llm.interfaces import LLMClient
 from ai_tour_guide.agent.rag.models import RAGResult
-from ai_tour_guide.agent.rag.prompting import build_contexts, build_messages
+from ai_tour_guide.agent.rag.prompting import build_context_from_chunks, build_messages
 from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
 from ai_tour_guide.knowledge_base.retrieval import SearchMode, retrieve
 
@@ -32,7 +32,7 @@ def answer_question(
     if not retrieved:
         return RAGResult(answer=INSUFFICIENT_CONTEXT_ANSWER)
 
-    contexts = build_contexts(retrieved)
+    contexts = build_context_from_chunks(retrieved)
     messages = build_messages(question, contexts)
     answer = asyncio.run(selected_client.generate_reply(messages))
     return RAGResult(
