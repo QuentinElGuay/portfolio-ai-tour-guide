@@ -66,8 +66,10 @@ def parse_pdf_stage(downloaded: DownloadedPdf) -> ParsedDocumentArtifact:
 def chunk_document_stage(
     parsed: ParsedDocumentArtifact,
     *,
-    target_chars: int = 750,
-    max_chars: int = 1_000,
+    target_chars: int,
+    max_chars: int,
+    min_depth: int,
+    max_depth: int,
 ) -> ChunkedDocumentArtifact:
     """Create persistence-ready document metadata and retrieval chunks."""
     chunks = tuple(
@@ -75,6 +77,8 @@ def chunk_document_stage(
             parsed.parsed_pdf.to_dict(),
             target_chars=target_chars,
             max_chars=max_chars,
+            min_depth=min_depth,
+            max_depth=max_depth,
         )
     )
     if not chunks:
@@ -92,6 +96,8 @@ def chunk_document_stage(
         chunking=ChunkingMetadata(
             target_chars=target_chars,
             max_chars=max_chars,
+            min_depth=min_depth,
+            max_depth=max_depth,
         ),
     )
 
@@ -167,8 +173,10 @@ def run_document_pipeline(
     settings: IngestionSettings,
     embedder: Embedder,
     embedding_batch_size: int,
-    target_chars: int = 750,
-    max_chars: int = 1_000,
+    target_chars: int,
+    max_chars: int,
+    min_depth: int,
+    max_depth: int,
 ) -> int:
     """Execute every typed stage sequentially for one source document."""
     downloaded = download_pdf_stage(
@@ -180,6 +188,8 @@ def run_document_pipeline(
         parsed,
         target_chars=target_chars,
         max_chars=max_chars,
+        min_depth=min_depth,
+        max_depth=max_depth,
     )
     embedded = embed_document_stage(
         chunked_document,
@@ -205,8 +215,10 @@ def run_pipeline(
     settings: IngestionSettings,
     embedder: Embedder,
     embedding_batch_size: int,
-    target_chars: int = 750,
-    max_chars: int = 1_000,
+    target_chars: int,
+    max_chars: int,
+    min_depth: int,
+    max_depth: int,
 ) -> tuple[int, ...]:
     """Run documents sequentially and return their database identifiers."""
     if settings.debug:
@@ -220,6 +232,8 @@ def run_pipeline(
             embedding_batch_size=embedding_batch_size,
             target_chars=target_chars,
             max_chars=max_chars,
+            min_depth=min_depth,
+            max_depth=max_depth,
         )
         for document in documents
     )

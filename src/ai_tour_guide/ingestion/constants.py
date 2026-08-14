@@ -1,0 +1,6 @@
+"""Application defaults for ingestion configuration."""
+
+DEFAULT_TARGET_CHARS = 750
+DEFAULT_MAX_CHARS = 1_000
+DEFAULT_SECTION_MIN_DEPTH = 1
+DEFAULT_SECTION_MAX_DEPTH = 2

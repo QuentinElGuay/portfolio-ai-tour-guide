@@ -6,6 +6,12 @@ import pytest
 from sqlalchemy.orm import Session
 
 from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.constants import (
+    DEFAULT_MAX_CHARS,
+    DEFAULT_SECTION_MAX_DEPTH,
+    DEFAULT_SECTION_MIN_DEPTH,
+    DEFAULT_TARGET_CHARS,
+)
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
@@ -47,7 +53,12 @@ def _document_record(*, collection: str | None = None) -> DocumentRecord:
 
 
 def _chunking_metadata() -> ChunkingMetadata:
-    return ChunkingMetadata(target_chars=750, max_chars=1_000)
+    return ChunkingMetadata(
+        target_chars=DEFAULT_TARGET_CHARS,
+        max_chars=DEFAULT_MAX_CHARS,
+        min_depth=DEFAULT_SECTION_MIN_DEPTH,
+        max_depth=DEFAULT_SECTION_MAX_DEPTH,
+    )
 
 
 def _embedded_chunk() -> EmbeddedChunk:
@@ -56,6 +67,8 @@ def _embedded_chunk() -> EmbeddedChunk:
             chunk_id='chunk-0001',
             document_title='A guide to Brittany',
             section_path=('Coast',),
+            section_id='section-sha256',
+            section_chunk_index=0,
             text='Visit the coast.',
             embedding_text='Coast\n\nVisit the coast.',
             page_start=2,

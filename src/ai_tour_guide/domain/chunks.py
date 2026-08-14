@@ -14,6 +14,8 @@ class Chunk:
     page_end: int | None
     chunk_index: int
     character_count: int
+    section_id: str | None = None
+    section_chunk_index: int | None = None
 
     def __post_init__(self) -> None:
         if not self.chunk_id.strip():
@@ -27,6 +29,9 @@ class Chunk:
 
         if self.chunk_index < 0:
             raise ValueError('chunk_index must not be negative')
+
+        if self.section_chunk_index is not None and self.section_chunk_index < 0:
+            raise ValueError('section_chunk_index must not be negative')
 
         if self.character_count <= 0:
             raise ValueError('character_count must be greater than zero')
@@ -50,6 +55,12 @@ class Chunk:
             chunk_id=str(data['chunk_id']),
             document_title=str(data['document_title']),
             section_path=tuple(data['section_path']),
+            section_id=data.get('section_id'),
+            section_chunk_index=(
+                int(data['section_chunk_index'])
+                if data.get('section_chunk_index') is not None
+                else None
+            ),
             text=str(data['text']),
             embedding_text=str(data['embedding_text']),
             page_start=data.get('page_start'),

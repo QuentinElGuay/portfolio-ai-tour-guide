@@ -271,11 +271,27 @@ class ChunkingMetadata:
 
     target_chars: int
     max_chars: int
+    min_depth: int
+    max_depth: int
+
+    def __post_init__(self) -> None:
+        if self.target_chars <= 0:
+            raise ValueError('target_chars must be greater than zero')
+        if self.max_chars <= 0:
+            raise ValueError('max_chars must be greater than zero')
+        if self.target_chars > self.max_chars:
+            raise ValueError('target_chars must be less than or equal to max_chars')
+        if self.min_depth <= 0:
+            raise ValueError('min_depth must be greater than zero')
+        if self.max_depth < self.min_depth:
+            raise ValueError('max_depth must be greater than or equal to min_depth')
 
     def to_dict(self) -> dict[str, int]:
         return {
             'target_chars': self.target_chars,
             'max_chars': self.max_chars,
+            'min_depth': self.min_depth,
+            'max_depth': self.max_depth,
         }
 
     @classmethod
@@ -283,6 +299,8 @@ class ChunkingMetadata:
         return cls(
             target_chars=int(data['target_chars']),
             max_chars=int(data['max_chars']),
+            min_depth=int(data['min_depth']),
+            max_depth=int(data['max_depth']),
         )
 
 

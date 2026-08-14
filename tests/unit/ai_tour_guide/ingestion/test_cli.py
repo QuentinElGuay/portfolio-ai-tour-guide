@@ -95,6 +95,8 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
         embedding_batch_size=8,
         target_chars=500,
         max_chars=700,
+        min_depth=1,
+        max_depth=2,
     )
 
     assert result == 42
@@ -104,6 +106,8 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
         parsed,
         target_chars=500,
         max_chars=700,
+        min_depth=1,
+        max_depth=2,
     )
     embed_stage.assert_called_once_with(
         chunked,

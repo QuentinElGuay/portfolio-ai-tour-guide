@@ -57,7 +57,13 @@ def test_typed_stages_compose_without_intermediate_files() -> None:
             source_checksum='source-sha256',
         )
     )
-    chunked = chunk_document_stage(parsed, target_chars=100, max_chars=200)
+    chunked = chunk_document_stage(
+        parsed,
+        target_chars=100,
+        max_chars=200,
+        min_depth=1,
+        max_depth=2,
+    )
     embedded = embed_document_stage(
         chunked,
         embedder=_FakeEmbedder(),
