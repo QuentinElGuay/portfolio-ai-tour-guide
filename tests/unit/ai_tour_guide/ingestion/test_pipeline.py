@@ -5,6 +5,7 @@ import pymupdf
 
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.ingestion.artifacts import DownloadedPdf
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
 from ai_tour_guide.ingestion.pipeline import (
     chunk_document_stage,
@@ -59,10 +60,7 @@ def test_typed_stages_compose_without_intermediate_files() -> None:
     )
     chunked = chunk_document_stage(
         parsed,
-        target_chars=100,
-        max_chars=200,
-        min_depth=1,
-        max_depth=2,
+        config=ChunkingConfig(100, 200, 1, 2),
     )
     embedded = embed_document_stage(
         chunked,

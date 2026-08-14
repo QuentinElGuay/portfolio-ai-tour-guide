@@ -10,12 +10,12 @@ from ai_tour_guide.domain.documents import DocumentRecord
 from ai_tour_guide.embedding import Embedder
 from ai_tour_guide.ingestion.artifacts import (
     ChunkedDocumentArtifact,
-    ChunkingMetadata,
     DownloadedPdf,
     EmbeddedDocumentArtifact,
     ParsedDocumentArtifact,
 )
 from ai_tour_guide.ingestion.chunking import chunk_document
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.embedding import embed_chunks
 from ai_tour_guide.ingestion.io import write_bytes_atomic
 from ai_tour_guide.ingestion.pdf.downloader import download_pdf_bytes
@@ -66,19 +66,13 @@ def parse_pdf_stage(downloaded: DownloadedPdf) -> ParsedDocumentArtifact:
 def chunk_document_stage(
     parsed: ParsedDocumentArtifact,
     *,
-    target_chars: int,
-    max_chars: int,
-    min_depth: int,
-    max_depth: int,
+    config: ChunkingConfig,
 ) -> ChunkedDocumentArtifact:
     """Create persistence-ready document metadata and retrieval chunks."""
     chunks = tuple(
         chunk_document(
             parsed.parsed_pdf.to_dict(),
-            target_chars=target_chars,
-            max_chars=max_chars,
-            min_depth=min_depth,
-            max_depth=max_depth,
+            config=config,
         )
     )
     if not chunks:
@@ -93,12 +87,7 @@ def chunk_document_stage(
             collection=parsed.document.collection,
         ),
         chunks=chunks,
-        chunking=ChunkingMetadata(
-            target_chars=target_chars,
-            max_chars=max_chars,
-            min_depth=min_depth,
-            max_depth=max_depth,
-        ),
+        chunking=config,
     )
 
 
@@ -173,10 +162,7 @@ def run_document_pipeline(
     settings: IngestionSettings,
     embedder: Embedder,
     embedding_batch_size: int,
-    target_chars: int,
-    max_chars: int,
-    min_depth: int,
-    max_depth: int,
+    chunking_config: ChunkingConfig,
 ) -> int:
     """Execute every typed stage sequentially for one source document."""
     downloaded = download_pdf_stage(
@@ -186,10 +172,7 @@ def run_document_pipeline(
     parsed = parse_pdf_stage(downloaded)
     chunked_document = chunk_document_stage(
         parsed,
-        target_chars=target_chars,
-        max_chars=max_chars,
-        min_depth=min_depth,
-        max_depth=max_depth,
+        config=chunking_config,
     )
     embedded = embed_document_stage(
         chunked_document,
@@ -215,10 +198,7 @@ def run_pipeline(
     settings: IngestionSettings,
     embedder: Embedder,
     embedding_batch_size: int,
-    target_chars: int,
-    max_chars: int,
-    min_depth: int,
-    max_depth: int,
+    chunking_config: ChunkingConfig,
 ) -> tuple[int, ...]:
     """Run documents sequentially and return their database identifiers."""
     if settings.debug:
@@ -230,10 +210,7 @@ def run_pipeline(
             settings=settings,
             embedder=embedder,
             embedding_batch_size=embedding_batch_size,
-            target_chars=target_chars,
-            max_chars=max_chars,
-            min_depth=min_depth,
-            max_depth=max_depth,
+            chunking_config=chunking_config,
         )
         for document in documents
     )

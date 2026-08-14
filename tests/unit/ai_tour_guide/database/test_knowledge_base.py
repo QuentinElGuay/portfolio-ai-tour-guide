@@ -5,13 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
-from ai_tour_guide.ingestion.constants import (
-    DEFAULT_MAX_CHARS,
-    DEFAULT_SECTION_MAX_DEPTH,
-    DEFAULT_SECTION_MIN_DEPTH,
-    DEFAULT_TARGET_CHARS,
-)
+from ai_tour_guide.ingestion.config import ChunkingConfig
+from ai_tour_guide.ingestion.constants import DEFAULT_MAX_CHARS, DEFAULT_TARGET_CHARS
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
@@ -52,12 +47,12 @@ def _document_record(*, collection: str | None = None) -> DocumentRecord:
     )
 
 
-def _chunking_metadata() -> ChunkingMetadata:
-    return ChunkingMetadata(
+def _chunking_config() -> ChunkingConfig:
+    return ChunkingConfig(
         target_chars=DEFAULT_TARGET_CHARS,
         max_chars=DEFAULT_MAX_CHARS,
-        min_depth=DEFAULT_SECTION_MIN_DEPTH,
-        max_depth=DEFAULT_SECTION_MAX_DEPTH,
+        section_chunk_min_depth=None,
+        section_chunk_max_depth=None,
     )
 
 
@@ -99,7 +94,7 @@ def test_insert_document_rejects_an_existing_document_without_changes() -> None:
             session,
             _document_record(),
             [_embedded_chunk()],
-            _chunking_metadata(),
+            _chunking_config(),
             embedding_model_id=7,
         )
 
@@ -115,7 +110,7 @@ def test_insert_document_rejects_a_document_without_chunks() -> None:
             session,
             _document_record(),
             [],
-            _chunking_metadata(),
+            _chunking_config(),
             embedding_model_id=7,
         )
 
@@ -132,7 +127,7 @@ def test_insert_document_adds_the_complete_aggregate() -> None:
         session,
         _document_record(collection='tour-guides'),
         [_embedded_chunk()],
-        _chunking_metadata(),
+        _chunking_config(),
         embedding_model_id=7,
     )
 

@@ -5,6 +5,7 @@ from typing import Any
 
 from ai_tour_guide.domain.chunks import Chunk
 from ai_tour_guide.domain.sections import compute_section_id
+from ai_tour_guide.ingestion.config import ChunkingConfig
 
 _SENTENCE_BOUNDARY_RE = re.compile(r'(?<=[.!?])\s+')
 _WHITESPACE_RE = re.compile(r'\s+')
@@ -271,10 +272,8 @@ def _text_limits(
 
 def chunk_document(
     document: dict[str, Any],
-    target_chars: int,
-    max_chars: int,
-    min_depth: int,
-    max_depth: int,
+    *,
+    config: ChunkingConfig,
 ) -> list[Chunk]:
     """
     Convert parser JSON into structure-aware chunks.
@@ -284,17 +283,6 @@ def chunk_document(
     paragraphs are split at sentence or word boundaries. The hard limit applies
     to embedding_text, including the document title and section breadcrumb.
     """
-    if target_chars <= 0:
-        raise ValueError('target_chars must be greater than zero')
-    if max_chars <= 0:
-        raise ValueError('max_chars must be greater than zero')
-    if target_chars > max_chars:
-        raise ValueError('target_chars must be less than or equal to max_chars')
-    if min_depth <= 0:
-        raise ValueError('min_depth must be greater than zero')
-    if max_depth < min_depth:
-        raise ValueError('max_depth must be greater than or equal to min_depth')
-
     document_title = _document_title(document)
     slug = _document_slug(document_title)
     chunks: list[Chunk] = []
@@ -317,13 +305,17 @@ def chunk_document(
         )
         section_id = compute_section_id(
             current_heading_path,
-            min_depth=min_depth,
-            max_depth=max_depth,
+            min_depth=(
+                0
+                if config.section_chunk_min_depth is None
+                else config.section_chunk_min_depth
+            ),
+            max_depth=config.section_chunk_max_depth,
         )
         text_target_chars, text_max_chars = _text_limits(
             section_path,
-            target_chars,
-            max_chars,
+            config.target_chars,
+            config.max_chars,
         )
 
         raw_paragraphs = section.get('paragraphs') or []

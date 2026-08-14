@@ -225,11 +225,11 @@ documents = Table(
         Integer,
     ),
     Column(
-        'section_min_depth',
+        'section_chunk_min_depth',
         Integer,
     ),
     Column(
-        'section_max_depth',
+        'section_chunk_max_depth',
         Integer,
     ),
     Column(

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.knowledge_base.connection import create_database_engine
 from ai_tour_guide.knowledge_base.models import (
     DocumentRow,
@@ -71,7 +71,7 @@ def insert_document(
     session: Session,
     document: DocumentRecord,
     chunks: Sequence[EmbeddedChunk],
-    chunking: ChunkingMetadata,
+    chunking: ChunkingConfig,
     *,
     embedding_model_id: int,
 ) -> DocumentRow:
@@ -110,7 +110,7 @@ def _is_document_identity_violation(exc: IntegrityError) -> bool:
 def insert_document_with_chunks(
     document: DocumentRecord,
     chunks: Sequence[EmbeddedChunk],
-    chunking_metadata: ChunkingMetadata,
+    chunking_metadata: ChunkingConfig,
     embedding_metadata: EmbeddingMetadata,
 ) -> int:
     """Persist a fully embedded document atomically and return its ID."""

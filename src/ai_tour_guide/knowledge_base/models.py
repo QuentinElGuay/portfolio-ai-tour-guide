@@ -14,7 +14,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.knowledge_base.tables import (
     document_chunks,
     documents,
@@ -92,8 +92,8 @@ class DocumentRow(Base):
     chunking_version: Mapped[str | None]
     target_chunk_chars: Mapped[int | None]
     max_chunk_chars: Mapped[int | None]
-    section_min_depth: Mapped[int | None]
-    section_max_depth: Mapped[int | None]
+    section_chunk_min_depth: Mapped[int | None]
+    section_chunk_max_depth: Mapped[int | None]
     target_chunk_tokens: Mapped[int | None]
     max_chunk_tokens: Mapped[int | None]
     chunk_overlap_tokens: Mapped[int | None]
@@ -171,7 +171,7 @@ class ModelFactory:
         document: DocumentRecord,
         *,
         embedding_model_id: int,
-        chunking: ChunkingMetadata,
+        chunking: ChunkingConfig,
         chunks: Sequence[EmbeddedChunk] = (),
     ) -> DocumentRow:
         """Create a document row with child chunk rows ready for a session.
@@ -203,8 +203,8 @@ class ModelFactory:
             source_checksum=document.source_checksum,
             target_chunk_chars=chunking.target_chars,
             max_chunk_chars=chunking.max_chars,
-            section_min_depth=chunking.min_depth,
-            section_max_depth=chunking.max_depth,
+            section_chunk_min_depth=chunking.section_chunk_min_depth,
+            section_chunk_max_depth=chunking.section_chunk_max_depth,
         )
         row.chunks = [ModelFactory.create_chunk(chunk) for chunk in chunks]
         return row

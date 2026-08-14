@@ -27,15 +27,15 @@ from ai_tour_guide.ingestion.settings import IngestionSettings
 )
 @click.option('--target-chars', type=click.IntRange(min=1), default=None)
 @click.option('--max-chars', type=click.IntRange(min=1), default=None)
-@click.option('--min-depth', type=click.IntRange(min=1), default=None)
-@click.option('--max-depth', type=click.IntRange(min=1), default=None)
+@click.option('--section-chunk-min-depth', type=click.IntRange(min=0), default=None)
+@click.option('--section-chunk-max-depth', type=click.IntRange(min=0), default=None)
 def chunk_command(
     input_path: Path,
     output_path: Path,
     target_chars: int | None,
     max_chars: int | None,
-    min_depth: int | None,
-    max_depth: int | None,
+    section_chunk_min_depth: int | None,
+    section_chunk_max_depth: int | None,
 ) -> None:
     """Read PARSED_DOCUMENT JSON and write CHUNKED_DOCUMENT JSON."""
     try:
@@ -45,18 +45,15 @@ def chunk_command(
                 for key, value in {
                     'target_chars': target_chars,
                     'max_chars': max_chars,
-                    'min_depth': min_depth,
-                    'max_depth': max_depth,
+                    'section_chunk_min_depth': section_chunk_min_depth,
+                    'section_chunk_max_depth': section_chunk_max_depth,
                 }.items()
                 if value is not None
             }
         )
         result = chunk_document_stage(
             PARSED_DOCUMENT_JSON.read(input_path),
-            target_chars=settings.target_chars,
-            max_chars=settings.max_chars,
-            min_depth=settings.min_depth,
-            max_depth=settings.max_depth,
+            config=settings.chunking_config,
         )
         destination = CHUNKED_DOCUMENT_JSON.write(result, output_path)
     except (OSError, RuntimeError, TypeError, ValueError, ValidationError) as exc:

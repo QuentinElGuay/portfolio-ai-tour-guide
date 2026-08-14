@@ -3,10 +3,9 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.constants import (
     DEFAULT_MAX_CHARS,
-    DEFAULT_SECTION_MAX_DEPTH,
-    DEFAULT_SECTION_MIN_DEPTH,
     DEFAULT_TARGET_CHARS,
 )
 
@@ -28,11 +27,15 @@ class IngestionSettings(BaseSettings):
     debug: bool = False
     target_chars: int = Field(default=DEFAULT_TARGET_CHARS, gt=0)
     max_chars: int = Field(default=DEFAULT_MAX_CHARS, gt=0)
-    min_depth: int = Field(default=DEFAULT_SECTION_MIN_DEPTH, gt=0)
-    max_depth: int = Field(default=DEFAULT_SECTION_MAX_DEPTH, gt=0)
+    section_chunk_min_depth: int | None = Field(default=None, ge=0)
+    section_chunk_max_depth: int | None = Field(default=None, ge=0)
 
-    def model_post_init(self, __context: object, /) -> None:
-        if self.target_chars > self.max_chars:
-            raise ValueError('target_chars must be less than or equal to max_chars')
-        if self.max_depth < self.min_depth:
-            raise ValueError('max_depth must be greater than or equal to min_depth')
+    @property
+    def chunking_config(self) -> ChunkingConfig:
+        """Return the chunking configuration resolved from settings."""
+        return ChunkingConfig(
+            target_chars=self.target_chars,
+            max_chars=self.max_chars,
+            section_chunk_min_depth=self.section_chunk_min_depth,
+            section_chunk_max_depth=self.section_chunk_max_depth,
+        )
