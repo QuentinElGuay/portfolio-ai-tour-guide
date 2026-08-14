@@ -225,6 +225,14 @@ documents = Table(
         Integer,
     ),
     Column(
+        'section_chunk_min_depth',
+        Integer,
+    ),
+    Column(
+        'section_chunk_max_depth',
+        Integer,
+    ),
+    Column(
         'target_chunk_tokens',
         Integer,
     ),
@@ -342,6 +350,14 @@ document_chunks = Table(
         nullable=False,
     ),
     Column(
+        'section_id',
+        Text,
+    ),
+    Column(
+        'section_chunk_index',
+        Integer,
+    ),
+    Column(
         'section_path',
         ARRAY(Text),
         nullable=False,
@@ -419,6 +435,10 @@ document_chunks = Table(
         name='ck_document_chunks_index_positive',
     ),
     CheckConstraint(
+        'section_chunk_index IS NULL OR section_chunk_index >= 0',
+        name='ck_document_chunks_section_index_positive',
+    ),
+    CheckConstraint(
         'character_count > 0',
         name='ck_document_chunks_character_count_positive',
     ),
@@ -463,6 +483,13 @@ Index(
     'ix_document_chunks_search_vector',
     document_chunks.c.search_vector,
     postgresql_using='gin',
+)
+
+Index(
+    'ix_document_chunks_section_order',
+    document_chunks.c.document_id,
+    document_chunks.c.section_id,
+    document_chunks.c.section_chunk_index,
 )
 
 # Each supported distance metric needs its own operator class and ANN index.

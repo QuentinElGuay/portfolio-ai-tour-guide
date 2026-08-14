@@ -3,7 +3,8 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import inspect
 
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
+from ai_tour_guide.ingestion.constants import DEFAULT_MAX_CHARS, DEFAULT_TARGET_CHARS
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
@@ -47,8 +48,13 @@ def _document_record(
     )
 
 
-def _chunking_metadata() -> ChunkingMetadata:
-    return ChunkingMetadata(target_chars=750, max_chars=1_000)
+def _chunking_config() -> ChunkingConfig:
+    return ChunkingConfig(
+        target_chars=DEFAULT_TARGET_CHARS,
+        max_chars=DEFAULT_MAX_CHARS,
+        section_chunk_min_depth=None,
+        section_chunk_max_depth=None,
+    )
 
 
 def _embedded_chunk() -> EmbeddedChunk:
@@ -57,6 +63,8 @@ def _embedded_chunk() -> EmbeddedChunk:
             chunk_id='brittany:chunk-0001',
             document_title='A guide to Brittany',
             section_path=('Brittany', 'Coast'),
+            section_id='section-sha256',
+            section_chunk_index=2,
             text='Visit the coast.',
             embedding_text='Brittany\nCoast\n\nVisit the coast.',
             page_start=2,
@@ -73,7 +81,7 @@ def test_create_document_preserves_document_field_names() -> None:
     row = ModelFactory.create_document(
         _document_record(),
         embedding_model_id=7,
-        chunking=_chunking_metadata(),
+        chunking=_chunking_config(),
     )
 
     assert isinstance(row, DocumentRow)
@@ -92,6 +100,8 @@ def test_create_document_preserves_document_field_names() -> None:
     assert row.source_page_count == 12
     assert row.page_count == 11
     assert row.source_checksum == 'document-sha256'
+    assert row.section_chunk_min_depth is None
+    assert row.section_chunk_max_depth is None
     assert 'document_id' not in row.__dict__
     assert 'created_at' not in row.__dict__
 
@@ -101,7 +111,7 @@ def test_create_document_attaches_mapped_chunk_rows() -> None:
         _document_record(),
         embedding_model_id=7,
         chunks=[_embedded_chunk()],
-        chunking=_chunking_metadata(),
+        chunking=_chunking_config(),
     )
 
     assert len(row.chunks) == 1
@@ -111,6 +121,8 @@ def test_create_document_attaches_mapped_chunk_rows() -> None:
     assert chunk_row.chunk_id == 'brittany:chunk-0001'
     assert chunk_row.chunk_index == 0
     assert chunk_row.section_path == ['Brittany', 'Coast']
+    assert chunk_row.section_id == 'section-sha256'
+    assert chunk_row.section_chunk_index == 2
     assert chunk_row.text == 'Visit the coast.'
     assert chunk_row.embedding_text == 'Brittany\nCoast\n\nVisit the coast.'
     assert chunk_row.page_start == 2
@@ -157,7 +169,7 @@ def test_document_collection_is_optional() -> None:
     row = ModelFactory.create_document(
         _document_record(collection=None),
         embedding_model_id=7,
-        chunking=_chunking_metadata(),
+        chunking=_chunking_config(),
     )
 
     assert row.collection is None

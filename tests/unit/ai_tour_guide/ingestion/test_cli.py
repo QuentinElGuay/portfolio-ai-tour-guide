@@ -8,6 +8,7 @@ from click.testing import CliRunner
 
 from ai_tour_guide.ingestion import pipeline
 from ai_tour_guide.ingestion.cli import main
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
 from ai_tour_guide.ingestion.settings import IngestionSettings
 
@@ -93,8 +94,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
         ),
         embedder=embedder,
         embedding_batch_size=8,
-        target_chars=500,
-        max_chars=700,
+        chunking_config=ChunkingConfig(500, 700, 1, 2),
     )
 
     assert result == 42
@@ -102,8 +102,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
     parse_stage.assert_called_once_with(downloaded)
     chunk_stage.assert_called_once_with(
         parsed,
-        target_chars=500,
-        max_chars=700,
+        config=ChunkingConfig(500, 700, 1, 2),
     )
     embed_stage.assert_called_once_with(
         chunked,

@@ -8,6 +8,7 @@ from typing import Any
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.pdf.parser import (
     IngestionDocument,
     ParsedParagraph,
@@ -266,33 +267,12 @@ class ParsedDocumentArtifact:
 
 
 @dataclass(frozen=True, slots=True)
-class ChunkingMetadata:
-    """Effective chunking configuration."""
-
-    target_chars: int
-    max_chars: int
-
-    def to_dict(self) -> dict[str, int]:
-        return {
-            'target_chars': self.target_chars,
-            'max_chars': self.max_chars,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> ChunkingMetadata:
-        return cls(
-            target_chars=int(data['target_chars']),
-            max_chars=int(data['max_chars']),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class ChunkedDocumentArtifact:
     """Persistence-ready document plus unembedded retrieval chunks."""
 
     document: DocumentRecord
     chunks: tuple[Chunk, ...]
-    chunking: ChunkingMetadata
+    chunking: ChunkingConfig
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -315,7 +295,7 @@ class ChunkedDocumentArtifact:
                 Chunk.from_dict(_require_mapping(chunk, field_name='chunk'))
                 for chunk in chunks
             ),
-            chunking=ChunkingMetadata.from_dict(
+            chunking=ChunkingConfig.from_dict(
                 _require_mapping(data.get('chunking'), field_name='chunking')
             ),
         )
@@ -327,7 +307,7 @@ class EmbeddedDocumentArtifact:
 
     document: DocumentRecord
     chunks: tuple[EmbeddedChunk, ...]
-    chunking: ChunkingMetadata
+    chunking: ChunkingConfig
     embedding: EmbeddingMetadata
 
     def to_dict(self) -> dict[str, Any]:
@@ -376,7 +356,7 @@ class EmbeddedDocumentArtifact:
                 _require_mapping(data.get('document'), field_name='document')
             ),
             chunks=tuple(embedded_chunks),
-            chunking=ChunkingMetadata.from_dict(
+            chunking=ChunkingConfig.from_dict(
                 _require_mapping(
                     data.get('chunking'),
                     field_name='chunking',
@@ -391,7 +371,6 @@ class EmbeddedDocumentArtifact:
 __all__ = [
     'ARTIFACT_SCHEMA_VERSION',
     'ChunkedDocumentArtifact',
-    'ChunkingMetadata',
     'DownloadedPdf',
     'EmbeddedDocumentArtifact',
     'ParsedDocumentArtifact',

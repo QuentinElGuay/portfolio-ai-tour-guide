@@ -27,15 +27,19 @@ LOGGER = logging.getLogger(__name__)
 )
 @click.option('--timeout', type=click.FloatRange(min=0.1), default=None)
 @click.option('--debug/--no-debug', default=None)
-@click.option('--target-chars', type=click.IntRange(min=1), default=750)
-@click.option('--max-chars', type=click.IntRange(min=1), default=1_000)
+@click.option('--target-chars', type=click.IntRange(min=1), default=None)
+@click.option('--max-chars', type=click.IntRange(min=1), default=None)
+@click.option('--section-chunk-min-depth', type=click.IntRange(min=0), default=None)
+@click.option('--section-chunk-max-depth', type=click.IntRange(min=0), default=None)
 def run_command(
     documents: TextIO,
     tmp_folder: Path | None,
     timeout: float | None,
     debug: bool | None,
-    target_chars: int,
-    max_chars: int,
+    target_chars: int | None,
+    max_chars: int | None,
+    section_chunk_min_depth: int | None,
+    section_chunk_max_depth: int | None,
 ) -> None:
     """Run all ingestion stages sequentially for one or more DOCUMENTS."""
     try:
@@ -46,6 +50,10 @@ def run_command(
                 'tmp_folder': tmp_folder,
                 'timeout': timeout,
                 'debug': debug,
+                'target_chars': target_chars,
+                'max_chars': max_chars,
+                'section_chunk_min_depth': section_chunk_min_depth,
+                'section_chunk_max_depth': section_chunk_max_depth,
             }.items()
             if value is not None
         }
@@ -67,8 +75,7 @@ def run_command(
             settings=ingestion_settings,
             embedder=embedder,
             embedding_batch_size=embedding_settings.batch_size,
-            target_chars=target_chars,
-            max_chars=max_chars,
+            chunking_config=ingestion_settings.chunking_config,
         )
     except (
         OSError,

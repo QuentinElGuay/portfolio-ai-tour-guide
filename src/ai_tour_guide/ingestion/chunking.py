@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_tour_guide.domain.chunks import Chunk
+from ai_tour_guide.domain.sections import compute_section_id
+from ai_tour_guide.ingestion.config import ChunkingConfig
 
 _SENTENCE_BOUNDARY_RE = re.compile(r'(?<=[.!?])\s+')
 _WHITESPACE_RE = re.compile(r'\s+')
@@ -270,8 +272,8 @@ def _text_limits(
 
 def chunk_document(
     document: dict[str, Any],
-    target_chars: int = 750,
-    max_chars: int = 1_000,
+    *,
+    config: ChunkingConfig,
 ) -> list[Chunk]:
     """
     Convert parser JSON into structure-aware chunks.
@@ -281,24 +283,39 @@ def chunk_document(
     paragraphs are split at sentence or word boundaries. The hard limit applies
     to embedding_text, including the document title and section breadcrumb.
     """
-    if target_chars <= 0:
-        raise ValueError('target_chars must be greater than zero')
-    if max_chars <= 0:
-        raise ValueError('max_chars must be greater than zero')
-    if target_chars > max_chars:
-        raise ValueError('target_chars must be less than or equal to max_chars')
-
     document_title = _document_title(document)
     slug = _document_slug(document_title)
     chunks: list[Chunk] = []
+    section_chunk_indexes: dict[str, int] = {}
 
-    def visit(section: dict[str, Any], parent_path: tuple[str, ...]) -> None:
+    def chunk_section_and_descendants(
+        section: dict[str, Any],
+        parent_path: tuple[str, ...],
+        heading_path: tuple[tuple[int, str], ...],
+        inferred_level: int,
+    ) -> None:
         title = _normalize_text(section.get('title'))
         section_path = parent_path + ((title,) if title else ())
+        raw_level = section.get('level')
+        level = int(raw_level) if raw_level is not None else inferred_level
+        if level <= 0:
+            raise ValueError('section.level must be greater than zero')
+        current_heading_path = (
+            heading_path + ((level, title),) if title else heading_path
+        )
+        section_id = compute_section_id(
+            current_heading_path,
+            min_depth=(
+                0
+                if config.section_chunk_min_depth is None
+                else config.section_chunk_min_depth
+            ),
+            max_depth=config.section_chunk_max_depth,
+        )
         text_target_chars, text_max_chars = _text_limits(
             section_path,
-            target_chars,
-            max_chars,
+            config.target_chars,
+            config.max_chars,
         )
 
         raw_paragraphs = section.get('paragraphs') or []
@@ -311,11 +328,17 @@ def chunk_document(
             max_chars=text_max_chars,
         ):
             chunk_index = len(chunks)
+            section_chunk_index = None
+            if section_id is not None:
+                section_chunk_index = section_chunk_indexes.get(section_id, 0)
+                section_chunk_indexes[section_id] = section_chunk_index + 1
             chunks.append(
                 Chunk(
                     chunk_id=f'{slug}:chunk-{chunk_index:04d}',
                     document_title=document_title,
                     section_path=section_path,
+                    section_id=section_id,
+                    section_chunk_index=section_chunk_index,
                     text=text,
                     embedding_text=_embedding_text(section_path, text),
                     page_start=page_start,
@@ -332,7 +355,12 @@ def chunk_document(
         for subsection in subsections:
             if not isinstance(subsection, dict):
                 raise TypeError('Each subsection must be an object')
-            visit(subsection, section_path)
+            chunk_section_and_descendants(
+                subsection,
+                section_path,
+                current_heading_path,
+                level + 1,
+            )
 
     sections = document.get('sections') or []
     if not isinstance(sections, list):
@@ -341,6 +369,6 @@ def chunk_document(
     for section in sections:
         if not isinstance(section, dict):
             raise TypeError('Each section must be an object')
-        visit(section, (document_title,))
+        chunk_section_and_descendants(section, (document_title,), (), 1)
 
     return chunks

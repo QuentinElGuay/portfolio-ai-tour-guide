@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
+from ai_tour_guide.ingestion.constants import DEFAULT_MAX_CHARS, DEFAULT_TARGET_CHARS
 
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
@@ -46,8 +47,13 @@ def _document_record(*, collection: str | None = None) -> DocumentRecord:
     )
 
 
-def _chunking_metadata() -> ChunkingMetadata:
-    return ChunkingMetadata(target_chars=750, max_chars=1_000)
+def _chunking_config() -> ChunkingConfig:
+    return ChunkingConfig(
+        target_chars=DEFAULT_TARGET_CHARS,
+        max_chars=DEFAULT_MAX_CHARS,
+        section_chunk_min_depth=None,
+        section_chunk_max_depth=None,
+    )
 
 
 def _embedded_chunk() -> EmbeddedChunk:
@@ -56,6 +62,8 @@ def _embedded_chunk() -> EmbeddedChunk:
             chunk_id='chunk-0001',
             document_title='A guide to Brittany',
             section_path=('Coast',),
+            section_id='section-sha256',
+            section_chunk_index=0,
             text='Visit the coast.',
             embedding_text='Coast\n\nVisit the coast.',
             page_start=2,
@@ -86,7 +94,7 @@ def test_insert_document_rejects_an_existing_document_without_changes() -> None:
             session,
             _document_record(),
             [_embedded_chunk()],
-            _chunking_metadata(),
+            _chunking_config(),
             embedding_model_id=7,
         )
 
@@ -102,7 +110,7 @@ def test_insert_document_rejects_a_document_without_chunks() -> None:
             session,
             _document_record(),
             [],
-            _chunking_metadata(),
+            _chunking_config(),
             embedding_model_id=7,
         )
 
@@ -119,7 +127,7 @@ def test_insert_document_adds_the_complete_aggregate() -> None:
         session,
         _document_record(collection='tour-guides'),
         [_embedded_chunk()],
-        _chunking_metadata(),
+        _chunking_config(),
         embedding_model_id=7,
     )
 

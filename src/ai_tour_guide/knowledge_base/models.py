@@ -14,7 +14,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
-from ai_tour_guide.ingestion.artifacts import ChunkingMetadata
+from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.knowledge_base.tables import (
     document_chunks,
     documents,
@@ -92,6 +92,8 @@ class DocumentRow(Base):
     chunking_version: Mapped[str | None]
     target_chunk_chars: Mapped[int | None]
     max_chunk_chars: Mapped[int | None]
+    section_chunk_min_depth: Mapped[int | None]
+    section_chunk_max_depth: Mapped[int | None]
     target_chunk_tokens: Mapped[int | None]
     max_chunk_tokens: Mapped[int | None]
     chunk_overlap_tokens: Mapped[int | None]
@@ -128,6 +130,8 @@ class DocumentChunkRow(Base):
     document_id: Mapped[int]
     chunk_id: Mapped[str]
     chunk_index: Mapped[int]
+    section_id: Mapped[str | None]
+    section_chunk_index: Mapped[int | None]
     section_path: Mapped[list[str]]
     text: Mapped[str]
     embedding_text: Mapped[str]
@@ -167,7 +171,7 @@ class ModelFactory:
         document: DocumentRecord,
         *,
         embedding_model_id: int,
-        chunking: ChunkingMetadata,
+        chunking: ChunkingConfig,
         chunks: Sequence[EmbeddedChunk] = (),
     ) -> DocumentRow:
         """Create a document row with child chunk rows ready for a session.
@@ -199,6 +203,8 @@ class ModelFactory:
             source_checksum=document.source_checksum,
             target_chunk_chars=chunking.target_chars,
             max_chunk_chars=chunking.max_chars,
+            section_chunk_min_depth=chunking.section_chunk_min_depth,
+            section_chunk_max_depth=chunking.section_chunk_max_depth,
         )
         row.chunks = [ModelFactory.create_chunk(chunk) for chunk in chunks]
         return row
@@ -211,6 +217,8 @@ class ModelFactory:
         return DocumentChunkRow(
             chunk_id=source.chunk_id,
             chunk_index=source.chunk_index,
+            section_id=source.section_id,
+            section_chunk_index=source.section_chunk_index,
             section_path=list(source.section_path),
             text=source.text,
             embedding_text=source.embedding_text,

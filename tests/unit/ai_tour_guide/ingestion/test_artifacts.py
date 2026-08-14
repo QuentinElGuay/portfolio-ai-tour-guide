@@ -10,11 +10,15 @@ from ai_tour_guide.domain.documents import DocumentMetadata, DocumentRecord
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.ingestion.artifacts import (
     ChunkedDocumentArtifact,
-    ChunkingMetadata,
     EmbeddedDocumentArtifact,
     ParsedDocumentArtifact,
 )
 from ai_tour_guide.ingestion.cli import main
+from ai_tour_guide.ingestion.config import ChunkingConfig
+from ai_tour_guide.ingestion.constants import (
+    DEFAULT_MAX_CHARS,
+    DEFAULT_TARGET_CHARS,
+)
 from ai_tour_guide.ingestion.pdf.parser import (
     IngestionDocument,
     ParsedParagraph,
@@ -114,7 +118,12 @@ def _parsed_artifact() -> ParsedDocumentArtifact:
             ChunkedDocumentArtifact(
                 document=_document_record(),
                 chunks=(_chunk(),),
-                chunking=ChunkingMetadata(target_chars=750, max_chars=1_000),
+                chunking=ChunkingConfig(
+                    target_chars=DEFAULT_TARGET_CHARS,
+                    max_chars=DEFAULT_MAX_CHARS,
+                    section_chunk_min_depth=None,
+                    section_chunk_max_depth=None,
+                ),
             ),
         ),
         (
@@ -129,9 +138,11 @@ def _parsed_artifact() -> ParsedDocumentArtifact:
                     ),
                 ),
                 chunking=(
-                    ChunkingMetadata(
-                        target_chars=750,
-                        max_chars=1_000,
+                    ChunkingConfig(
+                        target_chars=DEFAULT_TARGET_CHARS,
+                        max_chars=DEFAULT_MAX_CHARS,
+                        section_chunk_min_depth=None,
+                        section_chunk_max_depth=None,
                     )
                 ),
                 embedding=EmbeddingMetadata(
@@ -214,4 +225,4 @@ def test_chunk_command_reads_and_writes_self_contained_artifacts(
     assert artifact.document.collection == 'tour-guides'
     assert artifact.document.source_checksum == 'source-sha256'
     assert len(artifact.chunks) == 1
-    assert artifact.chunking == ChunkingMetadata(100, 200)
+    assert artifact.chunking == ChunkingConfig(100, 200, None, None)
