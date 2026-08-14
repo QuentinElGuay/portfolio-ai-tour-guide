@@ -7,42 +7,39 @@ from typing import Protocol
 import httpx
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
+from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
+
+SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
 
 
 def create_backend() -> ChatBackend:
-    """Create the HTTP backend configured for the running chat service."""
     api_url = os.getenv('CHAT_API_URL')
-
     if api_url:
         return HttpChatBackend(api_url=api_url)
-
-    raise RuntimeError(
-        'CHAT_API_URL is required to run the chat service. '
-        'Inject DemoBackend when developing the interface.'
-    )
+    return DemoBackend()
 
 
 class ChatBackend(Protocol):
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
-        """Return an assistant response for the complete conversation."""
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]: ...
 
 
 class DemoBackend:
-    """Development backend used only when no backend is injected."""
+    """Development fallback with the same payload contract as the API."""
 
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
-        return LLM_CONFIGURATION_REQUIRED_ANSWER
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+        return {
+            'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
+            'answer': NO_BACKEND_AVAILABLE_ANSWER,
+            'sources': [],
+        }
 
 
 class HttpChatBackend:
-    """Adapter from the chat interface to the agent HTTP API."""
-
     def __init__(self, api_url: str, timeout_seconds: float = 60.0) -> None:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
         question = next(
             (
                 message['content']
@@ -53,31 +50,36 @@ class HttpChatBackend:
         )
         if not question.strip():
             raise RuntimeError('The conversation does not contain a user question.')
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.api_url,
-                    json={'question': question},
-                )
+                response = await client.post(self.api_url, json={'question': question})
                 response.raise_for_status()
         except httpx.ConnectError as exc:
-            raise RuntimeError(
-                'Unable to connect to the chat API. '
-                'Make sure the backend is running and CHAT_API_URL is correct.'
-            ) from exc
+            raise RuntimeError('Unable to connect to the chat API.') from exc
         except httpx.HTTPStatusError as exc:
-            detail = exc.response.text[:500]
             raise RuntimeError(
-                f'The chat API returned HTTP {exc.response.status_code}: {detail}'
+                f'The chat API returned HTTP {exc.response.status_code}.'
             ) from exc
         except httpx.HTTPError as exc:
             raise RuntimeError(f'Chat API request failed: {exc}') from exc
-
         try:
             payload = response.json()
             answer = payload['answer']
             sources = payload.get('sources', [])
+
+            if not isinstance(payload, dict):
+                raise TypeError
+
+            if payload.get('schema_version') != SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION:
+                raise RuntimeError(
+                    'The chat API returned an unsupported schema version.'
+                )
+
+            if not isinstance(payload.get('answer'), str) or not isinstance(
+                payload.get('sources'), list
+            ):
+                raise TypeError
+
         except (ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(
                 "Invalid API response. Expected {'answer': '...', 'sources': [...]}."

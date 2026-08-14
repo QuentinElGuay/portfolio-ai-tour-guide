@@ -1,74 +1,85 @@
-"""Versioned golden-dataset loading utilities."""
-
-from __future__ import annotations
+"""Golden-dataset loading utilities."""
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_DATASET_ROOT = Path("evaluation/datasets")
-GOLDEN_DATASET_FILENAME = "golden_dataset.jsonl"
+DEFAULT_DATASET_ROOT = Path('evaluation/datasets')
+GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
 
 
 @dataclass(frozen=True, slots=True)
-class RetrievalExpectation:
-    relevant_chunk_ids: tuple[str, ...]
+class SourceExpectation:
+    source_url: str
+    version: str | None
+    pages: tuple[int, ...]
+    section_paths: tuple[tuple[str, ...], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ExpectedOutcome:
+    answerable: bool
+    reference_answer: str | None
+    relevant_sources: tuple[SourceExpectation, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class GoldenCase:
-    case_id: str
+    case_id: int
     question: str
-    retrieval: RetrievalExpectation
-    # TODO: Add generation expectations when the RAG evaluation schema is
-    # finalized (for example required facts, a reference answer, or judge rules).
+    category: str
+    expected: ExpectedOutcome
 
 
-def golden_dataset_directory(
-    version: int,
-    *,
-    root: Path = DEFAULT_DATASET_ROOT,
-) -> Path:
-    """Return the directory containing one golden-dataset version."""
-    if version <= 0:
-        raise ValueError("version must be a positive integer")
-    return root / f"v{version}"
-
-
-def golden_dataset_path(
-    version: int,
-    *,
-    root: Path = DEFAULT_DATASET_ROOT,
-) -> Path:
-    """Return the expected JSONL path for one golden-dataset version."""
-    return golden_dataset_directory(version, root=root) / GOLDEN_DATASET_FILENAME
+def golden_dataset_path(*, root: Path = DEFAULT_DATASET_ROOT) -> Path:
+    """Return the path to the unversioned golden dataset."""
+    return root / GOLDEN_DATASET_FILENAME
 
 
 def load_golden_dataset(
-    version: int,
     *,
     root: Path = DEFAULT_DATASET_ROOT,
 ) -> list[GoldenCase]:
-    """Load retrieval expectations from ``root/v{version}/golden_dataset.jsonl``."""
-    path = golden_dataset_path(version, root=root)
+    """Load document/page and answer expectations from a JSONL dataset."""
+    path = golden_dataset_path(root=root)
     cases: list[GoldenCase] = []
 
-    with path.open(encoding="utf-8") as file:
+    with path.open(encoding='utf-8') as file:
         for line_number, line in enumerate(file, start=1):
             if not line.strip():
                 continue
 
             raw = json.loads(line)
             try:
-                relevant_chunk_ids = tuple(raw["retrieval"]["relevant_chunk_ids"])
+                case_id = raw['id']
+                if not isinstance(case_id, int) or isinstance(case_id, bool):
+                    raise TypeError('id must be an integer')
+                expected = raw['expected']
+                relevant_sources = tuple(
+                    SourceExpectation(
+                        source_url=source['source_url'],
+                        version=source['version'],
+                        pages=tuple(source['pages']),
+                        section_paths=tuple(
+                            tuple(section_path)
+                            for section_path in source.get('section_paths', [])
+                        ),
+                    )
+                    for source in expected['relevant_sources']
+                )
                 case = GoldenCase(
-                    case_id=raw["id"],
-                    question=raw["question"],
-                    retrieval=RetrievalExpectation(relevant_chunk_ids=relevant_chunk_ids),
+                    case_id=case_id,
+                    question=raw['question'],
+                    category=raw['category'],
+                    expected=ExpectedOutcome(
+                        answerable=expected['answerable'],
+                        reference_answer=expected['reference_answer'],
+                        relevant_sources=relevant_sources,
+                    ),
                 )
             except (KeyError, TypeError) as exc:
                 raise ValueError(
-                    f"Invalid golden dataset row at {path}:{line_number}"
+                    f'Invalid golden dataset row at {path}:{line_number}'
                 ) from exc
 
             cases.append(case)

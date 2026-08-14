@@ -32,8 +32,10 @@ def test_openai_settings_reads_the_agent_api_key_from_environment(
     assert settings.model == 'test-model'
 
 
-def test_openai_client_sends_messages_and_returns_output_text() -> None:
-    response = SimpleNamespace(output_text='A grounded answer.')
+def test_openai_client_sends_messages_and_returns_structured_output() -> None:
+    response = SimpleNamespace(
+        output_text='{"answer": "A grounded answer.", "citations": []}'
+    )
     client = MagicMock()
     client.responses.create = AsyncMock(return_value=response)
     settings = OpenAISettings(
@@ -45,16 +47,18 @@ def test_openai_client_sends_messages_and_returns_output_text() -> None:
         {'role': 'user', 'content': 'What should I visit?'},
     ]
 
-    result = asyncio.run(OpenAIClient(settings, client=client).generate_reply(messages))
-
-    assert result == 'A grounded answer.'
-    client.responses.create.assert_awaited_once_with(
-        model='test-model',
-        input=[
-            {'role': 'system', 'content': 'Use the context.'},
-            {'role': 'user', 'content': 'What should I visit?'},
-        ],
+    result = asyncio.run(
+        OpenAIClient(settings, client=client).answer_question(messages)
     )
+
+    assert result.answer == 'A grounded answer.'
+    request = client.responses.create.await_args.kwargs
+    assert request['model'] == 'test-model'
+    assert request['input'] == [
+        {'role': 'system', 'content': 'Use the context.'},
+        {'role': 'user', 'content': 'What should I visit?'},
+    ]
+    assert request['text']['format']['type'] == 'json_schema'
 
 
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:

@@ -1,19 +1,14 @@
-import os
 from datetime import UTC, date, datetime
 
 from sqlalchemy import inspect
-
-from ai_tour_guide.ingestion.config import ChunkingConfig
-from ai_tour_guide.ingestion.constants import DEFAULT_MAX_CHARS, DEFAULT_TARGET_CHARS
-
-os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
-os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
 from ai_tour_guide.domain.chunks import Chunk, EmbeddedChunk
 from ai_tour_guide.domain.documents import (
     DocumentMetadata,
     DocumentRecord,
 )
+from ai_tour_guide.ingestion.config import ChunkingConfig
+from ai_tour_guide.ingestion.constants import DEFAULT_MAX_CHARS, DEFAULT_TARGET_CHARS
 from ai_tour_guide.knowledge_base.models import (
     DocumentChunkRow,
     DocumentRow,
@@ -180,11 +175,14 @@ def test_document_collection_is_optional() -> None:
     assert DocumentRow.__table__.c.collection.nullable is True
 
 
-def test_document_source_url_is_globally_unique() -> None:
+def test_document_source_url_and_version_are_globally_unique() -> None:
     constraint = next(
         constraint
         for constraint in DocumentRow.__table__.constraints
-        if constraint.name == 'uq_documents_source_url'
+        if constraint.name == 'uq_documents_source_url_version'
     )
 
-    assert tuple(column.name for column in constraint.columns) == ('source_url',)
+    assert tuple(column.name for column in constraint.columns) == (
+        'source_url',
+        'version',
+    )

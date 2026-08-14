@@ -82,12 +82,14 @@ def insert_document(
     existing_document_id = session.scalar(
         select(DocumentRow.document_id).where(
             DocumentRow.source_url == document.metadata.source_url,
+            DocumentRow.version == document.version,
         )
     )
 
     if existing_document_id is not None:
         raise DocumentAlreadyExistsError(
-            f'Document already exists for source URL {document.metadata.source_url!r}'
+            'Document already exists for source identity '
+            f'({document.metadata.source_url!r}, {document.version!r})'
         )
 
     row = ModelFactory.create_document(
@@ -104,7 +106,10 @@ def insert_document(
 
 def _is_document_identity_violation(exc: IntegrityError) -> bool:
     diagnostic = getattr(exc.orig, 'diag', None)
-    return getattr(diagnostic, 'constraint_name', None) == 'uq_documents_source_url'
+    return (
+        getattr(diagnostic, 'constraint_name', None)
+        == 'uq_documents_source_url_version'
+    )
 
 
 def insert_document_with_chunks(
@@ -134,8 +139,8 @@ def insert_document_with_chunks(
             except IntegrityError as exc:
                 if _is_document_identity_violation(exc):
                     raise DocumentAlreadyExistsError(
-                        'Document was inserted concurrently for source URL '
-                        f'{document.metadata.source_url!r}'
+                        'Document was inserted concurrently for source identity '
+                        f'({document.metadata.source_url!r}, {document.version!r})'
                     ) from exc
                 raise
 

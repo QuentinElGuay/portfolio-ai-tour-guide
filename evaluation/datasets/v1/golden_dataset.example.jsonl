@@ -1,8 +1,0 @@
-{
-  "id": "TODO",
-  "question": "TODO",
-  "retrieval": {
-    "relevant_chunk_ids": []
-  },
-  "_todo": "Replace TODO fields and add real chunk IDs from the exported corpus before evaluation."
-}

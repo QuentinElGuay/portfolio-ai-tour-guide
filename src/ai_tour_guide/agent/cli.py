@@ -3,6 +3,7 @@
 import click
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.retrieval import (
@@ -64,53 +65,31 @@ def search_command(query: str, mode: str, k: int) -> None:
     show_default=True,
     help='Maximum number of chunks to use as context.',
 )
-def ask_command(question: str, mode: str, k: int) -> None:
+@click.option(
+    '--verbose', is_flag=True, help='Print the complete serialized RAG result.'
+)
+def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
     """Answer QUESTION using the tour-guide knowledge base."""
+    import json
+
     try:
         result = answer_question(question, mode=mode, k=k)
     except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
-    click.echo(result.answer)
-    click.echo()
-    click.echo('Sources:')
-    if not result.chunks:
-        click.echo('- none')
+    if verbose:
+        click.echo(json.dumps(result.to_dict(), indent=2))
         return
 
-    references: dict[tuple[int, str], list[RetrievedChunk]] = {}
-    for retrieved in result.chunks:
-        source = retrieved.source
-        document = (source.document_id, source.title)
-        document_references = references.setdefault(document, [])
-        page_range = (source.page_start, source.page_end)
-        if any(
-            (item.source.page_start, item.source.page_end) == page_range
-            for item in document_references
-        ):
-            continue
-        document_references.append(retrieved)
-
-    for (_, title), document_references in references.items():
-        document_references.sort(
-            key=lambda item: (
-                item.source.page_start is None,
-                item.source.page_start or 0,
-                item.source.page_end or 0,
-            )
+    click.echo(
+        json.dumps(
+            {
+                'schema_version': ASK_RESPONSE_SCHEMA_VERSION,
+                'answer': result.answer,
+                'sources': [source.to_dict() for source in result.sources],  #TODO: see contexts
+            }
         )
-
-        # TODO: page formatting should be shared code with ai_tour_guide.agent.chat.backends._format_pages
-        # See src/ai_tour_guide/agent/source_formatting.py
-        page_ranges = [format_page_range(item.chunk) for item in document_references]
-        if len(page_ranges) == 1:
-            pages = page_ranges[0]
-        else:
-            pages = 'pages ' + ', '.join(
-                page_range.removeprefix('pages ').removeprefix('page ')
-                for page_range in page_ranges
-            )
-        click.echo(f'- {title} ({pages})')
+    )
 
 
 def _format_chunk(result: RetrievedChunk) -> str:
