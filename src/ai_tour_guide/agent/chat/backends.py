@@ -126,6 +126,8 @@ def _format_answer(answer: str, sources: list[object]) -> str:
     return f'{answer}\n\n**Sources**\n\n' + '\n'.join(formatted_sources)
 
 
+# TODO: page formatting should be shared with ai_tour_guide.agent.cli.ask_command
+# See src/ai_tour_guide/agent/source_formatting.py
 def _format_pages(pages: list[int]) -> str:
     page_numbers = [str(page) for page in pages]
     if len(page_numbers) == 1:

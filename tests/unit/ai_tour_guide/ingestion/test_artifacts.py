@@ -85,6 +85,7 @@ def _chunk() -> Chunk:
         chunk_id='brittany:chunk-0000',
         document_title='A guide to Brittany',
         section_path=('A guide to Brittany', 'Coast'),
+        section_id='coast',
         text='Visit Saint-Malo.',
         embedding_text=('A guide to Brittany\nCoast\n\nVisit Saint-Malo.'),
         page_start=1,

@@ -165,6 +165,10 @@ def test_document_requires_an_embedding_model() -> None:
     assert DocumentRow.__table__.c.embedding_model_id.nullable is False
 
 
+def test_document_chunk_requires_a_section_id() -> None:
+    assert DocumentChunkRow.__table__.c.section_id.nullable is False
+
+
 def test_document_collection_is_optional() -> None:
     row = ModelFactory.create_document(
         _document_record(collection=None),

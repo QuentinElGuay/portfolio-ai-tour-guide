@@ -79,7 +79,7 @@ def ask_command(question: str, mode: str, k: int) -> None:
         return
 
     references: dict[tuple[int, str], list[RetrievedChunk]] = {}
-    for retrieved in result.retrieved:
+    for retrieved in result.chunks:
         source = retrieved.source
         document = (source.document_id, source.title)
         document_references = references.setdefault(document, [])
@@ -99,6 +99,9 @@ def ask_command(question: str, mode: str, k: int) -> None:
                 item.source.page_end or 0,
             )
         )
+
+        # TODO: page formatting should be shared code with ai_tour_guide.agent.chat.backends._format_pages
+        # See src/ai_tour_guide/agent/source_formatting.py
         page_ranges = [format_page_range(item.chunk) for item in document_references]
         if len(page_ranges) == 1:
             pages = page_ranges[0]
@@ -116,7 +119,7 @@ def _format_chunk(result: RetrievedChunk) -> str:
     return (
         f'{chunk.chunk_id} ({format_page_range(chunk)}) '
         f'[rank {result.rank}, score {result.score:.4f} '
-        f'{result.score_kind.value}]\n{chunk.text}'
+        f'{result.score_kind.value}]\n{result.text}'
     )
 
 

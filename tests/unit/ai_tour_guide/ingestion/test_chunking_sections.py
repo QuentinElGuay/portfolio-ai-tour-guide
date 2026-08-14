@@ -22,7 +22,7 @@ def test_section_id_uses_heading_levels_not_section_path_positions() -> None:
     )
 
     assert section_id == descendant_id
-    assert section_id is not None
+    assert section_id == 'the-region-and-its-departments-departments-of-brittany'
 
 
 def test_section_id_defaults_cover_the_available_heading_depths() -> None:
@@ -34,7 +34,10 @@ def test_section_id_defaults_cover_the_available_heading_depths() -> None:
         )
     )
 
-    assert section_id is not None
+    assert section_id == (
+        'the-region-and-its-departments-departments-of-brittany-'
+        'key-features-of-each-departments'
+    )
 
 
 def test_chunks_share_section_id_and_have_local_indexes() -> None:

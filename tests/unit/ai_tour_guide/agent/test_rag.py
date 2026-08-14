@@ -5,12 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
 os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
 
-from ai_tour_guide.agent.rag.models import RAGResult
+from ai_tour_guide.agent.rag.models import Context, RAGResult
 from ai_tour_guide.agent.rag.pipeline import (
     INSUFFICIENT_CONTEXT_ANSWER,
     answer_question,
 )
-from ai_tour_guide.agent.rag.prompting import build_context
+from ai_tour_guide.agent.rag.prompting import (
+    build_context_from_chunks,
+    build_llm_context,
+)
 from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
 from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
@@ -61,27 +64,33 @@ def test_answer_question_retrieves_context_and_returns_sources(
 
     assert result == RAGResult(
         answer='It opens at ten.',
-        retrieved=[
-            RetrievedChunk(
-                chunk=chunk,
-                rank=1,
-                score=0.9,
-                score_kind=ScoreKind.TEXT_RANK,
-                source=SourceMetadata(
-                    document_id=7,
-                    chunk_id='chunk-123',
-                    title='A museum guide',
-                    source_url='https://example.com/museum',
-                    publisher=None,
-                    publication_date=None,
-                    collection=None,
-                    version=None,
-                    section_path=('Museum',),
-                    page_start=12,
-                    page_end=12,
+        contexts=(
+            Context(
+                section_id=None,
+                text='The museum opens at ten.',
+                chunks=(
+                    RetrievedChunk(
+                        chunk=chunk,
+                        rank=1,
+                        score=0.9,
+                        score_kind=ScoreKind.TEXT_RANK,
+                        source=SourceMetadata(
+                            document_id=7,
+                            chunk_id='chunk-123',
+                            title='A museum guide',
+                            source_url='https://example.com/museum',
+                            publisher=None,
+                            publication_date=None,
+                            collection=None,
+                            version=None,
+                            section_path=('Museum',),
+                            page_start=12,
+                            page_end=12,
+                        ),
+                    ),
                 ),
-            )
-        ],
+            ),
+        ),
     )
     retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
     messages = client.generate_reply.call_args.args[0]
@@ -114,6 +123,89 @@ def test_answer_question_requires_llm_configuration(
 
 
 def test_build_context_preserves_source_identity_and_pages() -> None:
-    assert build_context([_chunk()]) == (
-        '[Source: chunk-123, page 12]\nThe museum opens at ten.'
+    retrieved = RetrievedChunk(
+        chunk=_chunk(),
+        rank=1,
+        score=0.9,
+        score_kind=ScoreKind.TEXT_RANK,
+        source=SourceMetadata(
+            document_id=7,
+            chunk_id='chunk-123',
+            title='A museum guide',
+            source_url='https://example.com/museum',
+            publisher=None,
+            publication_date=None,
+            collection=None,
+            version=None,
+            section_path=('Museum',),
+            page_start=12,
+            page_end=12,
+        ),
+    )
+    contexts = build_context_from_chunks([retrieved])
+
+    assert build_llm_context(contexts) == (
+        '[Section: unavailable; Retrieved by: chunk-123 '
+        '(page 12, rank 1, score 0.9000 text_rank)]\n'
+        'The museum opens at ten.'
+    )
+
+
+def test_build_contexts_deduplicates_a_section_and_keeps_all_retrievals() -> None:
+    first = RetrievedChunk(
+        chunk=_chunk(),
+        rank=1,
+        score=0.9,
+        score_kind=ScoreKind.TEXT_RANK,
+        source=SourceMetadata(
+            document_id=7,
+            chunk_id='chunk-123',
+            title='A museum guide',
+            source_url='https://example.com/museum',
+            publisher=None,
+            publication_date=None,
+            collection=None,
+            version=None,
+            section_path=('Museum',),
+            page_start=12,
+            page_end=12,
+        ),
+        section_id='museum-opening-hours',
+        text='The museum opens at ten.\n\nThe last entry is at five.',
+    )
+    second = RetrievedChunk(
+        chunk=SimpleNamespace(
+            chunk_id='chunk-124',
+            page_start=12,
+            page_end=12,
+            text='The last entry is at five.',
+        ),
+        rank=2,
+        score=0.7,
+        score_kind=ScoreKind.TEXT_RANK,
+        source=SourceMetadata(
+            document_id=7,
+            chunk_id='chunk-124',
+            title='A museum guide',
+            source_url='https://example.com/museum',
+            publisher=None,
+            publication_date=None,
+            collection=None,
+            version=None,
+            section_path=('Museum',),
+            page_start=12,
+            page_end=12,
+        ),
+        section_id='museum-opening-hours',
+        text='The museum opens at ten.\n\nThe last entry is at five.',
+    )
+
+    contexts = build_context_from_chunks([first, second])
+
+    assert contexts == (
+        Context(
+            section_id='museum-opening-hours',
+            text='The museum opens at ten.\n\nThe last entry is at five.',
+            chunks=(first, second),
+        ),
     )

@@ -130,7 +130,7 @@ class DocumentChunkRow(Base):
     document_id: Mapped[int]
     chunk_id: Mapped[str]
     chunk_index: Mapped[int]
-    section_id: Mapped[str | None]
+    section_id: Mapped[str]
     section_chunk_index: Mapped[int | None]
     section_path: Mapped[list[str]]
     text: Mapped[str]

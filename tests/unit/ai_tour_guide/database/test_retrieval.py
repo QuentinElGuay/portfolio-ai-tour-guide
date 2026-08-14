@@ -16,8 +16,10 @@ from ai_tour_guide.knowledge_base.retrieval import (
     RetrievedChunk,
     ScoreKind,
     SearchMode,
+    SiblingChunks,
     SourceMetadata,
     retrieve,
+    retrieve_siblings,
 )
 from ai_tour_guide.knowledge_base.search import ScoredDocumentChunk
 
@@ -35,6 +37,10 @@ def _chunk(chunk_id: str):
         document_id=7,
         chunk_id=chunk_id,
         section_path=['Brittany', 'Coast'],
+        section_id='section-1',
+        section_chunk_index=0,
+        chunk_index=0,
+        text=f'Text for {chunk_id}.',
         page_start=2,
         page_end=3,
         document=SimpleNamespace(
@@ -86,7 +92,12 @@ def test_vector_retrieval_embeds_once_and_passes_metadata(
     chunk = _chunk('chunk-1')
     search_vector.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.2)]
 
-    result = retrieve('Brittany coast', mode='vector', k=2)
+    result = retrieve(
+        'Brittany coast',
+        mode='vector',
+        k=2,
+        retrieve_siblings=False,
+    )
 
     embedder_class.return_value.embed_query.assert_called_once_with('Brittany coast')
     assert result == [
@@ -124,7 +135,12 @@ def test_text_retrieval_does_not_embed(
     chunk = _chunk('chunk-1')
     search_text.return_value = [ScoredDocumentChunk(chunk=chunk, score=0.7)]
 
-    assert retrieve('Brittany coast', mode='text', k=2) == [
+    assert retrieve(
+        'Brittany coast',
+        mode='text',
+        k=2,
+        retrieve_siblings=False,
+    ) == [
         RetrievedChunk(
             chunk=chunk,
             rank=1,
@@ -177,6 +193,7 @@ def test_hybrid_retrieval_combines_rankings(
         mode='hybrid',
         k=3,
         hybrid_settings=HybridSearchSettings(vector_weight=0, text_weight=1),
+        retrieve_siblings=False,
     )
 
     assert [item.chunk for item in result] == [shared_chunk, text_chunk, vector_chunk]
@@ -184,6 +201,52 @@ def test_hybrid_retrieval_combines_rankings(
     search_vector.assert_called_once()
     search_text.assert_called_once_with(session, 'Brittany coast', 3)
     engine.dispose.assert_called_once_with()
+
+
+@patch('ai_tour_guide.knowledge_base.retrieval.retrieve_siblings')
+@patch('ai_tour_guide.knowledge_base.retrieval.search_text')
+@patch('ai_tour_guide.knowledge_base.retrieval.Session')
+@patch('ai_tour_guide.knowledge_base.retrieval.create_database_engine')
+def test_retrieval_expands_search_results_with_siblings(
+    create_engine: MagicMock,
+    session_class: MagicMock,
+    search_text: MagicMock,
+    retrieve_siblings_mock: MagicMock,
+) -> None:
+    engine = MagicMock()
+    session = MagicMock(spec=Session)
+    create_engine.return_value = engine
+    session_class.return_value.__enter__.return_value = session
+    matched_chunk = _chunk('matched')
+    first_sibling = _chunk('first')
+    first_sibling.section_chunk_index = 0
+    matched_chunk.section_chunk_index = 1
+    search_text.return_value = [ScoredDocumentChunk(chunk=matched_chunk, score=0.7)]
+    retrieve_siblings_mock.return_value = SiblingChunks(
+        section_id='section-1',
+        chunks=(first_sibling, matched_chunk),
+    )
+
+    result = retrieve('Brittany coast', mode='text', k=2)
+
+    assert result[0].section_id == 'section-1'
+    assert result[0].text == 'Text for first.\n\nText for matched.'
+    retrieve_siblings_mock.assert_called_once_with(session, matched_chunk)
+
+
+def test_retrieve_siblings_returns_document_scoped_ordered_text() -> None:
+    session = MagicMock(spec=Session)
+    chunk = _chunk('matched')
+    first_sibling = _chunk('first')
+    first_sibling.section_chunk_index = 0
+    chunk.section_chunk_index = 1
+    session.scalars.return_value.all.return_value = [first_sibling, chunk]
+
+    siblings = retrieve_siblings(session, chunk)
+
+    assert siblings.section_id == 'section-1'
+    assert siblings.chunks == (first_sibling, chunk)
+    assert siblings.text == 'Text for first.\n\nText for matched.'
 
 
 def test_retrieval_rejects_an_unsupported_mode() -> None:

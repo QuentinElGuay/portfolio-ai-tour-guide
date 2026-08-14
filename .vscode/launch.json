@@ -13,6 +13,20 @@
         "--output",
         "tmp/guide-discover-brittany-embedded.json"
       ]
+    },
+    {
+      "name": "Debug agent: ask",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ai_tour_guide.agent",
+      "args": [
+        "ask",
+        "--k",
+        "5",
+        "What are the main cities of Brittany?"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
     }
   ]
 }
