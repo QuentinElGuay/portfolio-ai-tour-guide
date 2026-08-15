@@ -9,7 +9,7 @@ def test_retrieve_searches_then_builds_contexts_in_same_session() -> None:
     Expected verification: raw search happens first, context expansion receives the same session and those
     results, and only RetrievedContext objects are returned to the RAG/LLM layer.
     """
-    pass
+    
 
 
 def test_retrieve_disposes_engine_when_search_or_context_expansion_fails() -> None:
@@ -18,4 +18,4 @@ def test_retrieve_disposes_engine_when_search_or_context_expansion_fails() -> No
     Required mocks: owned engine, Session context and one failing dependency per parametrized case.
     Expected verification: exception propagates and the engine is always disposed.
     """
-    pass
+    

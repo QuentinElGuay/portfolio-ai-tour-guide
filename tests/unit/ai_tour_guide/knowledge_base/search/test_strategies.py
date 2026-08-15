@@ -8,7 +8,7 @@ def test_text_strategy_returns_ranked_search_results_without_embedding() -> None
     Expected verification: ranks start at one, scores remain text ranks, ScoreKind is TEXT_RANK, and no
     embedding configuration/embedder is involved.
     """
-    pass
+    
 
 
 def test_vector_strategy_embeds_once_and_normalizes_distance() -> None:
@@ -18,7 +18,7 @@ def test_vector_strategy_embeds_once_and_normalizes_distance() -> None:
     Expected verification: query is embedded exactly once, metadata is forwarded to vector search, raw
     distance becomes higher-is-better score and score kind matches the configured distance metric.
     """
-    pass
+    
 
 
 def test_hybrid_strategy_composes_vector_text_and_rrf() -> None:
@@ -29,7 +29,7 @@ def test_hybrid_strategy_composes_vector_text_and_rrf() -> None:
     Expected verification: both strategies receive the same session/query/k and configured weights/rank
     constant are forwarded to fusion.
     """
-    pass
+    
 
 
 def test_create_search_strategy_constructs_only_required_dependencies() -> None:
@@ -39,4 +39,4 @@ def test_create_search_strategy_constructs_only_required_dependencies() -> None:
     Expected verification: text mode does not create an embedder; vector injects one into VectorSearchStrategy;
     hybrid composes vector and text strategies with supplied/default HybridSearchSettings.
     """
-    pass
+    

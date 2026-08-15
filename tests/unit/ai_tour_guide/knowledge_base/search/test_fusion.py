@@ -7,7 +7,7 @@ def test_reciprocal_rank_fusion_deduplicates_shared_chunks() -> None:
     Required fixtures: SearchResult objects with distinct document_id/chunk_id pairs and one shared pair.
     Expected verification: shared evidence becomes one candidate whose score accumulates both weighted ranks.
     """
-    pass
+    
 
 
 def test_reciprocal_rank_fusion_preserves_source_and_replaces_search_metadata() -> None:
@@ -17,4 +17,4 @@ def test_reciprocal_rank_fusion_preserves_source_and_replaces_search_metadata() 
     Expected verification: fused results keep original chunk/source provenance while receiving new sequential
     ranks, RRF scores and ``ScoreKind.RRF`` metadata.
     """
-    pass
+    

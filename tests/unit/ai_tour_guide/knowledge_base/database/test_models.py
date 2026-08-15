@@ -8,7 +8,7 @@ def test_orm_models_map_existing_core_tables() -> None:
     Expected verification: each ``__table__`` points to the corresponding table from ``database.tables``
     so DDL remains defined only once.
     """
-    pass
+    
 
 
 def test_model_factory_creates_document_with_chunk_children() -> None:
@@ -18,7 +18,7 @@ def test_model_factory_creates_document_with_chunk_children() -> None:
     Expected verification: document provenance/chunking fields are copied and child rows preserve chunk
     section metadata, text, hashes and embeddings without assigning database-generated IDs.
     """
-    pass
+    
 
 
 def test_model_factory_creates_chunk_row() -> None:
@@ -28,4 +28,4 @@ def test_model_factory_creates_chunk_row() -> None:
     embedding text, counts/hashes and embedding vector.
     Expected verification: all persisted chunk fields are mapped with tuple/vector values converted as needed.
     """
-    pass
+    

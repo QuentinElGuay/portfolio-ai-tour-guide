@@ -8,7 +8,7 @@ def test_retrieve_section_chunks_is_document_scoped_and_ordered() -> None:
     Expected verification: query constrains both document and section, eager-loads document provenance and
     orders by section_chunk_index then chunk_index.
     """
-    pass
+    
 
 
 def test_build_retrieved_contexts_deduplicates_sections_without_losing_search_hits() -> None:
@@ -19,4 +19,4 @@ def test_build_retrieved_contexts_deduplicates_sections_without_losing_search_hi
     Expected verification: one context per document+section in first-hit order, sibling text joined once,
     all triggering SearchResults retained, and sources cover every sibling supplied to the LLM.
     """
-    pass
+    

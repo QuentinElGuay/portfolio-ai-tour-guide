@@ -8,7 +8,7 @@ def test_search_vector_filters_to_compatible_embedding_model() -> None:
     Expected verification: vector query filters provider/model/revision/dimensions/normalization/distance,
     eager-loads document provenance, orders by configured pgvector distance and limits to k.
     """
-    pass
+    
 
 
 def test_search_text_builds_ranked_postgres_full_text_query() -> None:
@@ -18,7 +18,7 @@ def test_search_text_builds_ranked_postgres_full_text_query() -> None:
     Expected verification: plainto_tsquery/ts_rank_cd semantics are used, document provenance is eager-loaded,
     results are score-normalized to float and limited to k.
     """
-    pass
+    
 
 
 def test_search_queries_reject_invalid_inputs() -> None:
@@ -27,4 +27,4 @@ def test_search_queries_reject_invalid_inputs() -> None:
     Required inputs: simple mock Session and invalid parameters.
     Expected verification: ValueError occurs before executing the SQL statement.
     """
-    pass
+    

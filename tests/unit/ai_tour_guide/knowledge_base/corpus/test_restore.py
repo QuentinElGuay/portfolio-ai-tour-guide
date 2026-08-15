@@ -9,7 +9,7 @@ def test_load_corpus_uses_database_initializer_as_single_ddl_source() -> None:
     Expected verification: initializer is called with the same schema/engine before loading and restore code
     never creates application tables directly.
     """
-    pass
+    
 
 
 def test_load_corpus_restores_section_metadata_and_embeddings() -> None:
@@ -19,7 +19,7 @@ def test_load_corpus_restores_section_metadata_and_embeddings() -> None:
     section_path and embedding fields.
     Expected verification: insert SQL consumes those fields and resets document/embedding-model identities.
     """
-    pass
+    
 
 
 def test_load_corpus_rolls_back_on_failure() -> None:
@@ -28,7 +28,7 @@ def test_load_corpus_rolls_back_on_failure() -> None:
     Required mocks: raw connection with commit/rollback/close spies and failing cursor/copy operation.
     Expected verification: rollback and close occur, exception propagates, and owned engine is disposed.
     """
-    pass
+    
 
 
 def test_clear_knowledge_base_truncates_without_dropping_tables() -> None:
@@ -38,4 +38,4 @@ def test_clear_knowledge_base_truncates_without_dropping_tables() -> None:
     Expected verification: TRUNCATE with identity reset is issued for chunks/documents/models; no DROP TABLE
     or independent DDL is executed.
     """
-    pass
+    

@@ -7,7 +7,7 @@ def test_search_mode_lists_vector_text_and_hybrid() -> None:
     Required inputs: none. Expected verification: public mode values remain vector, text and hybrid in
     the intended order so CLI/evaluation configuration stays stable.
     """
-    pass
+    
 
 
 def test_hybrid_settings_validate_weights_and_rank_constant() -> None:
@@ -16,7 +16,7 @@ def test_hybrid_settings_validate_weights_and_rank_constant() -> None:
     Required inputs: negative/non-finite weights, both weights zero, negative rank_constant.
     Expected verification: defaults are explicit and invalid configurations raise ValueError.
     """
-    pass
+    
 
 
 def test_search_result_keeps_search_and_source_metadata_separate() -> None:
@@ -26,4 +26,4 @@ def test_search_result_keeps_search_and_source_metadata_separate() -> None:
     Expected verification: ranking data lives only under ``search`` while stable evidence identity lives
     under ``source`` for retrieval evaluation.
     """
-    pass
+    

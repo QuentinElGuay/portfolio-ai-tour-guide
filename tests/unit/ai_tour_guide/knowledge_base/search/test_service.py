@@ -8,7 +8,7 @@ def test_search_with_session_selects_strategy_and_returns_raw_results() -> None:
     Expected verification: mode is normalized, strategy receives the caller session/query/k, and SearchResult
     objects are returned unchanged for retrieval evaluation.
     """
-    pass
+    
 
 
 def test_search_owns_session_and_engine_lifecycle() -> None:
@@ -18,4 +18,4 @@ def test_search_owns_session_and_engine_lifecycle() -> None:
     Expected verification: one session is opened, raw results are returned, and the engine is disposed both
     on success and on search failure.
     """
-    pass
+    

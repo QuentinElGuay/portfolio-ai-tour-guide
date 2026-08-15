@@ -8,4 +8,4 @@ def test_source_metadata_from_chunk_copies_document_and_chunk_provenance() -> No
     Expected verification: returned SourceMetadata is detached/stable and includes document identity,
     chunk identity, section identity/path and pages used by evaluation/citation validation.
     """
-    pass
+    

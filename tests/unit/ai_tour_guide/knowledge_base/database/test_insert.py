@@ -7,7 +7,7 @@ def test_get_or_create_embedding_model_returns_compatible_existing_row() -> None
     Required fixtures/mocks: mocked Session, EmbeddingMetadata, compatible EmbeddingModelRow.
     Expected verification: existing row is returned and no new row is added/flushed.
     """
-    pass
+    
 
 
 def test_get_or_create_embedding_model_rejects_incompatible_existing_row() -> None:
@@ -16,7 +16,7 @@ def test_get_or_create_embedding_model_rejects_incompatible_existing_row() -> No
     Required fixtures: mocked session, embedding metadata and conflicting stored row.
     Expected verification: ``EmbeddingModelConfigurationError`` is raised.
     """
-    pass
+    
 
 
 def test_insert_document_rejects_duplicate_source_identity() -> None:
@@ -25,7 +25,7 @@ def test_insert_document_rejects_duplicate_source_identity() -> None:
     Required fixtures: mocked Session, DocumentRecord, non-empty EmbeddedChunk sequence, ChunkingConfig.
     Expected verification: ``DocumentAlreadyExistsError`` is raised and ModelFactory is not called.
     """
-    pass
+    
 
 
 def test_insert_document_with_chunks_is_atomic_and_disposes_engine() -> None:
@@ -35,4 +35,4 @@ def test_insert_document_with_chunks_is_atomic_and_disposes_engine() -> None:
     Expected verification: both writes share one transaction, returned document_id is propagated, and the
     engine is disposed even when persistence raises.
     """
-    pass
+    
