@@ -12,14 +12,14 @@ from ai_tour_guide.agent.rag.models import (
     SourceReference,
 )
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search.models import SourceMetadata
+from ai_tour_guide.knowledge_base.search.models import SourceDocumentMetadata
 
 logger = logging.getLogger(__name__)
 
 
-def _reference(source: SourceMetadata, pages: Sequence[int] = ()) -> SourceReference:
+def _reference(source: SourceDocumentMetadata, pages: Sequence[int] = ()) -> SourceReference:
     return SourceReference(
-        source_url=source.source_url,
+        source_url=source.url,
         version=source.version,
         title=source.title,
         publisher=source.publisher,
@@ -32,7 +32,7 @@ def _reference(source: SourceMetadata, pages: Sequence[int] = ()) -> SourceRefer
 def _invalid(
     citation: LLMCitation,
     reason: CitationInvalidReason,
-    source: SourceMetadata | None = None,
+    source: SourceDocumentMetadata | None = None,
 ) -> InvalidCitation:
     if reason is CitationInvalidReason.UNKNOWN_REASON:
         logger.error('Unknown citation validation reason for %r', citation)
@@ -53,13 +53,13 @@ def validate_citations(
     citations: Sequence[LLMCitation], retrieved: Sequence[RetrievedContext]
 ) -> CitationValidationResult:
     """Trust only page evidence actually supplied by the knowledge base."""
-    documents: OrderedDict[tuple[str, str | None], list[SourceMetadata]] = OrderedDict()
+    documents: OrderedDict[tuple[str, str | None], list[SourceDocumentMetadata]] = OrderedDict()
     for sources in retrieved.sources:
         documents.setdefault((sources.source.source_url, sources.source.version), []).append(
             sources.source
         )
 
-    valid: OrderedDict[tuple[str, str | None], tuple[SourceMetadata, set[int]]] = (
+    valid: OrderedDict[tuple[str, str | None], tuple[SourceDocumentMetadata, set[int]]] = (
         OrderedDict()
     )
     invalid: list[InvalidCitation] = []

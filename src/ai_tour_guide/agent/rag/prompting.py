@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search.models import SearchResult
+from ai_tour_guide.knowledge_base.search.models import SearchResult, SourceDocumentMetadata
 
 SYSTEM_PROMPT = """You are a concise, reliable tour guide.
 Answer the user's question using only the supplied retrieved context.
@@ -20,30 +20,41 @@ citations for the insufficient-context response.
 """
 
 def build_llm_context(contexts: Sequence[RetrievedContext]) -> str:
-    """Render deduplicated context with the retrievals that support it."""
-    return '\n\n'.join(
-        (
-            f'[Section: {context.section_id or "unavailable"}; '  # TODO: use the section path instead of section_id 
-            f'Retrieved by: {_format_retrievals(context.chunks)}]\n'
-            f'{context.text}'
-        )
-        for context in contexts
+    """Render retrieval contexts with provenance required for grounded citations."""
+    return '\n\n'.join(_format_context(context) for context in contexts)
+
+
+def _format_context(context: RetrievedContext) -> str:
+    sources = _format_sources(context.sources)
+
+    return (
+        f'{sources}\n'
+        f'Section: {' > '.join(context.section_path)}\n\n'
+        f'{context.text}'
     )
-    # TODO: evaluate the use of those other informations
-    # f'[Source URL: {item.source.source_url}; Version: {item.source.version!r}; '
-    # f'Title: {item.source.title}; Pages: {format_page_range(item.source)}; '
-    # f'Section: {" > ".join(item.source.section_path) or "unavailable"}]\n'
-    # f'{item.chunk.text}'
 
 
-def _format_retrievals(search_results: Sequence[SearchResult]) -> str:
-    """Render all ranked chunk references that selected one context section."""
-    return ', '.join(
-        (
-            f'{result.chunk.chunk_id} ({format_page_range(result.chunk)}, '
-            f'rank {result.search.rank}, score {result.search.score:.4f} {result.search.score_kind.value})'
-        )
-        for result in search_results
+def _format_sources(source_documents: Sequence[SourceDocumentMetadata]) -> str:
+    # All siblings belong to the same document.
+    source_document = source_documents[0]
+
+    pages = sorted(
+        {
+            page
+            for source in source_documents
+            if source.page_start is not None
+            for page in range(
+                source.page_start,
+                (source.page_end or source.page_start) + 1,
+            )
+        }
+    )
+
+    return (
+        f'Source: {source_document.title}\n'
+        f'URL: {source_document.url}\n'
+        f'Version: {source_document.version or "unavailable"}\n'
+        f'Pages: {", ".join(map(str, pages)) or "unavailable"}'
     )
 
 

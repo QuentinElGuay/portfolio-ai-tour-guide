@@ -7,7 +7,7 @@ from .search import (
     SearchMetadata,
     SearchMode,
     SearchResult,
-    SourceMetadata,
+    SourceDocumentMetadata,
     search,
 )
 
@@ -18,7 +18,7 @@ __all__ = [
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
-    'SourceMetadata',
+    'SourceDocumentMetadata',
     'retrieve',
     'search',
 ]

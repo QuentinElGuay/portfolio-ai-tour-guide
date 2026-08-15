@@ -44,13 +44,13 @@ class SearchMetadata:
 
 
 @dataclass(frozen=True, slots=True)
-class SourceMetadata:
+class SourceDocumentMetadata:
     """Stable provenance of one matched or context-provided chunk."""
 
     document_id: int
     chunk_id: str
     title: str
-    source_url: str
+    url: str
     publisher: str | None
     publication_date: date | None
     collection: str | None
@@ -67,7 +67,7 @@ class SearchResult:
 
     chunk: DocumentChunkRow
     search: SearchMetadata
-    source: SourceMetadata
+    source: SourceDocumentMetadata
 
 
 DEFAULT_RRF_RANK_CONSTANT = 60
@@ -99,5 +99,5 @@ __all__ = [
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
-    'SourceMetadata',
+    'SourceDocumentMetadata',
 ]

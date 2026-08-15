@@ -2,17 +2,17 @@
 
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
 
-from .models import SourceMetadata
+from .models import SourceDocumentMetadata
 
 
-def source_metadata_from_chunk(chunk: DocumentChunkRow) -> SourceMetadata:
+def source_metadata_from_chunk(chunk: DocumentChunkRow) -> SourceDocumentMetadata:
     """Copy provenance from an ORM chunk while its document relationship is available."""
     document = chunk.document
-    return SourceMetadata(
+    return SourceDocumentMetadata(
         document_id=chunk.document_id,
         chunk_id=chunk.chunk_id,
         title=document.title,
-        source_url=document.source_url,
+        url=document.source_url,
         publisher=document.publisher,
         publication_date=document.publication_date,
         collection=document.collection,

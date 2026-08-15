@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ai_tour_guide.knowledge_base.search.models import SearchResult, SourceMetadata
+from ai_tour_guide.knowledge_base.search.models import SearchResult, SourceDocumentMetadata
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,7 +12,7 @@ class RetrievedContext:
     section_id: str
     text: str
     search_results: tuple[SearchResult, ...]
-    sources: tuple[SourceMetadata, ...]
+    sources: tuple[SourceDocumentMetadata, ...]
 
 
 __all__ = ['RetrievedContext']

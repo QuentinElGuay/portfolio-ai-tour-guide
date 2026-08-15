@@ -124,7 +124,7 @@ def _serialize_search_result(search_result: SearchResult) -> dict[str, Any]:
         'score_kind': search.score_kind.value,
         'document_id': source.document_id,
         'chunk_id': source.chunk_id,
-        'source_url': source.source_url,
+        'source_url': source.url,
         'version': source.version,
         'title': source.title,
         'publisher': source.publisher,
