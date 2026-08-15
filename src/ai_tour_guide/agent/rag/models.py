@@ -225,7 +225,6 @@ __all__ = [
     'RAG_RESULT_SCHEMA_VERSION',
     'CitationInvalidReason',
     'CitationValidationResult',
-    'Context',
     'GeneratedAnswer',
     'InvalidCitation',
     'LLMCitation',

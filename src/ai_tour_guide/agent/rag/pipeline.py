@@ -41,76 +41,102 @@ def answer_question(
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
+    selected_mode = SearchMode(mode)
+
     selected_client = client or create_default_llm_client()
     if selected_client is None:
         raise RuntimeError('No LLM client is configured.')
+
+    retrieval_started = perf_counter()
+
     try:
-        retrieval_started = perf_counter()
-        retrieved_contexts = tuple(retrieve(question, mode=mode, k=k))
-        retrieval_latency = (perf_counter() - retrieval_started) * 1000
+        contexts = tuple(
+            retrieve(
+                question,
+                mode=selected_mode,
+                k=k,
+            )
+        )
     except (OSError, SQLAlchemyError) as exc:
+        retrieval_latency = (perf_counter() - retrieval_started) * 1000
+
         return RAGResult(
-            answer=GeneratedAnswer(LLM_CONFIGURATION_REQUIRED_ANSWER),
             question=question,
-            mode=SearchMode(mode),
+            mode=selected_mode,
             k=k,
             messages=(),
             generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
             error=_error('retrieval', exc),
-            retrieval_latency_ms=(perf_counter() - started) * 1000,
-            total_latency_ms=(perf_counter() - started) * 1000,
-        )
-    if not retrieved_contexts:
-        return RAGResult(
-            question=question,
-            mode=SearchMode(mode),
-            k=k,
-            messages=(),
-            generated=GeneratedAnswer(INSUFFICIENT_CONTEXT_ANSWER),
-            retrieved_contexts=(),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=(perf_counter() - started) * 1000,
         )
 
-    messages = build_messages(question, retrieved_contexts)
-    try:
-        generation_started = perf_counter()
-        generated = asyncio.run(selected_client.answer_question(messages))
-        generation_latency = (perf_counter() - generation_started) * 1000
-    except GenerationError as exc:
+    retrieval_latency = (perf_counter() - retrieval_started) * 1000
+
+    if not contexts:
         return RAGResult(
             question=question,
-            mode=SearchMode(mode),
+            mode=selected_mode,
             k=k,
-            contexts=retrieved_contexts,
-            messages=messages,
-            generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
-            retrieved_contexts=retrieved_contexts,
-            error=_error('generation', exc),
+            messages=(),
+            generated=GeneratedAnswer(INSUFFICIENT_CONTEXT_ANSWER),
+            contexts=(),
             retrieval_latency_ms=retrieval_latency,
-            generation_latency_ms=(perf_counter() - generation_started) * 1000,
             total_latency_ms=(perf_counter() - started) * 1000,
         )
-    validation = validate_citations(generated.citations, retrieved_contexts)
+
+    messages = build_messages(question, contexts)
+
+    generation_started = perf_counter()
+
+    try:
+        generated = asyncio.run(
+            selected_client.answer_question(messages)
+        )
+    except GenerationError as exc:
+        generation_latency = (perf_counter() - generation_started) * 1000
+
+        return RAGResult(
+            question=question,
+            mode=selected_mode,
+            k=k,
+            messages=messages,
+            generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
+            contexts=contexts,
+            error=_error('generation', exc),
+            retrieval_latency_ms=retrieval_latency,
+            generation_latency_ms=generation_latency,
+            total_latency_ms=(perf_counter() - started) * 1000,
+        )
+
+    generation_latency = (perf_counter() - generation_started) * 1000
+
+    validation = validate_citations(
+        generated.citations,
+        contexts,
+    )
+
     sources = (
         ()
         if generated.answer.strip() == INSUFFICIENT_CONTEXT_ANSWER
         else validation.references
     )
+
     return RAGResult(
         question=question,
-        mode=SearchMode(mode),
+        mode=selected_mode,
         k=k,
-        contexts=retrieved_contexts,
         messages=messages,
         generated=generated,
-        retrieved_contexts=retrieved_contexts,
+        contexts=contexts,
         sources=sources,
         invalid_citations=validation.invalid_citations,
         retrieval_latency_ms=retrieval_latency,
         generation_latency_ms=generation_latency,
         total_latency_ms=(perf_counter() - started) * 1000,
-        retrieval_metadata={'mode': SearchMode(mode).value},
+        retrieval_metadata={
+            'mode': selected_mode.value,
+        },
         llm_metadata=generated.llm_metadata,
         raw_provider_response=generated.raw_provider_response,
     )
