@@ -11,7 +11,8 @@ from ai_tour_guide.agent.rag.models import (
     LLMCitation,
     SourceReference,
 )
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, SourceMetadata
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
+from ai_tour_guide.knowledge_base.search.models import SourceMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +50,13 @@ def _invalid(
 
 
 def validate_citations(
-    citations: Sequence[LLMCitation], retrieved: Sequence[RetrievedChunk]
+    citations: Sequence[LLMCitation], retrieved: Sequence[RetrievedContext]
 ) -> CitationValidationResult:
     """Trust only page evidence actually supplied by the knowledge base."""
     documents: OrderedDict[tuple[str, str | None], list[SourceMetadata]] = OrderedDict()
-    for item in retrieved:
-        documents.setdefault((item.source.source_url, item.source.version), []).append(
-            item.source
+    for sources in retrieved.sources:
+        documents.setdefault((sources.source.source_url, sources.source.version), []).append(
+            sources.source
         )
 
     valid: OrderedDict[tuple[str, str | None], tuple[SourceMetadata, set[int]]] = (
@@ -94,11 +95,11 @@ def validate_citations(
             continue
         end = start if end is None else end
         supported: set[int] = set()
-        for item in document_sources:
-            if item.page_start is None:
+        for sources in document_sources:
+            if sources.page_start is None:
                 continue
-            item_end = item.page_start if item.page_end is None else item.page_end
-            supported.update(range(item.page_start, item_end + 1))
+            item_end = sources.page_start if sources.page_end is None else sources.page_end
+            supported.update(range(sources.page_start, item_end + 1))
         cited_pages = set(range(start, end + 1))
         confirmed = cited_pages & supported
         if confirmed:

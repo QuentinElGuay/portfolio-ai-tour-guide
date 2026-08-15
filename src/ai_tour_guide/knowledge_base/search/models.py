@@ -7,11 +7,13 @@ from math import isfinite
 
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
 
+from .models import SearchMode
+
 
 class SearchMode(StrEnum):
     """Supported ranking strategies."""
 
-    VECTOR = 'vector'
+    VECTOR = SearchMode.VECTOR
     TEXT = 'text'
     HYBRID = 'hybrid'
 

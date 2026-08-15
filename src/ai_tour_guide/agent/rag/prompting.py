@@ -3,9 +3,9 @@
 from collections.abc import Sequence
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.agent.rag.models import Context
 from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
+from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 SYSTEM_PROMPT = """You are a concise, reliable tour guide.
 Answer the user's question using only the supplied retrieved context.
@@ -19,7 +19,7 @@ source URL, version, and page bounds exactly from the context. Return no
 citations for the insufficient-context response.
 """
 
-def build_llm_context(contexts: Sequence[Context]) -> str:
+def build_llm_context(contexts: Sequence[RetrievedContext]) -> str:
     """Render deduplicated context with the retrievals that support it."""
     return '\n\n'.join(
         (
@@ -36,18 +36,18 @@ def build_llm_context(contexts: Sequence[Context]) -> str:
     # f'{item.chunk.text}'
 
 
-def _format_retrievals(retrieved: Sequence[RetrievedChunk]) -> str:
+def _format_retrievals(search_results: Sequence[SearchResult]) -> str:
     """Render all ranked chunk references that selected one context section."""
     return ', '.join(
         (
-            f'{item.source.chunk_id} ({format_page_range(item.chunk)}, '
-            f'rank {item.rank}, score {item.score:.4f} {item.score_kind.value})'
+            f'{result.chunk.chunk_id} ({format_page_range(result.chunk)}, '
+            f'rank {result.search.rank}, score {result.search.score:.4f} {result.search.score_kind.value})'
         )
-        for item in retrieved
+        for result in search_results
     )
 
 
-def build_messages(question: str, contexts: Sequence[Context]) -> list[Message]:
+def build_messages(question: str, contexts: Sequence[RetrievedContext]) -> list[Message]:
     """Build the grounded chat messages sent to the configured backend."""
     context = build_llm_context(contexts)
     return [

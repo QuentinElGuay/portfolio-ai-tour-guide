@@ -9,8 +9,8 @@ from typing import Any
 
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import SearchMode
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
+from ai_tour_guide.knowledge_base.search import SearchMode
 from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 RAG_RESULT_SCHEMA_VERSION = 1
@@ -147,7 +147,7 @@ def _serialize_context(context: RetrievedContext) -> dict[str, Any]:
             _serialize_search_result(result)
             for result in context.search_results
         ],
-        'sources': context.sources,
+        'sources': _json_value(context.sources),
     }
 
 
@@ -158,7 +158,7 @@ class RAGResult:
     k: int
     messages: tuple[Message, ...]
     generated: GeneratedAnswer
-    retrieved_contexts: tuple[SearchResult, ...] = ()
+    contexts: tuple[RetrievedContext, ...] = field(default_factory=tuple)
     sources: tuple[SourceReference, ...] = ()
     invalid_citations: tuple[InvalidCitation, ...] = ()
     error: RAGError | None = None
@@ -172,18 +172,11 @@ class RAGResult:
         default_factory=lambda: MappingProxyType({})
     )
     raw_provider_response: Any = None
-    contexts: tuple[RetrievedContext, ...] = field(default_factory=tuple)
-
-    @property
-    def chunks(self) -> list[DocumentChunkRow]:
-        """Return the retrieved chunks without their ranking metadata."""
-        return [chunk for context in self.contexts for chunk in context.chunks]
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self, 'messages', tuple(dict(message) for message in self.messages)
         )
-        object.__setattr__(self, 'retrieved', tuple(self.retrieved_contexts))
         object.__setattr__(self, 'sources', tuple(self.sources))
         object.__setattr__(self, 'invalid_citations', tuple(self.invalid_citations))
         object.__setattr__(
@@ -201,7 +194,7 @@ class RAGResult:
             'question': self.question,
             'mode': self.mode.value,
             'k': self.k,
-            'context': self.context,
+            'contexts': self.contexts,
             'messages': _json_value(self.messages),
             'generated': {
                 'answer': self.generated.answer,
@@ -209,7 +202,8 @@ class RAGResult:
             },
             'search_results': [
                 _serialize_search_result(result)
-                for result in self.retrieved_contexts
+                for context in self.contexts
+                for result in context.search_results
             ],
             'contexts': [
                 _serialize_context(context)

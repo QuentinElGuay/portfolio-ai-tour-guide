@@ -17,7 +17,8 @@ from ai_tour_guide.agent.responses import (
     LLM_CONFIGURATION_REQUIRED_ANSWER,
     RETRIEVAL_ERROR_ANSWER,
 )
-from ai_tour_guide.knowledge_base.retrieval import SearchMode, retrieve
+from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.search import SearchMode
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def _error(stage: str, exc: Exception) -> RAGError:
 def answer_question(
     question: str,
     *,
-    mode: SearchMode = 'vector',
+    mode: SearchMode = SearchMode.VECTOR,
     k: int = 5,
     client: LLMClient | None = None,
 ) -> RAGResult:
@@ -49,7 +50,7 @@ def answer_question(
         retrieval_latency = (perf_counter() - retrieval_started) * 1000
     except (OSError, SQLAlchemyError) as exc:
         return RAGResult(
-            answer=LLM_CONFIGURATION_REQUIRED_ANSWER,
+            answer=GeneratedAnswer(LLM_CONFIGURATION_REQUIRED_ANSWER),
             question=question,
             mode=SearchMode(mode),
             k=k,

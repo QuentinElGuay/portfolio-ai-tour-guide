@@ -6,11 +6,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.retrieval import (
-    RetrievedChunk,
-    SearchMode,
-    retrieve,
-)
+from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.search import SearchMode
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})

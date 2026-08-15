@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
-from ai_tour_guide.knowledge_base.retrieval import SearchMode, retrieve
+from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.search import SearchMode
 from evaluation.dataset import DEFAULT_DATASET_ROOT, GoldenCase, load_golden_dataset
 from evaluation.retrieval.metrics import (
     hit_rate_at_k,

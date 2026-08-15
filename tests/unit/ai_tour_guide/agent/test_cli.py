@@ -5,7 +5,7 @@ from click.testing import CliRunner
 
 from ai_tour_guide.agent.cli import main
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGResult, SourceReference
-from ai_tour_guide.knowledge_base.retrieval import SearchMode
+from ai_tour_guide.knowledge_base.search import SearchMode
 
 
 def _result() -> RAGResult:
