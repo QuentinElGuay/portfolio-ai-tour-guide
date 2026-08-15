@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
 from ai_tour_guide.agent.llm.interfaces import GenerationError, LLMClient
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGError, RAGResult
-from ai_tour_guide.agent.rag.prompting import build_context_from_chunks, build_messages
+from ai_tour_guide.agent.rag.prompting import build_messages
 from ai_tour_guide.agent.rag.sources import validate_citations
 from ai_tour_guide.agent.responses import (
     GENERATION_ERROR_ANSWER,
@@ -45,7 +45,7 @@ def answer_question(
         raise RuntimeError('No LLM client is configured.')
     try:
         retrieval_started = perf_counter()
-        retrieved = tuple(retrieve(question, mode=mode, k=k))
+        retrieved_contexts = tuple(retrieve(question, mode=mode, k=k))
         retrieval_latency = (perf_counter() - retrieval_started) * 1000
     except (OSError, SQLAlchemyError) as exc:
         return RAGResult(
@@ -53,27 +53,25 @@ def answer_question(
             question=question,
             mode=SearchMode(mode),
             k=k,
-            context='',
             messages=(),
             generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
             error=_error('retrieval', exc),
             retrieval_latency_ms=(perf_counter() - started) * 1000,
             total_latency_ms=(perf_counter() - started) * 1000,
         )
-    if not retrieved:
+    if not retrieved_contexts:
         return RAGResult(
             question=question,
             mode=SearchMode(mode),
             k=k,
-            context='',
             messages=(),
             generated=GeneratedAnswer(INSUFFICIENT_CONTEXT_ANSWER),
-            retrieved=(),
+            retrieved_contexts=(),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=(perf_counter() - started) * 1000,
         )
-    contexts = build_context_from_chunks(retrieved)
-    messages = build_messages(question, contexts)
+
+    messages = build_messages(question, retrieved_contexts)
     try:
         generation_started = perf_counter()
         generated = asyncio.run(selected_client.answer_question(messages))
@@ -83,16 +81,16 @@ def answer_question(
             question=question,
             mode=SearchMode(mode),
             k=k,
-            context=contexts,
+            contexts=retrieved_contexts,
             messages=messages,
             generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
-            retrieved=retrieved,
+            retrieved_contexts=retrieved_contexts,
             error=_error('generation', exc),
             retrieval_latency_ms=retrieval_latency,
             generation_latency_ms=(perf_counter() - generation_started) * 1000,
             total_latency_ms=(perf_counter() - started) * 1000,
         )
-    validation = validate_citations(generated.citations, retrieved)
+    validation = validate_citations(generated.citations, retrieved_contexts)
     sources = (
         ()
         if generated.answer.strip() == INSUFFICIENT_CONTEXT_ANSWER
@@ -102,10 +100,10 @@ def answer_question(
         question=question,
         mode=SearchMode(mode),
         k=k,
-        context=contexts,
+        contexts=retrieved_contexts,
         messages=messages,
         generated=generated,
-        retrieved=retrieved,
+        retrieved_contexts=retrieved_contexts,
         sources=sources,
         invalid_citations=validation.invalid_citations,
         retrieval_latency_ms=retrieval_latency,

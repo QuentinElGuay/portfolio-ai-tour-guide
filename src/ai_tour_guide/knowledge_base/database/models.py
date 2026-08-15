@@ -37,7 +37,7 @@ class EmbeddingModelRow(Base):
     distance_metric: Mapped[str]
     created_at: Mapped[datetime]
 
-    documents: Mapped[list['DocumentRow']] = relationship(back_populates='embedding_model')
+    documents: Mapped[list[DocumentRow]] = relationship(back_populates='embedding_model')
 
 
 class DocumentRow(Base):
@@ -78,7 +78,7 @@ class DocumentRow(Base):
     created_at: Mapped[datetime]
 
     embedding_model: Mapped[EmbeddingModelRow] = relationship(back_populates='documents')
-    chunks: Mapped[list['DocumentChunkRow']] = relationship(
+    chunks: Mapped[list[DocumentChunkRow]] = relationship(
         back_populates='document',
         cascade='all, delete-orphan',
         passive_deletes=True,

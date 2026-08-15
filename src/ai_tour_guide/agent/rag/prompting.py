@@ -19,33 +19,6 @@ source URL, version, and page bounds exactly from the context. Return no
 citations for the insufficient-context response.
 """
 
-
-def build_context_from_chunks(
-    retrieved: Sequence[RetrievedChunk],
-) -> tuple[Context, ...]:
-    """Group retrieved chunks into one context entry per document section."""
-    contexts: dict[tuple[int, str | None], Context] = {}
-
-    for item in retrieved:
-        identity = (item.source.document_id, item.section_id)
-        existing = contexts.get(identity)
-        if existing is None:
-            contexts[identity] = Context(
-                section_id=item.section_id,
-                text=item.text or item.chunk.text,
-                chunks=(item,),
-            )
-            continue
-
-        contexts[identity] = Context(
-            section_id=existing.section_id,
-            text=existing.text,
-            chunks=(*existing.chunks, item),
-        )
-
-    return tuple(contexts.values())
-
-
 def build_llm_context(contexts: Sequence[Context]) -> str:
     """Render deduplicated context with the retrievals that support it."""
     return '\n\n'.join(

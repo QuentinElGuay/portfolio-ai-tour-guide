@@ -8,20 +8,13 @@ from types import MappingProxyType
 from typing import Any
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, SearchMode
+from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
+from ai_tour_guide.knowledge_base.retrieval import SearchMode
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
+from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 RAG_RESULT_SCHEMA_VERSION = 1
 
-
-@dataclass(frozen=True, slots=True)
-class Context:
-    """One deduplicated section of LLM context and its retrieval evidence."""
-
-    section_id: str | None
-    text: str
-    chunks: tuple[RetrievedChunk, ...]
-   
 
 class CitationInvalidReason(StrEnum):
     UNKNOWN_DOCUMENT = 'unknown_document'
@@ -120,13 +113,15 @@ def _json_value(value: Any) -> Any:
     return str(value)
 
 
-def _serialize_retrieved(result: RetrievedChunk) -> dict[str, Any]:
-    source = result.source
-    chunk = result.chunk
+def _serialize_search_result(search_result: SearchResult) -> dict[str, Any]:
+    source = search_result.source
+    search = search_result.search
+    chunk = search_result.chunk
+
     return {
-        'rank': result.rank,
-        'score': result.score,
-        'score_kind': result.score_kind.value,
+        'rank': search.rank,
+        'score': search.score,
+        'score_kind': search.score_kind.value,
         'document_id': source.document_id,
         'chunk_id': source.chunk_id,
         'source_url': source.source_url,
@@ -135,6 +130,7 @@ def _serialize_retrieved(result: RetrievedChunk) -> dict[str, Any]:
         'publisher': source.publisher,
         'collection': source.collection,
         'publication_date': _json_value(source.publication_date),
+        'section_id': source.section_id,
         'section_path': list(source.section_path),
         'page_start': source.page_start,
         'page_end': source.page_end,
@@ -143,15 +139,26 @@ def _serialize_retrieved(result: RetrievedChunk) -> dict[str, Any]:
     }
 
 
+def _serialize_context(context: RetrievedContext) -> dict[str, Any]:
+    return {
+        'section_id': context.section_id,
+        'text': context.text,
+        'search_results': [
+            _serialize_search_result(result)
+            for result in context.search_results
+        ],
+        'sources': context.sources,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class RAGResult:
     question: str
     mode: SearchMode
     k: int
-    context: str  #TODO: check the use after merge
     messages: tuple[Message, ...]
     generated: GeneratedAnswer
-    retrieved: tuple[RetrievedChunk, ...] = ()
+    retrieved_contexts: tuple[SearchResult, ...] = ()
     sources: tuple[SourceReference, ...] = ()
     invalid_citations: tuple[InvalidCitation, ...] = ()
     error: RAGError | None = None
@@ -165,7 +172,7 @@ class RAGResult:
         default_factory=lambda: MappingProxyType({})
     )
     raw_provider_response: Any = None
-    contexts: tuple[Context, ...] = field(default_factory=tuple)
+    contexts: tuple[RetrievedContext, ...] = field(default_factory=tuple)
 
     @property
     def chunks(self) -> list[DocumentChunkRow]:
@@ -176,7 +183,7 @@ class RAGResult:
         object.__setattr__(
             self, 'messages', tuple(dict(message) for message in self.messages)
         )
-        object.__setattr__(self, 'retrieved', tuple(self.retrieved))
+        object.__setattr__(self, 'retrieved', tuple(self.retrieved_contexts))
         object.__setattr__(self, 'sources', tuple(self.sources))
         object.__setattr__(self, 'invalid_citations', tuple(self.invalid_citations))
         object.__setattr__(
@@ -200,7 +207,14 @@ class RAGResult:
                 'answer': self.generated.answer,
                 'citations': _json_value(self.generated.citations),
             },
-            'retrieved': [_serialize_retrieved(item) for item in self.retrieved],
+            'search_results': [
+                _serialize_search_result(result)
+                for result in self.retrieved_contexts
+            ],
+            'contexts': [
+                _serialize_context(context)
+                for context in self.contexts
+            ],
             'sources': [source.to_dict() for source in self.sources],
             'invalid_citations': _json_value(self.invalid_citations),
             'error': _json_value(self.error),
