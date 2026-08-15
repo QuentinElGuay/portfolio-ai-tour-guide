@@ -1,24 +1,23 @@
-"""Knowledge-base persistence, search, and LLM-context retrieval."""
+"""Ranked evidence search over the knowledge-base corpus."""
 
-from .retrieval import RetrievedContext, retrieve
-from .search import (
+from .models import (
+    DEFAULT_RRF_RANK_CONSTANT,
     HybridSearchSettings,
     ScoreKind,
     SearchMetadata,
     SearchMode,
     SearchResult,
     SourceMetadata,
-    search,
 )
+from .service import search
 
 __all__ = [
+    'DEFAULT_RRF_RANK_CONSTANT',
     'HybridSearchSettings',
-    'RetrievedContext',
     'ScoreKind',
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
     'SourceMetadata',
-    'retrieve',
     'search',
 ]

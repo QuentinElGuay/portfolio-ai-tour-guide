@@ -1,6 +1,8 @@
+"""SQLAlchemy engine creation for the knowledge-base database."""
+
 from sqlalchemy import URL, Engine, create_engine
 
-from ai_tour_guide.knowledge_base.settings import DatabaseSettings
+from .settings import DatabaseSettings
 
 
 def _search_path_option(schema: str) -> str:
@@ -8,9 +10,8 @@ def _search_path_option(schema: str) -> str:
 
 
 def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
-    """Create the PostgreSQL SQLAlchemy engine."""
+    """Create a PostgreSQL SQLAlchemy engine using the selected schema search path."""
     selected_settings = settings or DatabaseSettings()
-
     database_url = URL.create(
         drivername='postgresql+psycopg',
         username=selected_settings.user,
@@ -19,9 +20,11 @@ def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
         port=selected_settings.port,
         database=selected_settings.name,
     )
-
     return create_engine(
         database_url,
         connect_args={'options': _search_path_option(selected_settings.schema_name)},
         pool_pre_ping=True,
     )
+
+
+__all__ = ['create_database_engine']

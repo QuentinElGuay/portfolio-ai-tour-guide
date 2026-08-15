@@ -1,10 +1,4 @@
-"""SQLAlchemy ORM mappings for the knowledge-base tables.
-
-The database schema remains defined in :mod:`ai_tour_guide.database.tables`.
-These classes map ORM behavior and relationships onto those existing
-``Table`` objects so constraints, indexes, and column definitions have a
-single source of truth.
-"""
+"""SQLAlchemy ORM mappings over the Core schema declared in ``tables.py``."""
 
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -15,14 +9,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
 from ai_tour_guide.ingestion.config import ChunkingConfig
-from ai_tour_guide.knowledge_base.tables import (
-    document_chunks,
-    documents,
-    embedding_models,
-)
-from ai_tour_guide.knowledge_base.tables import (
-    metadata as table_metadata,
-)
+
+from .tables import document_chunks, documents, embedding_models
+from .tables import metadata as table_metadata
 
 
 class Base(DeclarativeBase):
@@ -48,19 +37,7 @@ class EmbeddingModelRow(Base):
     distance_metric: Mapped[str]
     created_at: Mapped[datetime]
 
-    documents: Mapped[list[DocumentRow]] = relationship(
-        back_populates='embedding_model',
-    )
-
-    def __repr__(self) -> str:
-        return (
-            'EmbeddingModelRow('
-            f'embedding_model_id={self.embedding_model_id!r}, '
-            f'provider={self.provider!r}, '
-            f'model_name={self.model_name!r}, '
-            f'model_revision={self.model_revision!r}'
-            ')'
-        )
+    documents: Mapped[list['DocumentRow']] = relationship(back_populates='embedding_model')
 
 
 class DocumentRow(Base):
@@ -100,26 +77,13 @@ class DocumentRow(Base):
     embedded_at: Mapped[datetime | None]
     created_at: Mapped[datetime]
 
-    embedding_model: Mapped[EmbeddingModelRow] = relationship(
-        back_populates='documents',
-    )
-    chunks: Mapped[list[DocumentChunkRow]] = relationship(
+    embedding_model: Mapped[EmbeddingModelRow] = relationship(back_populates='documents')
+    chunks: Mapped[list['DocumentChunkRow']] = relationship(
         back_populates='document',
         cascade='all, delete-orphan',
         passive_deletes=True,
         order_by='DocumentChunkRow.chunk_index',
     )
-
-    def __repr__(self) -> str:
-        return (
-            'DocumentRow('
-            f'document_id={self.document_id!r}, '
-            f'collection={self.collection!r}, '
-            f'version={self.version!r}, '
-            f'title={self.title!r}, '
-            f'source_url={self.source_url!r}'
-            ')'
-        )
 
 
 class DocumentChunkRow(Base):
@@ -145,26 +109,11 @@ class DocumentChunkRow(Base):
     search_vector: Mapped[Any]
     created_at: Mapped[datetime]
 
-    document: Mapped[DocumentRow] = relationship(
-        back_populates='chunks',
-    )
-
-    def __repr__(self) -> str:
-        return (
-            'DocumentChunkRow('
-            f'document_id={self.document_id!r}, '
-            f'chunk_id={self.chunk_id!r}, '
-            f'chunk_index={self.chunk_index!r}'
-            ')'
-        )
+    document: Mapped[DocumentRow] = relationship(back_populates='chunks')
 
 
 class ModelFactory:
-    """Create transient ORM rows from ingestion domain objects.
-
-    The factory unwraps nested domain values and converts immutable tuples to
-    mutable lists suitable for PostgreSQL array and vector columns.
-    """
+    """Create transient ORM rows from ingestion domain objects."""
 
     @staticmethod
     def create_document(
@@ -174,14 +123,8 @@ class ModelFactory:
         chunking: ChunkingConfig,
         chunks: Sequence[EmbeddedChunk] = (),
     ) -> DocumentRow:
-        """Create a document row with child chunk rows ready for a session.
-
-        Primary keys and timestamps are omitted so PostgreSQL can generate
-        them. Adding the returned row to a session also persists its chunks
-        through the configured ``save-update`` relationship cascade.
-        """
+        """Create a document aggregate ready to be added to a SQLAlchemy session."""
         metadata = document.metadata
-
         row = DocumentRow(
             embedding_model_id=embedding_model_id,
             collection=document.collection,
@@ -193,6 +136,7 @@ class ModelFactory:
             authors=list(metadata.authors),
             subject=metadata.subject,
             keywords=list(metadata.keywords),
+            language=getattr(metadata, 'language', None),
             creator=metadata.creator,
             producer=metadata.producer,
             format=metadata.format,
@@ -205,15 +149,17 @@ class ModelFactory:
             max_chunk_chars=chunking.max_chars,
             section_chunk_min_depth=chunking.section_chunk_min_depth,
             section_chunk_max_depth=chunking.section_chunk_max_depth,
+            target_chunk_tokens=getattr(chunking, 'target_tokens', None),
+            max_chunk_tokens=getattr(chunking, 'max_tokens', None),
+            chunk_overlap_tokens=getattr(chunking, 'overlap_tokens', None),
         )
         row.chunks = [ModelFactory.create_chunk(chunk) for chunk in chunks]
         return row
 
     @staticmethod
     def create_chunk(chunk: EmbeddedChunk) -> DocumentChunkRow:
-        """Create a chunk row to attach to a :class:`DocumentRow`."""
+        """Create a persisted chunk row from one embedded ingestion chunk."""
         source = chunk.chunk
-
         return DocumentChunkRow(
             chunk_id=source.chunk_id,
             chunk_index=source.chunk_index,
@@ -225,6 +171,8 @@ class ModelFactory:
             page_start=source.page_start,
             page_end=source.page_end,
             character_count=source.character_count,
+            token_count=getattr(source, 'token_count', None),
+            content_hash=getattr(source, 'content_hash', None),
             embedding_input_sha256=chunk.embedding_input_sha256,
             embedding=list(chunk.embedding),
         )
