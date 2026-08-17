@@ -26,17 +26,24 @@ def reciprocal_rank_fusion(
 ) -> list[SearchResult]:
     """Combine ranked results with weighted reciprocal-rank fusion."""
     candidates: dict[_ChunkIdentity, _FusionCandidate] = {}
+
     for ranking, weight in rankings:
         for rank, result in enumerate(ranking, start=1):
-            identity = _ChunkIdentity(result.source.document_id, result.source.chunk_id)
-            candidate = candidates.setdefault(identity, _FusionCandidate(result=result))
+            identity = _ChunkIdentity(
+                result.chunk.document_id,
+                result.chunk.chunk_id,
+            )
+            candidate = candidates.setdefault(
+                identity,
+                _FusionCandidate(result=result),
+            )
             candidate.score += weight / (rank_constant + rank)
 
     ordered = sorted(candidates.values(), key=lambda item: item.score, reverse=True)
+
     return [
         SearchResult(
             chunk=candidate.result.chunk,
-            source=candidate.result.source,
             search=SearchMetadata(
                 rank=rank,
                 score=candidate.score,

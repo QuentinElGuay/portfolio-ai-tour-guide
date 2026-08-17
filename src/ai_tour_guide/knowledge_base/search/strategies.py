@@ -15,7 +15,6 @@ from .models import (
     SearchMode,
     SearchResult,
 )
-from .provenance import source_metadata_from_chunk
 from .queries import search_text, search_vector
 
 
@@ -32,8 +31,11 @@ class TextSearchStrategy:
         return [
             SearchResult(
                 chunk=result.chunk,
-                search=SearchMetadata(rank=rank, score=result.score, score_kind=ScoreKind.TEXT_RANK),
-                source=source_metadata_from_chunk(result.chunk),
+                search=SearchMetadata(
+                    rank=rank,
+                    score=result.score,
+                    score_kind=ScoreKind.TEXT_RANK,
+                ),
             )
             for rank, result in enumerate(search_text(session, query, k), start=1)
         ]
@@ -53,10 +55,12 @@ class VectorSearchStrategy:
                 chunk=result.chunk,
                 search=SearchMetadata(
                     rank=rank,
-                    score=_relevance_score(result.score, self.embedder.metadata.distance_metric),
+                    score=_relevance_score(
+                        result.score,
+                        self.embedder.metadata.distance_metric,
+                    ),
                     score_kind=score_kind,
                 ),
-                source=source_metadata_from_chunk(result.chunk),
             )
             for rank, result in enumerate(
                 search_vector(

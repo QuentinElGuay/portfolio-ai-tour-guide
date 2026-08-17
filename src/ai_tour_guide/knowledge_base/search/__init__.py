@@ -7,7 +7,6 @@ from .models import (
     SearchMetadata,
     SearchMode,
     SearchResult,
-    SourceDocumentMetadata,
 )
 from .service import search
 
@@ -18,6 +17,5 @@ __all__ = [
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
-    'SourceDocumentMetadata',
     'search',
 ]

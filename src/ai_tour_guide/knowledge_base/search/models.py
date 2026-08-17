@@ -1,11 +1,10 @@
 """Immutable search-domain models shared by strategies, evaluations, and retrieval."""
 
 from dataclasses import dataclass
-from datetime import date
 from enum import StrEnum
 from math import isfinite
 
-from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
+from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 
 
 class SearchMode(StrEnum):
@@ -44,30 +43,16 @@ class SearchMetadata:
 
 
 @dataclass(frozen=True, slots=True)
-class SourceDocumentMetadata:
-    """Stable provenance of one matched or context-provided chunk."""
-
-    document_id: int
-    chunk_id: str
-    title: str
-    url: str
-    publisher: str | None
-    publication_date: date | None
-    collection: str | None
-    version: str | None
-    section_id: str
-    section_path: tuple[str, ...]
-    page_start: int | None
-    page_end: int | None
-
-
-@dataclass(frozen=True, slots=True)
 class SearchResult:
-    """One raw ranked match returned by a search strategy."""
+    """One raw ranked chunk returned by a search strategy."""
 
     chunk: DocumentChunkRow
     search: SearchMetadata
-    source: SourceDocumentMetadata
+
+    @property
+    def document(self) -> DocumentRow:
+        """Return the source document already attached to the matched chunk."""
+        return self.chunk.document
 
 
 DEFAULT_RRF_RANK_CONSTANT = 60
@@ -99,5 +84,4 @@ __all__ = [
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
-    'SourceDocumentMetadata',
 ]

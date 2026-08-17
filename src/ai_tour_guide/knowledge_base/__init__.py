@@ -1,13 +1,12 @@
 """Knowledge-base persistence, search, and LLM-context retrieval."""
 
-from .retrieval import RetrievedContext, retrieve
+from .retrieval import RetrievedContext, retrieve_context
 from .search import (
     HybridSearchSettings,
     ScoreKind,
     SearchMetadata,
     SearchMode,
     SearchResult,
-    SourceDocumentMetadata,
     search,
 )
 
@@ -18,7 +17,6 @@ __all__ = [
     'SearchMetadata',
     'SearchMode',
     'SearchResult',
-    'SourceDocumentMetadata',
-    'retrieve',
+    'retrieve_context',
     'search',
 ]

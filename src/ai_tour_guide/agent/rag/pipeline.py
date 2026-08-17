@@ -17,7 +17,7 @@ from ai_tour_guide.agent.responses import (
     LLM_CONFIGURATION_REQUIRED_ANSWER,
     RETRIEVAL_ERROR_ANSWER,
 )
-from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.search import SearchMode
 
 logger = logging.getLogger(__name__)
@@ -50,13 +50,11 @@ def answer_question(
     retrieval_started = perf_counter()
 
     try:
-        contexts = tuple(
-            retrieve(
+        contexts = retrieve_context(
                 question,
-                mode=selected_mode,
+                search_mode=selected_mode,
                 k=k,
             )
-        )
     except (OSError, SQLAlchemyError) as exc:
         retrieval_latency = (perf_counter() - retrieval_started) * 1000
 

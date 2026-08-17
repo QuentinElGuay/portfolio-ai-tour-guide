@@ -2,10 +2,11 @@
 
 from collections.abc import Sequence
 
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.source_formatting import format_page_range
+from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search.models import SearchResult, SourceDocumentMetadata
+from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 SYSTEM_PROMPT = """You are a concise, reliable tour guide.
 Answer the user's question using only the supplied retrieved context.
@@ -25,7 +26,7 @@ def build_llm_context(contexts: Sequence[RetrievedContext]) -> str:
 
 
 def _format_context(context: RetrievedContext) -> str:
-    sources = _format_sources(context.sources)
+    sources = _format_sources(context.chunks)
 
     return (
         f'{sources}\n'
@@ -34,18 +35,17 @@ def _format_context(context: RetrievedContext) -> str:
     )
 
 
-def _format_sources(source_documents: Sequence[SourceDocumentMetadata]) -> str:
+def _format_sources(document_chunks: Sequence[DocumentChunkRow]) -> str:
     # All siblings belong to the same document.
-    source_document = source_documents[0]
-
+  
     pages = sorted(
         {
             page
-            for source in source_documents
-            if source.page_start is not None
+            for chunk in document_chunks
+            if chunk.page_start is not None
             for page in range(
-                source.page_start,
-                (source.page_end or source.page_start) + 1,
+                chunk.page_start,
+                (chunk.page_end or chunk.page_start) + 1,
             )
         }
     )
@@ -58,23 +58,17 @@ def _format_sources(source_documents: Sequence[SourceDocumentMetadata]) -> str:
     )
 
 
-def build_messages(question: str, contexts: Sequence[RetrievedContext]) -> list[Message]:
+def build_messages(question: str, contexts: Sequence[RetrievedContext]) -> tuple[Message, ...]:
     """Build the grounded chat messages sent to the configured backend."""
     context = build_llm_context(contexts)
-    return [
-        {'role': 'system', 'content': SYSTEM_PROMPT},
-        {
-            'role': 'user',
-            'content': (
-                f'Retrieved context:\n\n{context}\n\nUser question:\n{question}'
-            ),
-        },
-    ]
+    return (
+        Message(role=Role.USER, content=SYSTEM_PROMPT),
+        Message(role=Role.USER, content=f'Retrieved context:\n\n{context}\n\nUser question:\n{question}'),
+    )
 
 
 __all__ = [
     'SYSTEM_PROMPT',
-    'build_context_from_chunks',
     'build_llm_context',
     'build_messages',
 ]

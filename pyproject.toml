@@ -46,6 +46,10 @@ number = true
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 
+[tool.pyright]
+typeCheckingMode = "standard"
+include = ["src", "tests"]
+
 [dependency-groups]
 dev = [
     "mdformat>=1.0.0",
@@ -57,4 +61,5 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.1",
     "questionary>=2.1.1",
+    "pyright>=1.1.411",
 ]

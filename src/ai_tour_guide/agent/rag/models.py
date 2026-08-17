@@ -8,7 +8,6 @@ from types import MappingProxyType
 from typing import Any
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import SearchMode
 from ai_tour_guide.knowledge_base.search.models import SearchResult
