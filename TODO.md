@@ -21,10 +21,12 @@ already been implemented are intentionally omitted.
 
 ## Evaluation
 
-- [ ] Implement the RAG evaluation runner in `evaluation/rag/run.py`.
-  - It currently raises `NotImplementedError` after loading the golden cases.
-- [ ] Add deterministic evaluation metrics in `evaluation/rag/metrics.py` once the
-  runner contract is finalized.
+- [x] Implement the RAG evaluation runner in `evaluation/rag/run.py`.
+  - It runs the production RAG pipeline and aggregates deterministic metrics.
+- [x] Add deterministic evaluation metrics in `evaluation/rag/metrics.py`.
+- [x] Add an opt-in LLM judge using golden `reference_answer` values.
+- [ ] Persist generated RAG traces and judge results for later re-scoring without
+  rerunning the answer model.
 - [ ] Reconcile the `corpus_knowledge_base` fixture contract.
   - Its annotation and documentation expect a corpus-version argument, while the
     implementation currently exposes a zero-argument factory.

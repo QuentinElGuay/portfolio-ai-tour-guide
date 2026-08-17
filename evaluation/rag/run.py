@@ -1,6 +1,7 @@
 """Standalone RAG benchmark runner."""
 
 import argparse
+import asyncio
 import json
 from pathlib import Path
 
@@ -14,7 +15,8 @@ from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 from ai_tour_guide.knowledge_base.search import SearchMode
 from evaluation.dataset import DEFAULT_DATASET_ROOT, load_golden_dataset
-from evaluation.rag.metrics import score_case, summarize
+from evaluation.rag.judge import OpenAIAnswerJudge
+from evaluation.rag.metrics import score_case, summarize, summarize_judgements
 
 DEFAULT_K = 5
 
@@ -25,6 +27,7 @@ def run(
     dataset_root: Path = DEFAULT_DATASET_ROOT,
     mode: SearchMode = SearchMode.VECTOR,
     k: int = DEFAULT_K,
+    judge: bool = False,
 ) -> None:
     """Run end-to-end RAG evaluation over one corpus and golden dataset."""
     if k <= 0:
@@ -38,6 +41,7 @@ def run(
         )
 
     selected_mode = SearchMode(mode)
+    answer_judge = OpenAIAnswerJudge() if judge else None
     with (
         corpus_context(root=corpus_root, schema_name='evaluation'),
         database_engine(schema_name='evaluation') as engine,
@@ -50,6 +54,7 @@ def run(
                 )
 
         case_metrics = []
+        verdicts = []
         for case in tqdm(cases, desc=f'RAG ({selected_mode.value})', unit='case'):
             result = answer_question(
                 case.question,
@@ -59,6 +64,8 @@ def run(
                 engine=engine,
             )
             case_metrics.append(score_case(case, result))
+            if answer_judge is not None:
+                verdicts.append(asyncio.run(answer_judge.judge(case, result.answer)))
 
     report = {
         'dataset': str(dataset_root),
@@ -68,6 +75,11 @@ def run(
         'k': k,
         'metrics': summarize(case_metrics),
     }
+    if answer_judge is not None:
+        report['judge'] = {
+            'model': answer_judge.model,
+            'metrics': summarize_judgements(verdicts),
+        }
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
@@ -81,12 +93,18 @@ def main() -> None:
         default=SearchMode.VECTOR.value,
     )
     parser.add_argument('--k', type=int, default=DEFAULT_K)
+    parser.add_argument(
+        '--judge',
+        action='store_true',
+        help='Score generated answers against golden reference answers with an LLM.',
+    )
     args = parser.parse_args()
     run(
         corpus_root=args.corpus,
         dataset_root=args.dataset,
         mode=SearchMode(args.mode),
         k=args.k,
+        judge=args.judge,
     )
 
 

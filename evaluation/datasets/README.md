@@ -35,3 +35,7 @@ parsing errors here; those are operational-failure tests, not corpus-ground-trut
 `section_path` identifies expected provenance. It is slugified and contains the document
 section path with its final heading removed. A result matches when its reduced,
 slugified section path is equal to the expected path.
+
+When `make evaluate-judge` is used, `reference_answer` is supplied to the optional LLM
+judge to assess the generated answer semantically. It is not used by search or the
+deterministic citation and latency metrics.

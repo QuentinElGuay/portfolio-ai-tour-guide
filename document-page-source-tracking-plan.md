@@ -28,6 +28,7 @@ flowchart TD
     R --> API[HTTP API]
     API --> CHAT[Chat backend]
     C --> RE[RAG evaluation]
+    RE --> J[Optional LLM judge]
 ```
 
 ## Source and citation contracts
@@ -96,7 +97,7 @@ They are not used by the current search-evaluation golden dataset.
 The search evaluator lives in `evaluation/search/` and is run with:
 
 ```bash
-make evaluate EVALUATION=retrieval
+make evaluate-search
 ```
 
 The Make target name remains compatible, but the evaluator itself is called “search
@@ -134,20 +135,24 @@ comparison. Pages are intentionally absent from this dataset.
 
 ## Remaining work
 
-### Implement the RAG evaluator
+### RAG and judge evaluation
 
-`evaluation/rag/run.py` is still a stub. It should:
+The RAG evaluator is implemented in `evaluation/rag/run.py`. It calls
+`answer_question()` for each golden case, displays progress with `tqdm`, and reports
+aggregate citation, provenance, refusal, error, and latency metrics.
 
-- call `answer_question()` for each golden case;
-- display progress with `tqdm`;
-- retain the answer, contexts, raw citations, valid sources, invalid citations, errors,
-  timing, and model metadata;
-- calculate aggregate results;
-- avoid changing the normal CLI/API response contract.
+Use the following commands:
 
-`evaluation/rag/metrics.py` should be implemented after the per-case result contract is
-defined. Candidate metrics include answer correctness, citation validity, citation
-precision/recall, and refusal quality.
+- `make evaluate-rag` runs the RAG pipeline without semantic judging;
+- `make evaluate-judge` runs the RAG pipeline and judges each answer against its golden
+  `reference_answer`;
+- `make evaluate` runs search plus the judge-enabled RAG evaluation;
+- `make evaluate-all` is an alias for `make evaluate`.
+
+Search evaluation is offline because it does not call an LLM. RAG and judge evaluation
+are online because they call the configured answer model; the judge adds a second model
+call per case. Judge metrics are aggregated, while individual reasons are not yet
+persisted.
 
 ### Complete agent tests
 
@@ -177,6 +182,7 @@ initialization process. This is not required for the current search-evaluation C
 - [x] CLI, API, and chat consume normalized sources without reselecting them.
 - [x] Search evaluation uses raw `SearchResult` values.
 - [x] Search evaluation uses slugified section paths and no pages.
-- [ ] RAG evaluation runner is implemented.
+- [x] RAG evaluation runner is implemented with deterministic metrics.
+- [x] Optional LLM judge evaluates answers against golden reference answers.
 - [ ] Placeholder agent tests are replaced with real assertions.
 - [ ] Full test suite passes without incomplete skeleton tests.

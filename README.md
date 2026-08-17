@@ -133,6 +133,10 @@ Set an OpenAI API key in `.env` to generate answers:
 AGENT_OPENAI_API_KEY=your-api-key
 ```
 
+`make evaluate` and `make evaluate-judge` can optionally use a separate judge
+configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MODEL`.
+When these are absent, it reuses `AGENT_OPENAI_API_KEY` and `AGENT_OPENAI_MODEL`.
+
 > [!NOTE]
 > OpenAI is the only currently supported LLM provider at the moment but more might be
 > added in the future.
@@ -168,11 +172,11 @@ Run `make help` for every available shortcut.
 | `make ingest`                           | Ingest documents defined in `source_files.json`.     |
 | `make export-corpus`                    | Overwrite the current knowledge-base corpus export.  |
 | `make load-corpus DB_SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
-| `make evaluate`                         | Run search and RAG checks.                           |
-| `make evaluate-search`                  | Run search metrics only.                             |
-| `make evaluate-rag`                     | Run RAG citation and latency metrics.                |
-| `make evaluate JUDGE=1`                 | Also run the optional, costlier LLM judge.           |
-| `make evaluate-all`                     | Alias for `make evaluate JUDGE=1`.                   |
+| `make evaluate`                         | Run search, RAG, and judge evaluation.               |
+| `make evaluate-search`                  | Run offline search metrics only.                     |
+| `make evaluate-rag`                     | Run RAG metrics without answer judging.              |
+| `make evaluate-judge`                   | Generate and judge RAG answers only.                 |
+| `make evaluate-all`                     | Alias for `make evaluate`.                           |
 | `make vector_search QUESTION='...'`     | Search chunks semantically.                          |
 | `make text_search QUESTION='...'`       | Search chunks with PostgreSQL full-text search.      |
 | `make ask QUESTION='...'`               | Generate an answer from retrieved context.           |

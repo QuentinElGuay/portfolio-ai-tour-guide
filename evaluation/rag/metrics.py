@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from ai_tour_guide.agent.rag.models import RAGResult
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from evaluation.dataset import GoldenCase, slugify_section_path
+from evaluation.rag.judge import JudgeVerdict
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +98,18 @@ def summarize(metrics: Iterable[RAGCaseMetrics]) -> dict[str, float | int]:
     }
 
 
+def summarize_judgements(verdicts: Iterable[JudgeVerdict]) -> dict[str, float | int]:
+    """Aggregate semantic answer-quality verdicts returned by the LLM judge."""
+    values = list(verdicts)
+    if not values:
+        return {'cases': 0}
+    return {
+        'cases': len(values),
+        'answer_correct_rate': _mean(float(verdict.correct) for verdict in values),
+        'mean_judge_latency_ms': _mean(verdict.latency_ms for verdict in values),
+    }
+
+
 def _citation_sections(
     result: RAGResult,
 ) -> set[tuple[tuple[str, str | None], tuple[str, ...]]]:
@@ -131,4 +144,4 @@ def _mean_optional(values: Iterable[float | None]) -> float | None:
     return _mean(present) if present else None
 
 
-__all__ = ['RAGCaseMetrics', 'score_case', 'summarize']
+__all__ = ['RAGCaseMetrics', 'score_case', 'summarize', 'summarize_judgements']

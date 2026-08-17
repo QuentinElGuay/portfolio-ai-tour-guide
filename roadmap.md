@@ -601,12 +601,13 @@ LLM, for example:
 
 ______________________________________________________________________
 
-### [P0] Build the offline evaluation runner
+### [P0] Build the evaluation runners
 
 **Labels:** `evaluation`, `developer-experience`
 
-Create a reproducible offline evaluation entry point that can execute retrieval and LLM
-experiments against versioned datasets and persist comparable results.
+Create reproducible evaluation entry points against versioned datasets. Search
+evaluation is offline; RAG and judge evaluation call live LLM providers and are
+therefore online.
 
 The evaluation runner is a development tool, not a long-running application service. It
 should reuse the same retrieval and LLM application components used by the agent, but
@@ -618,13 +619,12 @@ implementation detail when it provides the right database, network, and dependen
 environment. If a Compose entry is added for evaluation, it should be a short-lived tool
 service behind an evaluation profile, not an always-on application service.
 
-- [ ] Add an `ai_tour_guide.evaluation` package with retrieval and LLM evaluation entry
-  points
-- [ ] Add a CLI command for search evaluation
-- [ ] Add a CLI command for LLM evaluation
-- [ ] Add `make eval-retrieval` and `make eval-llm` shortcuts for the evaluation
-  commands
-- [ ] Allow evaluation commands to run against an isolated PostgreSQL schema, for
+- [x] Add evaluation entry points for search, RAG, and optional LLM judging
+- [x] Add a CLI command for search evaluation
+- [x] Add a CLI command for RAG and LLM-judge evaluation
+- [x] Add `make evaluate-search`, `make evaluate-rag`, and `make evaluate-judge`
+  shortcuts for the evaluation commands
+- [x] Allow evaluation commands to run against an isolated PostgreSQL schema, for
   example `DB_SCHEMA=evaluation`
 - [ ] Allow an experiment/configuration name to be recorded with each run
 - [ ] Persist machine-readable results for every run
@@ -637,8 +637,9 @@ service behind an evaluation profile, not an always-on application service.
 **Suggested interface**
 
 ```text
-make eval-retrieval -> uv run python -m ai_tour_guide.evaluation retrieval --dataset evals/retrieval.jsonl
-make eval-llm -> uv run python -m ai_tour_guide.evaluation llm --dataset evals/llm.jsonl
+make evaluate-search -> uv run python -m evaluation.search.run
+make evaluate-rag -> uv run python -m evaluation.rag.run
+make evaluate-judge -> uv run python -m evaluation.rag.run --judge
 ```
 
 This is a proposed interface for the new evaluation module. It follows the project's
@@ -647,7 +648,7 @@ existing `uv run` workflow without adding an unrelated project-specific command.
 **Deliverables**
 
 - `evals/` — versioned evaluation datasets and experiment definitions
-- offline evaluation runner/CLI — executes retrieval and LLM experiments
+- evaluation runners/CLI — executes search, RAG, and optional judge evaluations
 - `results/` or equivalent generated artifacts — JSON/CSV metrics plus a Markdown
   summary
 - documented winning retrieval configuration
@@ -656,8 +657,8 @@ existing `uv run` workflow without adding an unrelated project-specific command.
 
 **Acceptance criteria**
 
-- [ ] Retrieval and LLM evaluations can be executed without the chat UI
-- [ ] The runner uses production retrieval and LLM components rather than duplicate
+- [x] Search, RAG, and LLM-judge evaluations can be executed without the chat UI
+- [x] The runner uses production retrieval and LLM components rather than duplicate
   implementations
 - [ ] Every experiment records enough configuration to reproduce the comparison
 - [ ] Results from multiple approaches can be compared in one report
@@ -668,6 +669,30 @@ existing `uv run` workflow without adding an unrelated project-specific command.
 - Python
 - Click
 - JSONL
+
+______________________________________________________________________
+
+### [P1] Speed up online evaluations safely
+
+**Labels:** `evaluation`, `performance`, `llm`
+
+RAG and judge evaluations call external LLMs and currently process cases serially. Add
+bounded asynchronous scheduling without exceeding provider limits or losing the stable
+case ordering used by reports.
+
+- [ ] Extract an async RAG evaluation path instead of creating one event loop per case
+- [ ] Run independent cases concurrently with a configurable in-flight limit
+- [ ] Add a shared requests-per-second limiter for answer and judge calls
+- [ ] Retry transient failures and rate limits with bounded exponential backoff
+- [ ] Preserve case order and aggregate failures without aborting the whole run
+- [ ] Keep search evaluation independent from the online LLM scheduler
+
+**Acceptance criteria**
+
+- [ ] Online evaluations complete faster for the same dataset
+- [ ] Concurrency and rate limits are configurable from the evaluation command
+- [ ] The evaluator remains within the configured provider limits
+- [ ] Results remain comparable with serial execution
 
 ______________________________________________________________________
 
@@ -792,6 +817,8 @@ variations.
 
 **Evaluation dimensions**
 
+- [x] Optional structured LLM judge compares generated answers with the golden
+  `reference_answer`; it is available through `make evaluate-judge`
 - [ ] Answer correctness
 - [ ] Groundedness / faithfulness to the supplied context
 - [ ] Unsupported-question handling
@@ -800,8 +827,9 @@ variations.
 - [ ] Citation accuracy if citations are part of an evaluated approach
 - [ ] Manual review of representative successes and failures
 
-Automated LLM-as-a-judge tooling is optional. A small, clearly documented manual rubric
-is acceptable for the core milestone as long as every prompt is evaluated consistently.
+The optional automated LLM judge is implemented for semantic answer correctness. A
+small, clearly documented manual rubric remains useful for qualities the judge does not
+measure reliably, such as nuanced groundedness and usefulness.
 
 **Experiment rules**
 
@@ -847,7 +875,7 @@ ______________________________________________________________________
 - [ ] A reviewer can see evidence for both project evaluation criteria
 - [ ] The documented winner matches the configuration used by the application
 - [ ] Evaluation limitations are explicit
-- [ ] Results can be regenerated with the offline evaluation runner
+- [ ] Results can be regenerated with the evaluation runners
 
 ______________________________________________________________________
 
@@ -863,7 +891,7 @@ Ships when **Milestone 5** passes its exit criteria:
 - Versioned LLM evaluation dataset
 - Multiple prompt/LLM approaches compared under fixed retrieval context
 - Selected LLM/prompt configuration used by the application
-- Reproducible offline evaluation runner and documented results
+- Reproducible evaluation runners and documented results
 
 ______________________________________________________________________
 
@@ -899,6 +927,7 @@ ______________________________________________________________________
 - [ ] Log questions and answers
 - [ ] Log retrieved chunks
 - [ ] Log model and prompt version
+- [ ] Log input, output, cached, and reasoning token usage
 - [ ] Log latency
 - [ ] Log errors
 - [ ] Avoid storing unnecessary personal data
@@ -1157,7 +1186,7 @@ where retrieval and generation run together exactly as they do in the applicatio
 
 **Tools**
 
-- Existing offline evaluation runner
+- Existing evaluation runners
 - Ragas, DeepEval, or a documented manual rubric
 
 ______________________________________________________________________
@@ -1195,7 +1224,8 @@ performance into a Milestone 5 scoring requirement.
 - [ ] Measure retrieval latency
 - [ ] Measure end-to-end answer latency
 - [ ] Record retrieved context size
-- [ ] Record LLM input and output token usage
+- [x] Capture provider usage metadata in generated-answer and judge traces
+- [ ] Aggregate LLM input, output, cached, and reasoning token usage in reports
 - [ ] Estimate per-request LLM cost for evaluated configurations
 - [ ] Compare quality/latency/cost tradeoffs for major configuration changes
 
@@ -1204,6 +1234,9 @@ performance into a Milestone 5 scoring requirement.
 - [ ] Measurements are collected with a documented methodology
 - [ ] The project can explain the main quality-versus-cost tradeoffs
 - [ ] Performance measurements do not replace the quality metrics from Milestone 5
+
+The current implementation captures provider usage metadata in memory, but does not yet
+aggregate, persist, price, or alert on token consumption.
 
 ______________________________________________________________________
 
