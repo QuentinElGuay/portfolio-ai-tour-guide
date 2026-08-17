@@ -84,9 +84,7 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
             {
                 'schema_version': ASK_RESPONSE_SCHEMA_VERSION,
                 'answer': result.answer,
-                'sources': [
-                    source.to_dict() for source in result.sources
-                ],  # TODO: see contexts
+                'sources': [source.to_dict() for source in result.sources],
             }
         )
     )
