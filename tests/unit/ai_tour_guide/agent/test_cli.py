@@ -13,7 +13,6 @@ def _result() -> RAGResult:
         question='What?',
         mode=SearchMode.TEXT,
         k=2,
-        context='',
         messages=(),
         generated=GeneratedAnswer('The coast is beautiful.'),
         sources=(

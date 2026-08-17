@@ -217,5 +217,5 @@ def test_build_retrieved_contexts_empty_results_issue_no_sibling_queries(
     retrieve_siblings: MagicMock,
 ) -> None:
     contexts = build_retrieved_contexts(MagicMock(), [])
-    assert contexts == []
+    assert contexts == ()
     retrieve_siblings.assert_not_called()

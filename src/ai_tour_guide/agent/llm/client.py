@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from openai import APIError, AsyncOpenAI
 
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.llm.interfaces import GenerationError
 from ai_tour_guide.agent.llm.settings import OpenAISettings
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
@@ -31,7 +31,14 @@ class OpenAIClient:
             response = await self._client.responses.create(
                 model=self.model,
                 input=[
-                    {'role': message['role'].value, 'content': message['content']}
+                    {
+                        'role': (
+                            message['role'].value
+                            if isinstance(message['role'], Role)
+                            else message['role']
+                        ),
+                        'content': message['content'],
+                    }
                     for message in messages
                 ],
                 text={
