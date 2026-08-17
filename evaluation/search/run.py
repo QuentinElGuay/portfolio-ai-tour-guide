@@ -3,13 +3,25 @@
 import argparse
 import json
 from collections.abc import Iterable
+from dataclasses import asdict
 from pathlib import Path
+from time import perf_counter
 from typing import Any, TypedDict
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
-from ai_tour_guide.knowledge_base.search import SearchMode, SearchResult, search
+from ai_tour_guide.knowledge_base.database.connection import database_engine
+from ai_tour_guide.knowledge_base.database.models import DocumentRow
+from ai_tour_guide.knowledge_base.search import SearchMode, SearchResult
+from ai_tour_guide.knowledge_base.search.strategies import (
+    HybridSearchStrategy,
+    SearchStrategy,
+    VectorSearchStrategy,
+    create_search_strategy,
+)
 from evaluation.dataset import (
     DEFAULT_DATASET_ROOT,
     GoldenCase,
@@ -26,15 +38,29 @@ DEFAULT_K = 5
 SEARCH_MODES = tuple(SearchMode)
 
 
+class SearchResultTrace(TypedDict):
+    """Diagnostic fields retained for one raw ranked search result."""
+
+    rank: int
+    score: float
+    score_kind: str
+    chunk_id: str
+    document_id: int
+    source_url: str
+    version: str | None
+    section_path: tuple[str, ...]
+
+
 class CaseMetrics(TypedDict):
-    """Metrics and trace data for one evaluated question."""
+    """Metrics and diagnostics calculated for one evaluated question."""
 
     id: int
     category: str
-    hit_rate_at_k: float
-    recall_at_k: float
-    reciprocal_rank: float
-    retrieved_chunks: list[str]
+    search_latency_ms: float
+    raw_hit_rate_at_k: float
+    raw_recall_at_k: float
+    raw_reciprocal_rank: float
+    results: list[SearchResultTrace]
 
 
 def _evidence_key(
@@ -46,45 +72,64 @@ def _evidence_key(
 
 
 def _expected_evidence(case: GoldenCase) -> tuple[str, ...]:
-    evidence: set[str] = set()
-    for source in case.expected.relevant_sources:
-        evidence.add(
-            _evidence_key(source.source_url, source.version, source.section_path)
-        )
+    evidence = {
+        _evidence_key(source.source_url, source.version, source.section_path)
+        for source in case.expected.relevant_sources
+    }
     return tuple(sorted(evidence))
 
 
-def _retrieved_evidence(
-    results: Iterable[SearchResult],
-) -> list[str]:
-    """Return unique section evidence keys in raw search ranking order."""
-    evidence: dict[str, None] = {}
-    for result in results:
-        source_document = result.document
-        key = _evidence_key(
-            source_document.source_url,
-            source_document.version,
-            slugify_section_path(list(result.chunk.section_path[:-1])),
-        )
-        evidence.setdefault(key, None)
-    return list(evidence)
-
-
-def _case_metrics(case: GoldenCase, search_mode: SearchMode, *, k: int) -> CaseMetrics:
-    expected: tuple[str, ...] = _expected_evidence(case)
-    results = search(
-        case.question,
-        mode=search_mode,
-        k=k,
+def _section_evidence_key(result: SearchResult) -> str:
+    """Return the golden-dataset section identity for one search result."""
+    source_document = result.document
+    return _evidence_key(
+        source_document.source_url,
+        source_document.version,
+        slugify_section_path(list(result.chunk.section_path[:-1])),
     )
-    retrieved_evidence = _retrieved_evidence(results)
+
+
+def _raw_evidence(results: Iterable[SearchResult]) -> list[str]:
+    """Return one section evidence key per raw ranked search result."""
+    return [_section_evidence_key(result) for result in results]
+
+
+def _trace(result: SearchResult) -> SearchResultTrace:
+    """Preserve raw search diagnostics for optional detailed reporting."""
+    return {
+        'rank': result.search.rank,
+        'score': result.search.score,
+        'score_kind': result.search.score_kind.value,
+        'chunk_id': result.chunk.chunk_id,
+        'document_id': result.document.document_id,
+        'source_url': result.document.source_url,
+        'version': result.document.version,
+        'section_path': tuple(result.chunk.section_path),
+    }
+
+
+def _case_metrics(
+    session: Session,
+    strategy: SearchStrategy,
+    case: GoldenCase,
+    *,
+    k: int,
+) -> CaseMetrics:
+    """Evaluate raw chunk ranking for one golden case."""
+    expected = _expected_evidence(case)
+    started = perf_counter()
+    results = strategy.search(session, case.question, k=k)
+    search_latency_ms = (perf_counter() - started) * 1000
+    raw_evidence = _raw_evidence(results)
+
     return {
         'id': case.case_id,
         'category': case.category,
-        'hit_rate_at_k': hit_rate_at_k(retrieved_evidence, expected, k=k),
-        'recall_at_k': recall_at_k(retrieved_evidence, expected, k=k),
-        'reciprocal_rank': reciprocal_rank(retrieved_evidence, expected),
-        'retrieved_chunks': [result.chunk.chunk_id for result in results],
+        'search_latency_ms': search_latency_ms,
+        'raw_hit_rate_at_k': hit_rate_at_k(raw_evidence, expected, k=k),
+        'raw_recall_at_k': recall_at_k(raw_evidence, expected, k=k),
+        'raw_reciprocal_rank': reciprocal_rank(raw_evidence, expected),
+        'results': [_trace(result) for result in results],
     }
 
 
@@ -92,34 +137,61 @@ def run(
     *,
     corpus_root: Path = DEFAULT_CORPUS_ROOT,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
+    k: int = DEFAULT_K,
+    modes: Iterable[SearchMode] = SEARCH_MODES,
 ) -> None:
     """Run search evaluation over one corpus and one golden dataset."""
+    if k <= 0:
+        raise ValueError('k must be greater than zero')
     cases = load_golden_dataset(root=dataset_root)
+    selected_modes = tuple(SearchMode(mode) for mode in modes)
 
-    with corpus_context(root=corpus_root, schema_name='evaluation'):
+    with (
+        corpus_context(root=corpus_root, schema_name='evaluation'),
+        database_engine(schema_name='evaluation') as engine,
+    ):
         report: dict[str, Any] = {
             'dataset': str(dataset_root),
             'corpus': str(corpus_root),
-            'k': DEFAULT_K,
+            'schema': 'evaluation',
+            'k': k,
             'cases': len(cases),
             'modes': {},
         }
-        for mode in SEARCH_MODES:
-            case_results = [
-                _case_metrics(case, mode, k=DEFAULT_K)
-                for case in tqdm(
-                    cases,
-                    desc=f'Search ({mode.value})',
-                    unit='case',
+        with Session(engine) as session:
+            session.connection()
+            if session.scalar(select(DocumentRow.document_id).limit(1)) is None:
+                raise RuntimeError(
+                    'The evaluation schema is empty. Run `make evaluate` after '
+                    'loading a corpus.'
                 )
-            ]
-            report['modes'][mode.value] = {
-                'hit_rate_at_k': _mean(case['hit_rate_at_k'] for case in case_results),
-                'recall_at_k': _mean(case['recall_at_k'] for case in case_results),
-                'mean_reciprocal_rank': _mean(
-                    case['reciprocal_rank'] for case in case_results
-                ),
-            }
+            for mode in selected_modes:
+                strategy = create_search_strategy(mode)
+                case_results = [
+                    _case_metrics(session, strategy, case, k=k)
+                    for case in tqdm(
+                        cases,
+                        desc=f'Search ({mode.value})',
+                        unit='case',
+                    )
+                ]
+                report['modes'][mode.value] = {
+                    'configuration': _strategy_configuration(strategy),
+                    'chunk_ranking': {
+                        'hit_rate_at_k': _mean(
+                            case['raw_hit_rate_at_k'] for case in case_results
+                        ),
+                        'recall_at_k': _mean(
+                            case['raw_recall_at_k'] for case in case_results
+                        ),
+                        'mean_reciprocal_rank': _mean(
+                            case['raw_reciprocal_rank'] for case in case_results
+                        ),
+                    },
+                    'mean_search_latency_ms': _mean(
+                        case['search_latency_ms'] for case in case_results
+                    ),
+                }
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
@@ -128,16 +200,40 @@ def _mean(values: Iterable[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _strategy_configuration(strategy: SearchStrategy) -> dict[str, object]:
+    """Return reproducibility information for the active search strategy."""
+    configuration: dict[str, object] = {'strategy': type(strategy).__name__}
+    if isinstance(strategy, VectorSearchStrategy):
+        configuration['embedding'] = asdict(strategy.embedder.metadata)
+    if isinstance(strategy, HybridSearchStrategy):
+        configuration['hybrid'] = {
+            'vector_weight': strategy.settings.vector_weight,
+            'text_weight': strategy.settings.text_weight,
+            'rank_constant': strategy.settings.rank_constant,
+        }
+        if isinstance(strategy.vector, VectorSearchStrategy):
+            configuration['embedding'] = asdict(strategy.vector.embedder.metadata)
+    return configuration
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description='Evaluate retrieval over a fixed corpus.'
-    )
+    parser = argparse.ArgumentParser(description='Evaluate ranked search results.')
     parser.add_argument('--corpus', type=Path, default=DEFAULT_CORPUS_ROOT)
     parser.add_argument('--dataset', type=Path, default=DEFAULT_DATASET_ROOT)
+    parser.add_argument('--k', type=int, default=DEFAULT_K)
+    parser.add_argument(
+        '--mode',
+        type=SearchMode,
+        choices=SEARCH_MODES,
+        action='append',
+        help='Evaluate one mode; repeat to evaluate several modes. Defaults to all.',
+    )
     args = parser.parse_args()
     run(
         corpus_root=args.corpus,
         dataset_root=args.dataset,
+        k=args.k,
+        modes=args.mode or SEARCH_MODES,
     )
 
 

@@ -83,6 +83,7 @@ class InvalidCitation:
 class CitationValidationResult:
     references: tuple[SourceReference, ...]
     invalid_citations: tuple[InvalidCitation, ...]
+    matched_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +164,7 @@ class RAGResult:
     contexts: tuple[RetrievedContext, ...] = field(default_factory=tuple)
     sources: tuple[SourceReference, ...] = ()
     invalid_citations: tuple[InvalidCitation, ...] = ()
+    citation_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
     error: RAGError | None = None
     retrieval_latency_ms: float | None = None
     generation_latency_ms: float | None = None
@@ -181,6 +183,13 @@ class RAGResult:
         )
         object.__setattr__(self, 'sources', tuple(self.sources))
         object.__setattr__(self, 'invalid_citations', tuple(self.invalid_citations))
+        object.__setattr__(
+            self,
+            'citation_section_paths',
+            tuple(
+                tuple(path for path in paths) for paths in self.citation_section_paths
+            ),
+        )
         object.__setattr__(
             self, 'retrieval_metadata', _freeze_mapping(self.retrieval_metadata)
         )
@@ -209,6 +218,7 @@ class RAGResult:
             'contexts': [_serialize_context(context) for context in self.contexts],
             'sources': [source.to_dict() for source in self.sources],
             'invalid_citations': _json_value(self.invalid_citations),
+            'citation_section_paths': _json_value(self.citation_section_paths),
             'error': _json_value(self.error),
             'retrieval_latency_ms': self.retrieval_latency_ms,
             'generation_latency_ms': self.generation_latency_ms,

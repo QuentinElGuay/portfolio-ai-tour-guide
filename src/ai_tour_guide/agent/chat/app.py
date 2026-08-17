@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Sequence
 
@@ -8,6 +9,7 @@ import gradio as gr
 from ai_tour_guide.agent.chat.backends import (
     ChatBackend,
     DemoBackend,
+    HttpChatBackend,
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Message, Role
@@ -95,7 +97,13 @@ def _render_response(payload: dict[str, object]) -> str:
 
 
 def main() -> None:
-    app = create_app(create_backend())
+    backend = create_backend()
+    if isinstance(backend, HttpChatBackend):
+        try:
+            asyncio.run(backend.check_ready())
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+    app = create_app(backend)
     app.launch(
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),

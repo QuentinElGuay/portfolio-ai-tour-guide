@@ -2,11 +2,15 @@
 
 from datetime import date
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
 from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.knowledge_base.database.connection import create_database_engine
+from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 ASK_RESPONSE_SCHEMA_VERSION = 1
 
@@ -61,9 +65,34 @@ class AskResponse(BaseModel):
 app = FastAPI(title='AI Tour Guide Agent')
 
 
+def _ensure_knowledge_base_ready() -> None:
+    """Raise a service error when the configured schema has no corpus."""
+    engine = create_database_engine()
+    try:
+        with engine.connect() as connection:
+            document_id = connection.scalar(select(DocumentRow.document_id).limit(1))
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail='The knowledge base is unavailable. Check the database service.',
+        ) from exc
+    finally:
+        engine.dispose()
+
+    if document_id is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                'The knowledge base is empty. Run `make load-corpus DB_SCHEMA=public` '
+                'before starting the application.'
+            ),
+        )
+
+
 @app.get('/health')
 def health() -> dict[str, str]:
-    """Report that the HTTP process is ready to receive requests."""
+    """Report that the HTTP process and its knowledge base are ready."""
+    _ensure_knowledge_base_ready()
     return {'status': 'ok'}
 
 

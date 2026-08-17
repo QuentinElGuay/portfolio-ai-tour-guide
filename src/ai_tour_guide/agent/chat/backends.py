@@ -60,6 +60,25 @@ class HttpChatBackend(ChatBackend):
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
+    async def check_ready(self) -> None:
+        """Verify that the API and its configured knowledge base are ready."""
+        health_url = f'{self.api_url.rsplit("/", 1)[0]}/health'
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(health_url)
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = ''
+            try:
+                payload = exc.response.json()
+                detail = payload.get('detail', '') if isinstance(payload, dict) else ''
+            except ValueError:
+                pass
+            message = f' Chat API health check failed: {detail}' if detail else ''
+            raise RuntimeError(f'The chat API is not ready.{message}') from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError('Unable to reach the chat API health check.') from exc
+
     async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
         question = next(
             (

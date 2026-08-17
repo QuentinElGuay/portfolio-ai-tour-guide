@@ -150,9 +150,10 @@ Open `http://localhost:7860` to use the chat. The agent API is available at
 `http://localhost:8000/docs`.
 
 The first ingestion or image build can download the configured embedding model. To
-recreate the local database and ingest the same source URL again, use `make reset-db`.
-Use `DB_SCHEMA` to target another schema in the same PostgreSQL database, for example
-when isolating future evaluation data from local development data.
+recreate the local database, use `make reset-db`, then run `make ingest` to populate the
+public schema. A reset intentionally leaves the database empty until ingestion
+completes. Use `DB_SCHEMA` to target another schema in the same PostgreSQL database, for
+example when isolating future evaluation data from local development data.
 
 > [!WARNING]
 > `make reset-db` permanently deletes the project's PostgreSQL volume.

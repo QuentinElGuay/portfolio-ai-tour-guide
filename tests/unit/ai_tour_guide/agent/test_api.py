@@ -1,7 +1,11 @@
+from unittest.mock import MagicMock, patch
+
 from ai_tour_guide.agent.api import health
 
 
-def test_health_reports_ok() -> None:
+@patch('ai_tour_guide.agent.api._ensure_knowledge_base_ready')
+def test_health_reports_ok(_ensure_knowledge_base_ready: MagicMock) -> None:
+    _ensure_knowledge_base_ready.return_value = None
     assert health() == {'status': 'ok'}
 
 

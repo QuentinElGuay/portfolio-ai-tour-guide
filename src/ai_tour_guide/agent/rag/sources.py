@@ -24,6 +24,7 @@ class CitationEvidence:
 
     document: DocumentRow
     pages: set[int]
+    section_paths: set[tuple[str, ...]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +92,10 @@ def validate_citations(
             if all(not context.pages for context in document_sources):
                 valid.setdefault(
                     identity,
-                    CitationEvidence(source, set()),
+                    CitationEvidence(source, set(), set()),
+                )
+                valid[identity].section_paths.update(
+                    tuple(context.section_path) for context in document_sources
                 )
             else:
                 invalid.append(
@@ -116,21 +120,29 @@ def validate_citations(
         confirmed = cited_pages & supported
         if confirmed:
             existing = valid.setdefault(
-                identity,
-                CitationEvidence(source, set()),
+                identity, CitationEvidence(source, set(), set())
             )
             existing.pages.update(confirmed)
+            existing.section_paths.update(
+                tuple(context.section_path)
+                for context in document_sources
+                if confirmed & set(context.pages)
+            )
         if confirmed != cited_pages:
             invalid.append(
                 _invalid(citation, CitationInvalidReason.UNSUPPORTED_PAGE, source)
             )
 
+    evidence_values = tuple(valid.values())
     return CitationValidationResult(
         references=tuple(
             _reference(evidence.document, tuple(evidence.pages))
-            for evidence in valid.values()
+            for evidence in evidence_values
         ),
         invalid_citations=tuple(invalid),
+        matched_section_paths=tuple(
+            tuple(sorted(evidence.section_paths)) for evidence in evidence_values
+        ),
     )
 
 

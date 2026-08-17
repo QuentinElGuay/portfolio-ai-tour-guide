@@ -126,6 +126,7 @@ def answer_question(
         contexts=contexts,
         sources=sources,
         invalid_citations=validation.invalid_citations,
+        citation_section_paths=validation.matched_section_paths,
         retrieval_latency_ms=retrieval_latency,
         generation_latency_ms=generation_latency,
         total_latency_ms=(perf_counter() - started) * 1000,

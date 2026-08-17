@@ -34,6 +34,7 @@ help: ## Show the available commands.
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
 	@echo "  make evaluate                        Load corpus and run both evaluations"
+	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
 	@echo "  make evaluate EVALUATION=rag        Load corpus and run RAG evaluation"
 	@echo "  make evaluate EVALUATION=both       Run both evaluations"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
@@ -94,7 +95,7 @@ evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluati
 	$(COMPOSE) up -d --wait database
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
 	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
-		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
 	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = both ]; then \
 		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \

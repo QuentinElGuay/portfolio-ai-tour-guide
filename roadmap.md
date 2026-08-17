@@ -1228,6 +1228,36 @@ capture reliably.
 
 ______________________________________________________________________
 
+### [P3] Add CI/CD search evaluation quality gates
+
+**Labels:** `evaluation`, `ci`, `deployment`, `experiments`, `post-capstone`
+
+Run the search evaluation automatically before production deployment after the current
+capstone goals are complete. The evaluator should remain runnable locally, while CI uses
+its aggregate metrics and diagnostics as a deployment quality gate.
+
+- [ ] Add a CI job that starts the evaluation database, loads the pinned corpus, and
+  runs the search evaluation before deployment
+- [ ] Define minimum thresholds for hit rate@K, recall@K, and MRR per search mode
+- [ ] Fail the deployment when a metric regresses beyond the accepted tolerance
+- [ ] Record run metadata: commit, dataset, corpus, search mode, `k`, embedding
+  configuration, and execution timestamp
+- [ ] Upload aggregate reports and representative failure diagnostics as CI artifacts
+- [ ] Compare the current run with the main-branch or last-release baseline
+- [ ] Add an optional durable store for historical runs after the CI artifact flow is
+  reliable
+- [ ] Keep local evaluation independent from CI services and historical persistence
+
+**Acceptance criteria**
+
+- [ ] Search evaluation runs automatically before production deployment
+- [ ] A search regression blocks deployment with an actionable report
+- [ ] Evaluation runs can be reproduced from their recorded configuration
+- [ ] Aggregate results and failure diagnostics are retained as CI artifacts
+- [ ] Historical persistence is additive and does not become a runtime dependency
+
+______________________________________________________________________
+
 ### [P3] Deploy to the cloud
 
 - [ ] Select hosting provider
