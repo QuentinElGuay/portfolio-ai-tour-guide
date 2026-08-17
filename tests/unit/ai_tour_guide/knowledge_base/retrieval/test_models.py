@@ -76,8 +76,9 @@ def test_retrieved_context_derives_text_path_and_exact_pages_from_siblings() -> 
     )
 
     context = RetrievedContext(
-        document=document,
+        source_document=document,
         section_id='section-a',
+        section_path=('Guide', 'section-a'),
         context_chunks=(first, second),
         search_results=(_search_result(first, rank=1),),
     )
@@ -102,8 +103,9 @@ def test_retrieved_context_keeps_original_search_result_metadata_unchanged() -> 
     )
 
     context = RetrievedContext(
-        document=document,
+        source_document=document,
         section_id='section-a',
+        section_path=('Guide', 'section-a'),
         context_chunks=(first, second),
         search_results=(first_result, second_result),
     )
@@ -124,8 +126,9 @@ def test_retrieved_context_rejects_mixed_document_chunks() -> None:
 
     with pytest.raises(ValueError, match='context document and section'):
         RetrievedContext(
-            document=document_a,
+            source_document=document_a,
             section_id='section-a',
+            section_path=('Guide', 'section-a'),
             context_chunks=(chunk_a, chunk_b),
             search_results=(_search_result(chunk_a, rank=1),),
         )
@@ -138,8 +141,9 @@ def test_retrieved_context_rejects_search_result_from_another_section() -> None:
 
     with pytest.raises(ValueError, match='search results'):
         RetrievedContext(
-            document=document,
+            source_document=document,
             section_id='section-a',
+            section_path=('Guide', 'section-a'),
             context_chunks=(sibling,),
             search_results=(_search_result(other_section, rank=1),),
         )

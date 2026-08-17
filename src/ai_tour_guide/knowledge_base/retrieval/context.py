@@ -59,6 +59,7 @@ def build_retrieved_contexts(
         first_result = search_results[0]
         document = first_result.document
         section_id = first_result.chunk.section_id
+        section_path = tuple(first_result.chunk.section_path)
 
         siblings = retrieve_section_chunks(
             session,
@@ -68,8 +69,9 @@ def build_retrieved_contexts(
 
         contexts.append(
             RetrievedContext(
-                document=document,
+                source_document=document,
                 section_id=section_id,
+                section_path=section_path,
                 context_chunks=siblings,
                 # Keep the original objects: rank, score and score kind are untouched.
                 search_results=tuple(search_results),

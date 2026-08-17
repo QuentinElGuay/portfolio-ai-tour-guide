@@ -34,8 +34,9 @@ def _context(*pages: int) -> RetrievedContext:
         for index, page in enumerate(pages)
     )
     return RetrievedContext(
-        document=document,
+        source_document=document,
         section_id='section-a',
+        section_path=('Guide', 'section-a'),
         context_chunks=chunks,
         search_results=tuple(
             SearchResult(

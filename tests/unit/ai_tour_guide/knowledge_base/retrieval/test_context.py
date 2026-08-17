@@ -184,7 +184,8 @@ def test_build_retrieved_contexts_queries_once_per_unique_document_section(
 
     # Exactly one context exists per unique document+section identity.
     identities = [
-        (context.document.document_id, context.section_id) for context in contexts
+        (context.source_document.document_id, context.section_id)
+        for context in contexts
     ]
     assert identities == [
         (1, 'section-a'),

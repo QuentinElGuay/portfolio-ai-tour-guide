@@ -1,8 +1,12 @@
 """Golden-dataset loading utilities."""
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+
+_NON_ALPHANUMERIC_RE = re.compile(r'[^a-z0-9]+')
 
 DEFAULT_DATASET_ROOT = Path('evaluation/datasets')
 GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
@@ -12,8 +16,7 @@ GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
 class SourceExpectation:
     source_url: str
     version: str | None
-    pages: tuple[int, ...]
-    section_paths: tuple[tuple[str, ...], ...]
+    section_path: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,11 +39,25 @@ def golden_dataset_path(*, root: Path = DEFAULT_DATASET_ROOT) -> Path:
     return root / GOLDEN_DATASET_FILENAME
 
 
+def slugify_section_path(section_path: list[str]) -> tuple[str, ...]:
+    """Normalize section titles for stable evaluation comparisons."""
+    return tuple(
+        _NON_ALPHANUMERIC_RE.sub(
+            '-',
+            unicodedata.normalize('NFKD', title)
+            .encode('ascii', 'ignore')
+            .decode('ascii')
+            .lower(),
+        ).strip('-')
+        for title in section_path
+    )
+
+
 def load_golden_dataset(
     *,
     root: Path = DEFAULT_DATASET_ROOT,
 ) -> list[GoldenCase]:
-    """Load document/page and answer expectations from a JSONL dataset."""
+    """Load section-based answer expectations from a JSONL dataset."""
     path = golden_dataset_path(root=root)
     cases: list[GoldenCase] = []
 
@@ -59,11 +76,7 @@ def load_golden_dataset(
                     SourceExpectation(
                         source_url=source['source_url'],
                         version=source['version'],
-                        pages=tuple(source['pages']),
-                        section_paths=tuple(
-                            tuple(section_path)
-                            for section_path in source.get('section_paths', [])
-                        ),
+                        section_path=slugify_section_path(source['section_path']),
                     )
                     for source in expected['relevant_sources']
                 )

@@ -2,12 +2,22 @@
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any, TypedDict
+
+from tqdm import tqdm
 
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
-from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.retrieval import retrieve_context
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import SearchMode
-from evaluation.dataset import DEFAULT_DATASET_ROOT, GoldenCase, load_golden_dataset
+from evaluation.dataset import (
+    DEFAULT_DATASET_ROOT,
+    GoldenCase,
+    load_golden_dataset,
+    slugify_section_path,
+)
 from evaluation.retrieval.metrics import (
     hit_rate_at_k,
     recall_at_k,
@@ -18,57 +28,67 @@ DEFAULT_K = 5
 SEARCH_MODES = tuple(SearchMode)
 
 
+class CaseMetrics(TypedDict):
+    """Metrics and trace data for one evaluated question."""
+
+    id: int
+    category: str
+    hit_rate_at_k: float
+    recall_at_k: float
+    reciprocal_rank: float
+    retrieved_chunks: list[str]
+
+
 def _evidence_key(
     source_url: str,
     version: str | None,
     section_path: tuple[str, ...],
-    page: int,
 ) -> str:
-    return json.dumps([source_url, version, section_path, page], ensure_ascii=False)
+    return json.dumps([source_url, version, section_path], ensure_ascii=False)
 
 
-def _expected_evidence(case: GoldenCase) -> set[str]:
+def _expected_evidence(case: GoldenCase) -> tuple[str, ...]:
     evidence: set[str] = set()
     for source in case.expected.relevant_sources:
-        paths = source.section_paths or ((),)
-        for section_path in paths:
-            for page in source.pages:
-                evidence.add(
-                    _evidence_key(source.source_url, source.version, section_path, page)
-                )
-    return evidence
-
-
-def _retrieved_evidence(result: object) -> list[str]:
-    source = result.source
-    if source.page_start is None or source.page_end is None:
-        return []
-    return [
-        _evidence_key(
-            source.source_url,
-            source.version,
-            source.section_path,
-            page,
+        evidence.add(
+            _evidence_key(source.source_url, source.version, source.section_path)
         )
-        for page in range(source.page_start, source.page_end + 1)
-    ]
+    return tuple(sorted(evidence))
 
 
-def _case_metrics(case: GoldenCase, mode: SearchMode, *, k: int) -> dict[str, object]:
-    expected = _expected_evidence(case)
-    retrieved = retrieve(case.question, mode=mode, k=k)
-    retrieved_evidence = [
-        evidence for result in retrieved for evidence in _retrieved_evidence(result)
-    ]
-    # A page-spanning chunk can produce duplicate evidence keys; preserve rank order.
-    deduplicated = list(dict.fromkeys(retrieved_evidence))
+def _retrieved_evidence(
+    retrieved_contexts: Iterable[RetrievedContext],
+) -> list[str]:
+    """Return unique retrieved evidence keys in ranking order."""
+    evidence: dict[str, None] = {}
+    for retrieved_context in retrieved_contexts:
+        source_document = retrieved_context.source_document
+        key = _evidence_key(
+            source_document.source_url,
+            source_document.version,
+            slugify_section_path(list(retrieved_context.section_path[:-1])),
+        )
+        evidence.setdefault(key, None)
+    return list(evidence)
+
+
+def _case_metrics(case: GoldenCase, search_mode: SearchMode, *, k: int) -> CaseMetrics:
+    expected: tuple[str, ...] = _expected_evidence(case)
+    retrieved_contexts: tuple[RetrievedContext, ...] = retrieve_context(
+        case.question, search_mode=search_mode, k=k
+    )
+    retrieved_evidence = _retrieved_evidence(retrieved_contexts)
     return {
         'id': case.case_id,
         'category': case.category,
-        'hit_rate_at_k': hit_rate_at_k(deduplicated, expected, k=k),
-        'recall_at_k': recall_at_k(deduplicated, expected, k=k),
-        'reciprocal_rank': reciprocal_rank(deduplicated, expected),
-        'retrieved_chunks': [result.source.chunk_id for result in retrieved],
+        'hit_rate_at_k': hit_rate_at_k(retrieved_evidence, expected, k=k),
+        'recall_at_k': recall_at_k(retrieved_evidence, expected, k=k),
+        'reciprocal_rank': reciprocal_rank(retrieved_evidence, expected),
+        'retrieved_chunks': [
+            result.chunk.chunk_id
+            for context in retrieved_contexts
+            for result in context.search_results
+        ],
     }
 
 
@@ -81,7 +101,7 @@ def run(
     cases = load_golden_dataset(root=dataset_root)
 
     with corpus_context(root=corpus_root, schema_name='evaluation'):
-        report: dict[str, object] = {
+        report: dict[str, Any] = {
             'dataset': str(dataset_root),
             'corpus': str(corpus_root),
             'k': DEFAULT_K,
@@ -89,19 +109,25 @@ def run(
             'modes': {},
         }
         for mode in SEARCH_MODES:
-            case_results = [_case_metrics(case, mode, k=DEFAULT_K) for case in cases]
+            case_results = [
+                _case_metrics(case, mode, k=DEFAULT_K)
+                for case in tqdm(
+                    cases,
+                    desc=f'Retrieval ({mode.value})',
+                    unit='case',
+                )
+            ]
             report['modes'][mode.value] = {
                 'hit_rate_at_k': _mean(case['hit_rate_at_k'] for case in case_results),
                 'recall_at_k': _mean(case['recall_at_k'] for case in case_results),
                 'mean_reciprocal_rank': _mean(
                     case['reciprocal_rank'] for case in case_results
                 ),
-                'cases': case_results,
             }
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
-def _mean(values: object) -> float:
+def _mean(values: Iterable[float]) -> float:
     values = list(values)
     return sum(values) / len(values) if values else 0.0
 

@@ -11,7 +11,7 @@ QUESTION ?=
 K ?= 5
 ANNOTATOR_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
-EVALUATION ?= retrieval
+EVALUATION ?= both
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
@@ -33,7 +33,7 @@ help: ## Show the available commands.
 	@echo "  make export-corpus                   Overwrite the current corpus export"
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
-	@echo "  make evaluate                        Load corpus and run retrieval evaluation"
+	@echo "  make evaluate                        Load corpus and run both evaluations"
 	@echo "  make evaluate EVALUATION=rag        Load corpus and run RAG evaluation"
 	@echo "  make evaluate EVALUATION=both       Run both evaluations"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
@@ -91,6 +91,7 @@ load-corpus: ## Replace the knowledge-base corpus in the selected DB_SCHEMA.
 
 evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluations.
 	@case "$(EVALUATION)" in retrieval|rag|both) ;; *) echo "EVALUATION must be retrieval, rag, or both" >&2; exit 1;; esac
+	$(COMPOSE) up -d --wait database
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
 	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
 		uv run python -m evaluation.retrieval.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \

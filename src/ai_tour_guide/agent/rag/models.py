@@ -146,9 +146,9 @@ def _serialize_context(context: RetrievedContext) -> dict[str, Any]:
             _serialize_search_result(result) for result in context.search_results
         ],
         'source': {
-            'source_url': context.document.source_url,
-            'version': context.document.version,
-            'title': context.document.title,
+            'source_url': context.source_document.source_url,
+            'version': context.source_document.version,
+            'title': context.source_document.title,
         },
     }
 

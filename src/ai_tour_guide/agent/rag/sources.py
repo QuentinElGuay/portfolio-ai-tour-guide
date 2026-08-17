@@ -72,7 +72,7 @@ def validate_citations(
     """Trust only page evidence actually supplied by the knowledge base."""
     documents: OrderedDict[DocumentIdentity, list[RetrievedContext]] = OrderedDict()
     for context in retrieved:
-        document = context.document
+        document = context.source_document
         documents.setdefault(
             DocumentIdentity(document.source_url, document.version), []
         ).append(context)
@@ -85,7 +85,7 @@ def validate_citations(
         if not document_sources:
             invalid.append(_invalid(citation, CitationInvalidReason.UNKNOWN_DOCUMENT))
             continue
-        source = document_sources[0].document
+        source = document_sources[0].source_document
         start, end = citation.page_start, citation.page_end
         if start is None and end is None:
             if all(not context.pages for context in document_sources):

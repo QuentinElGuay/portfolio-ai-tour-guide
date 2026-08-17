@@ -25,7 +25,7 @@ def build_llm_context(contexts: Sequence[RetrievedContext]) -> str:
 
 
 def _format_context(context: RetrievedContext) -> str:
-    sources = _format_source(context.document, context.pages)
+    sources = _format_source(context.source_document, context.pages)
 
     return f'{sources}\nSection: {" > ".join(context.section_path)}\n\n{context.text}'
 
