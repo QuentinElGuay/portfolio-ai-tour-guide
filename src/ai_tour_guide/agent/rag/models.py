@@ -101,7 +101,7 @@ def _json_value(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Enum):
         return value.value
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return {key: _json_value(item) for key, item in asdict(value).items()}
     if isinstance(value, Mapping):
         return {str(key): _json_value(item) for key, item in value.items()}
@@ -113,7 +113,7 @@ def _json_value(value: Any) -> Any:
 
 
 def _serialize_search_result(search_result: SearchResult) -> dict[str, Any]:
-    source = search_result.source
+    source = search_result.document
     search = search_result.search
     chunk = search_result.chunk
 
@@ -122,17 +122,17 @@ def _serialize_search_result(search_result: SearchResult) -> dict[str, Any]:
         'score': search.score,
         'score_kind': search.score_kind.value,
         'document_id': source.document_id,
-        'chunk_id': source.chunk_id,
-        'source_url': source.url,
+        'chunk_id': chunk.chunk_id,
+        'source_url': source.source_url,
         'version': source.version,
         'title': source.title,
         'publisher': source.publisher,
         'collection': source.collection,
         'publication_date': _json_value(source.publication_date),
-        'section_id': source.section_id,
-        'section_path': list(source.section_path),
-        'page_start': source.page_start,
-        'page_end': source.page_end,
+        'section_id': chunk.section_id,
+        'section_path': list(chunk.section_path),
+        'page_start': search_result.page_start,
+        'page_end': search_result.page_end,
         'content_hash': getattr(chunk, 'content_hash', None),
         'text': chunk.text,
     }
@@ -143,10 +143,13 @@ def _serialize_context(context: RetrievedContext) -> dict[str, Any]:
         'section_id': context.section_id,
         'text': context.text,
         'search_results': [
-            _serialize_search_result(result)
-            for result in context.search_results
+            _serialize_search_result(result) for result in context.search_results
         ],
-        'sources': _json_value(context.sources),
+        'source': {
+            'source_url': context.document.source_url,
+            'version': context.document.version,
+            'title': context.document.title,
+        },
     }
 
 
@@ -193,7 +196,6 @@ class RAGResult:
             'question': self.question,
             'mode': self.mode.value,
             'k': self.k,
-            'contexts': self.contexts,
             'messages': _json_value(self.messages),
             'generated': {
                 'answer': self.generated.answer,
@@ -204,10 +206,7 @@ class RAGResult:
                 for context in self.contexts
                 for result in context.search_results
             ],
-            'contexts': [
-                _serialize_context(context)
-                for context in self.contexts
-            ],
+            'contexts': [_serialize_context(context) for context in self.contexts],
             'sources': [source.to_dict() for source in self.sources],
             'invalid_citations': _json_value(self.invalid_citations),
             'error': _json_value(self.error),

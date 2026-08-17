@@ -16,6 +16,7 @@ class LLMClient(Protocol):
 
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
         """Return a structured answer for ``messages``."""
+        ...
 
 
 __all__ = ['GenerationError', 'LLMClient']

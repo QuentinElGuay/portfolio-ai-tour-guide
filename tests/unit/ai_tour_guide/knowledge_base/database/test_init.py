@@ -8,7 +8,6 @@ def test_initialize_database_creates_extension_schema_tables_and_indexes() -> No
     Expected verification: pgvector extension and schema creation execute before Core metadata creates
     tables/indexes, without any duplicated hand-written DDL.
     """
-    
 
 
 def test_initialize_database_rejects_unsupported_schema() -> None:
@@ -17,7 +16,6 @@ def test_initialize_database_rejects_unsupported_schema() -> None:
     Required inputs: one invalid schema string; no engine should be needed.
     Expected verification: ValueError is raised before creating an engine or executing SQL.
     """
-    
 
 
 def test_initialize_database_disposes_only_owned_engine() -> None:
@@ -26,4 +24,3 @@ def test_initialize_database_disposes_only_owned_engine() -> None:
     Required mocks: ``create_database_engine`` plus mocked owned/injected engines.
     Expected verification: internally-created engine is disposed and caller-owned engine is not.
     """
-    

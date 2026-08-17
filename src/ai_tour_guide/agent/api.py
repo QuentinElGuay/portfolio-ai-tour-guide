@@ -5,6 +5,7 @@ from datetime import date
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 
+from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
 from ai_tour_guide.agent.rag.pipeline import answer_question
 
 ASK_RESPONSE_SCHEMA_VERSION = 1
@@ -35,6 +36,19 @@ class SourceResponse(BaseModel):
     publication_date: date | None
     pages: list[int]
 
+    @classmethod
+    def from_reference(cls, reference: SourceReference) -> SourceResponse:
+        """Build an API response from an internal source reference."""
+        return cls(
+            source_url=reference.source_url,
+            version=reference.version,
+            title=reference.title,
+            publisher=reference.publisher,
+            collection=reference.collection,
+            publication_date=reference.publication_date,
+            pages=list(reference.pages),
+        )
+
 
 class AskResponse(BaseModel):
     """Grounded answer and the sources used to produce it."""
@@ -56,13 +70,6 @@ def health() -> dict[str, str]:
 @app.post('/ask', response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result = answer_question(request.question)
-    sources = [
-        SourceResponse(
-            title=retrieved.source.title,
-            page_start=retrieved.source.page_start,
-            page_end=retrieved.source.page_end,
-        )
-        for retrieved in result.chunks
-    ]
+    result: RAGResult = answer_question(request.question)
+    sources = [SourceResponse.from_reference(source) for source in result.sources]
     return AskResponse(answer=result.answer, sources=sources)

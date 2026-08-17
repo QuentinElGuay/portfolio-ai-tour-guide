@@ -37,7 +37,9 @@ def search_vector(
     query_embedding = list(query)
     if not query_embedding:
         raise ValueError('query embedding must not be empty')
-    statement = _vector_statement(query_embedding, k, embedding_metadata=embedding_metadata)
+    statement = _vector_statement(
+        query_embedding, k, embedding_metadata=embedding_metadata
+    )
     return _execute_scored_search(session, statement)
 
 

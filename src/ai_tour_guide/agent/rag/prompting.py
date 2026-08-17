@@ -3,10 +3,8 @@
 from collections.abc import Sequence
 
 from ai_tour_guide.agent.chat.models import Message, Role
-from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
+from ai_tour_guide.knowledge_base.database.models import DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 SYSTEM_PROMPT = """You are a concise, reliable tour guide.
 Answer the user's question using only the supplied retrieved context.
@@ -20,50 +18,39 @@ source URL, version, and page bounds exactly from the context. Return no
 citations for the insufficient-context response.
 """
 
+
 def build_llm_context(contexts: Sequence[RetrievedContext]) -> str:
     """Render retrieval contexts with provenance required for grounded citations."""
     return '\n\n'.join(_format_context(context) for context in contexts)
 
 
 def _format_context(context: RetrievedContext) -> str:
-    sources = _format_sources(context.chunks)
+    sources = _format_source(context.document, context.pages)
 
-    return (
-        f'{sources}\n'
-        f'Section: {' > '.join(context.section_path)}\n\n'
-        f'{context.text}'
-    )
+    return f'{sources}\nSection: {" > ".join(context.section_path)}\n\n{context.text}'
 
 
-def _format_sources(document_chunks: Sequence[DocumentChunkRow]) -> str:
-    # All siblings belong to the same document.
-  
-    pages = sorted(
-        {
-            page
-            for chunk in document_chunks
-            if chunk.page_start is not None
-            for page in range(
-                chunk.page_start,
-                (chunk.page_end or chunk.page_start) + 1,
-            )
-        }
-    )
+def _format_source(source_document: DocumentRow, source_pages: tuple[int, ...]) -> str:
 
     return (
         f'Source: {source_document.title}\n'
-        f'URL: {source_document.url}\n'
+        f'URL: {source_document.source_url}\n'
         f'Version: {source_document.version or "unavailable"}\n'
-        f'Pages: {", ".join(map(str, pages)) or "unavailable"}'
+        f'Pages: {", ".join(str(source_pages))}'
     )
 
 
-def build_messages(question: str, contexts: Sequence[RetrievedContext]) -> tuple[Message, ...]:
+def build_messages(
+    question: str, contexts: Sequence[RetrievedContext]
+) -> tuple[Message, ...]:
     """Build the grounded chat messages sent to the configured backend."""
     context = build_llm_context(contexts)
     return (
         Message(role=Role.USER, content=SYSTEM_PROMPT),
-        Message(role=Role.USER, content=f'Retrieved context:\n\n{context}\n\nUser question:\n{question}'),
+        Message(
+            role=Role.USER,
+            content=f'Retrieved context:\n\n{context}\n\nUser question:\n{question}',
+        ),
     )
 
 

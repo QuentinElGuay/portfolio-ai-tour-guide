@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.retrieval import retrieve
+from ai_tour_guide.knowledge_base.retrieval import retrieve_context
 from ai_tour_guide.knowledge_base.search import SearchMode, SearchResult
 
 
@@ -34,7 +34,7 @@ def main() -> None:
 def search_command(query: str, mode: str, k: int) -> None:
     """Search for document chunks matching QUERY."""
     try:
-        contexts = retrieve(query, mode=mode, k=k)
+        contexts = retrieve_context(query, mode=mode, k=k)
     except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -71,7 +71,7 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
     import json
 
     try:
-        result = answer_question(question, mode=mode, k=k)
+        result = answer_question(question, mode=SearchMode(mode), k=k)
     except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -84,7 +84,9 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
             {
                 'schema_version': ASK_RESPONSE_SCHEMA_VERSION,
                 'answer': result.answer,
-                'sources': [source.to_dict() for source in result.sources],  #TODO: see contexts
+                'sources': [
+                    source.to_dict() for source in result.sources
+                ],  # TODO: see contexts
             }
         )
     )
@@ -93,7 +95,7 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
 def _format_search_result(result: SearchResult) -> str:
     """Format a search result with the provenance needed to inspect a it."""
     return (
-        f'{ result.chunk.chunk_id} ({format_page_range(result.chunk)}) '
+        f'{result.chunk.chunk_id} ({format_page_range(result.page_start, result.page_end)}) '
         f'[rank {result.search.rank}, score {result.search.score:.4f} '
         f'{result.search.score_kind.value}]\n{result.chunk.text}'
     )

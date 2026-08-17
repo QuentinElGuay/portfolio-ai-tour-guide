@@ -1,5 +1,8 @@
 """SQLAlchemy engine creation for the knowledge-base database."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from sqlalchemy import URL, Engine, create_engine
 
 from .settings import DatabaseSettings
@@ -27,4 +30,20 @@ def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
     )
 
 
-__all__ = ['create_database_engine']
+@contextmanager
+def database_engine(
+    engine: Engine | None = None, *, schema_name: str = 'public'
+) -> Iterator[Engine]:
+    """Yield an engine and dispose it only when this context creates it."""
+    owned_engine = engine is None
+    db_engine = engine or create_database_engine(
+        DatabaseSettings(schema_name=schema_name)
+    )
+    try:
+        yield db_engine
+    finally:
+        if owned_engine:
+            db_engine.dispose()
+
+
+__all__ = ['create_database_engine', 'database_engine']

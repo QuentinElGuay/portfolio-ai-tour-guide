@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
+from typing import cast
 
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 
@@ -54,6 +55,16 @@ class SearchResult:
         """Return the source document already attached to the matched chunk."""
         return self.chunk.document
 
+    @property
+    def page_start(self) -> int | None:
+        """Return the matched chunk's first source page."""
+        return cast(int | None, self.chunk.page_start)
+
+    @property
+    def page_end(self) -> int | None:
+        """Return the matched chunk's last source page."""
+        return cast(int | None, self.chunk.page_end)
+
 
 DEFAULT_RRF_RANK_CONSTANT = 60
 
@@ -72,7 +83,9 @@ class HybridSearchSettings:
         if self.text_weight < 0 or not isfinite(self.text_weight):
             raise ValueError('text_weight must be a finite non-negative number')
         if self.vector_weight == 0 and self.text_weight == 0:
-            raise ValueError('at least one hybrid search weight must be greater than zero')
+            raise ValueError(
+                'at least one hybrid search weight must be greater than zero'
+            )
         if self.rank_constant < 0:
             raise ValueError('rank_constant must be non-negative')
 

@@ -7,11 +7,14 @@ from sqlalchemy.orm import Session
 
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
-from ai_tour_guide.knowledge_base.search.models import SearchResult, HybridSearchSettings, SearchMode
+from ai_tour_guide.knowledge_base.search.models import (
+    HybridSearchSettings,
+    SearchMode,
+    SearchResult,
+)
 from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
 
 from .models import RetrievedContext
-
 
 ContextIdentity = tuple[int, str]
 
@@ -67,7 +70,7 @@ def build_retrieved_contexts(
             RetrievedContext(
                 document=document,
                 section_id=section_id,
-                chunks=siblings,
+                context_chunks=siblings,
                 # Keep the original objects: rank, score and score kind are untouched.
                 search_results=tuple(search_results),
             )
@@ -100,5 +103,4 @@ def retrieve_context(
         engine.dispose()
 
 
-
-__all__ = ['build_retrieved_contexts', 'retrieve_section_chunks', 'retrieve_context']
+__all__ = ['build_retrieved_contexts', 'retrieve_context', 'retrieve_section_chunks']

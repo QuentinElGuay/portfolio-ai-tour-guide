@@ -12,21 +12,21 @@ class RetrievedContext:
 
     document: DocumentRow
     section_id: str
-    chunks: tuple[DocumentChunkRow, ...]
+    context_chunks: tuple[DocumentChunkRow, ...]
     search_results: tuple[SearchResult, ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, 'chunks', tuple(self.chunks))
+        object.__setattr__(self, 'context_chunks', tuple(self.context_chunks))
         object.__setattr__(self, 'search_results', tuple(self.search_results))
 
-        if not self.chunks:
+        if not self.context_chunks:
             raise ValueError('RetrievedContext must contain at least one sibling chunk')
         if not self.search_results:
             raise ValueError('RetrievedContext must contain at least one search result')
 
         identity = (self.document.document_id, self.section_id)
 
-        for chunk in self.chunks:
+        for chunk in self.context_chunks:
             if (chunk.document_id, chunk.section_id) != identity:
                 raise ValueError(
                     'all context chunks must belong to the context document and section'
@@ -38,32 +38,33 @@ class RetrievedContext:
                     'all search results must belong to the context document and section'
                 )
 
-        expected_path = tuple(self.chunks[0].section_path)
-        if any(tuple(chunk.section_path) != expected_path for chunk in self.chunks):
+        expected_path = tuple(self.context_chunks[0].section_path)
+        if any(
+            tuple(chunk.section_path) != expected_path for chunk in self.context_chunks
+        ):
             raise ValueError('all context chunks must share the same section path')
 
     @property
     def section_path(self) -> tuple[str, ...]:
         """Return the shared hierarchical path of this section."""
-        return tuple(self.chunks[0].section_path)
+        return tuple(self.context_chunks[0].section_path)
 
     @property
     def text(self) -> str:
         """Join sibling chunks in the order returned by the sibling query."""
-        return '\n\n'.join(chunk.text for chunk in self.chunks)
+        return '\n\n'.join(chunk.text for chunk in self.context_chunks)
 
     @property
     def pages(self) -> tuple[int, ...]:
-        """Return exact unique pages represented by the expanded context."""
-        pages: set[int] = set()
-
-        for chunk in self.chunks:
-            if chunk.page_start is None:
-                continue
-            page_end = chunk.page_start if chunk.page_end is None else chunk.page_end
-            pages.update(range(chunk.page_start, page_end + 1))
-
-        return tuple(sorted(pages))
+        """Return sorted, deduplicated pages with unavailable pages omitted."""
+        page_ranges = (
+            range(chunk.page_start, (chunk.page_end or chunk.page_start) + 1)
+            for chunk in self.context_chunks
+            if chunk.page_start is not None
+        )
+        return tuple(
+            sorted({page for page_range in page_ranges for page in page_range})
+        )
 
 
 __all__ = ['RetrievedContext']

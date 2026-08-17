@@ -29,6 +29,7 @@ def test_search_command_prints_chunks(retrieve: MagicMock) -> None:
     """Verify that the search command displays retrieved chunks and their retrieval metadata."""
     assert False
 
+
 @patch('ai_tour_guide.agent.cli.answer_question')
 def test_ask_command_prints_answer_and_compact_sources(
     answer_question: MagicMock,
@@ -50,6 +51,7 @@ def test_ask_command_orders_pages(
 ) -> None:
     """Verify that source page references are displayed in ascending page order."""
     assert False
+
 
 @patch('ai_tour_guide.agent.cli.answer_question')
 def test_ask_command_prints_normalized_sources(answer_question: MagicMock) -> None:

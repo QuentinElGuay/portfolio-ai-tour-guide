@@ -103,7 +103,10 @@ def insert_document(
 
 def _is_document_identity_violation(exc: IntegrityError) -> bool:
     diagnostic = getattr(exc.orig, 'diag', None)
-    return getattr(diagnostic, 'constraint_name', None) == 'uq_documents_source_url_version'
+    return (
+        getattr(diagnostic, 'constraint_name', None)
+        == 'uq_documents_source_url_version'
+    )
 
 
 def insert_document_with_chunks(
@@ -118,7 +121,9 @@ def insert_document_with_chunks(
         with Session(engine, expire_on_commit=False) as session:
             try:
                 with session.begin():
-                    embedding_model = get_or_create_embedding_model(session, embedding_metadata)
+                    embedding_model = get_or_create_embedding_model(
+                        session, embedding_metadata
+                    )
                     row = insert_document(
                         session,
                         document,

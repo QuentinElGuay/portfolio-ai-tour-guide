@@ -184,8 +184,7 @@ def test_build_retrieved_contexts_queries_once_per_unique_document_section(
 
     # Exactly one context exists per unique document+section identity.
     identities = [
-        (context.document.document_id, context.section_id)
-        for context in contexts
+        (context.document.document_id, context.section_id) for context in contexts
     ]
     assert identities == [
         (1, 'section-a'),
@@ -203,10 +202,12 @@ def test_build_retrieved_contexts_queries_once_per_unique_document_section(
     assert first_context.search_results[0].search.score == 0.91
     assert first_context.search_results[1].search.rank == 3
     assert first_context.search_results[1].search.score == 0.73
-    assert first_context.search_results[1].search.score_kind is ScoreKind.COSINE_SIMILARITY
+    assert (
+        first_context.search_results[1].search.score_kind is ScoreKind.COSINE_SIMILARITY
+    )
 
     # Expanded content comes from all ordered siblings, not only matched chunks.
-    assert first_context.chunks == (a1, a2)
+    assert first_context.context_chunks == (a1, a2)
     assert first_context.text == 'a1\n\na2'
     assert first_context.pages == (1, 2)
 

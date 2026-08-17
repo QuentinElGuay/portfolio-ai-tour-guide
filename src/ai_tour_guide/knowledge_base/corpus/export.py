@@ -1,15 +1,16 @@
 """Export a reproducible logical corpus including persisted embeddings."""
 
 from pathlib import Path
+from typing import Any, LiteralString, cast
 
+from psycopg import Cursor, sql
 from sqlalchemy.engine import Engine
 
-from ai_tour_guide.knowledge_base.database.connection import create_database_engine
-from ai_tour_guide.knowledge_base.database.settings import DatabaseSettings
+from ai_tour_guide.knowledge_base.database.connection import database_engine
 
-from .format import COPY_OPTIONS, DEFAULT_CORPUS_ROOT
+from .format import DEFAULT_CORPUS_ROOT
 
-_EXPORTS = {
+_EXPORTS: dict[str, LiteralString] = {
     'embedding_models.jsonl': """
         SELECT jsonb_build_object(
             'embedding_model_id', embedding_model_id,
@@ -96,25 +97,31 @@ def export_corpus(
 ) -> Path:
     """Export the configured knowledge-base state into the logical JSONL corpus format."""
     root.mkdir(parents=True, exist_ok=True)
-    owned_engine = engine is None
-    if engine is None:
-        engine = create_database_engine(DatabaseSettings(schema_name='public'))
-
-    try:
-        raw_connection = engine.raw_connection()
+    with database_engine(engine) as db_engine:
+        raw_connection = db_engine.raw_connection()
         try:
-            with raw_connection.cursor() as cursor:
+            cursor = cast(Cursor[Any], raw_connection.cursor())
+            try:
                 for filename, select_sql in _EXPORTS.items():
                     output_path = root / filename
-                    copy_sql = f'COPY ({select_sql}) TO STDOUT WITH ({COPY_OPTIONS})'
-                    with output_path.open('wb') as output_file, cursor.copy(copy_sql) as copy:
+                    copy_sql = sql.SQL(
+                        'COPY ({select_sql}) TO STDOUT WITH ({copy_options})'
+                    ).format(
+                        select_sql=sql.SQL(select_sql),
+                        copy_options=sql.SQL(
+                            "FORMAT CSV, DELIMITER E'\\x01', QUOTE E'\\x02'"
+                        ),
+                    )
+                    with (
+                        output_path.open('wb') as output_file,
+                        cursor.copy(copy_sql) as copy,
+                    ):
                         for data in copy:
                             output_file.write(data)
+            finally:
+                cursor.close()
         finally:
             raw_connection.close()
-    finally:
-        if owned_engine:
-            engine.dispose()
     return root
 
 

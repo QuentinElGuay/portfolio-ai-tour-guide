@@ -171,8 +171,7 @@ explicitly.
 Move the useful behavior of the chat backend's `_format_pages()` into this module:
 
 ```python
-def format_pages(pages: Sequence[int]) -> str:
-    ...
+def format_pages(pages: Sequence[int]) -> str: ...
 ```
 
 Add a formatter for a trusted `SourceReference` only if CLI and chat can genuinely share
@@ -278,8 +277,7 @@ Implement:
 def validate_citations(
     citations: Sequence[LLMCitation],
     retrieved: Sequence[RetrievedChunk],
-) -> CitationValidationResult:
-    ...
+) -> CitationValidationResult: ...
 ```
 
 Validation rules:
@@ -299,8 +297,7 @@ Implement normalization either inside validation or as a separate function:
 ```python
 def normalize_source_references(
     references: Sequence[SourceReference],
-) -> list[SourceReference]:
-    ...
+) -> list[SourceReference]: ...
 ```
 
 Normalization rules:

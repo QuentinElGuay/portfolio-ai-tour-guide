@@ -48,6 +48,9 @@ addopts = "--import-mode=importlib"
 
 [tool.pyright]
 typeCheckingMode = "standard"
+reportCallIssue = "none"
+venvPath = "."
+venv = ".venv"
 include = ["src", "tests"]
 
 [dependency-groups]

@@ -8,7 +8,6 @@ def test_export_corpus_writes_all_logical_files() -> None:
     Expected verification: all CORPUS_FILES are created and exports include embeddings plus section_id and
     section_chunk_index while omitting PostgreSQL-generated search_vector.
     """
-    
 
 
 def test_export_corpus_disposes_only_owned_engine() -> None:
@@ -17,4 +16,3 @@ def test_export_corpus_disposes_only_owned_engine() -> None:
     Required mocks: database engine factory and raw connection/copy behavior.
     Expected verification: only the internally-created engine is disposed.
     """
-    

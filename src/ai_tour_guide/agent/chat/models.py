@@ -15,3 +15,13 @@ class Role(StrEnum):
 class Message(TypedDict):
     role: Role
     content: str
+
+
+class ChatHistoryItem(TypedDict):
+    """One message-shaped item supplied by Gradio's chat history."""
+
+    role: str
+    content: object
+
+
+__all__ = ['ChatHistoryItem']

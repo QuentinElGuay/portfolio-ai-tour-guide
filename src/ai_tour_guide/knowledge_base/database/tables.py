@@ -41,7 +41,9 @@ embedding_models = Table(
     Column('tokenizer_revision', Text),
     Column('max_input_tokens', Integer),
     Column('distance_metric', Text, nullable=False, server_default=text("'cosine'")),
-    Column('created_at', DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
     UniqueConstraint(
         'provider',
         'model_name',
@@ -81,7 +83,9 @@ documents = Table(
     Column('publication_date', Date),
     Column('authors', ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")),
     Column('subject', Text),
-    Column('keywords', ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")),
+    Column(
+        'keywords', ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    ),
     Column('language', Text),
     Column('creator', Text),
     Column('producer', Text),
@@ -101,30 +105,58 @@ documents = Table(
     Column('max_chunk_tokens', Integer),
     Column('chunk_overlap_tokens', Integer),
     Column('embedded_at', DateTime(timezone=True)),
-    Column('created_at', DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
     UniqueConstraint(
         'source_url',
         'version',
         name='uq_documents_source_url_version',
         postgresql_nulls_not_distinct=True,
     ),
-    CheckConstraint("collection IS NULL OR btrim(collection) <> ''", name='ck_documents_collection_not_empty'),
-    CheckConstraint("version IS NULL OR btrim(version) <> ''", name='ck_documents_version_not_empty'),
-    CheckConstraint('source_page_count IS NULL OR source_page_count > 0', name='ck_documents_source_page_count_positive'),
-    CheckConstraint('page_count IS NULL OR page_count >= 0', name='ck_documents_page_count_non_negative'),
-    CheckConstraint('target_chunk_chars IS NULL OR target_chunk_chars > 0', name='ck_documents_target_chunk_chars_positive'),
-    CheckConstraint('max_chunk_chars IS NULL OR max_chunk_chars > 0', name='ck_documents_max_chunk_chars_positive'),
+    CheckConstraint(
+        "collection IS NULL OR btrim(collection) <> ''",
+        name='ck_documents_collection_not_empty',
+    ),
+    CheckConstraint(
+        "version IS NULL OR btrim(version) <> ''", name='ck_documents_version_not_empty'
+    ),
+    CheckConstraint(
+        'source_page_count IS NULL OR source_page_count > 0',
+        name='ck_documents_source_page_count_positive',
+    ),
+    CheckConstraint(
+        'page_count IS NULL OR page_count >= 0',
+        name='ck_documents_page_count_non_negative',
+    ),
+    CheckConstraint(
+        'target_chunk_chars IS NULL OR target_chunk_chars > 0',
+        name='ck_documents_target_chunk_chars_positive',
+    ),
+    CheckConstraint(
+        'max_chunk_chars IS NULL OR max_chunk_chars > 0',
+        name='ck_documents_max_chunk_chars_positive',
+    ),
     CheckConstraint(
         'target_chunk_chars IS NULL OR max_chunk_chars IS NULL OR target_chunk_chars <= max_chunk_chars',
         name='ck_documents_chunk_chars_range',
     ),
-    CheckConstraint('target_chunk_tokens IS NULL OR target_chunk_tokens > 0', name='ck_documents_target_chunk_tokens_positive'),
-    CheckConstraint('max_chunk_tokens IS NULL OR max_chunk_tokens > 0', name='ck_documents_max_chunk_tokens_positive'),
+    CheckConstraint(
+        'target_chunk_tokens IS NULL OR target_chunk_tokens > 0',
+        name='ck_documents_target_chunk_tokens_positive',
+    ),
+    CheckConstraint(
+        'max_chunk_tokens IS NULL OR max_chunk_tokens > 0',
+        name='ck_documents_max_chunk_tokens_positive',
+    ),
     CheckConstraint(
         'target_chunk_tokens IS NULL OR max_chunk_tokens IS NULL OR target_chunk_tokens <= max_chunk_tokens',
         name='ck_documents_chunk_tokens_range',
     ),
-    CheckConstraint('chunk_overlap_tokens IS NULL OR chunk_overlap_tokens >= 0', name='ck_documents_chunk_overlap_tokens_positive'),
+    CheckConstraint(
+        'chunk_overlap_tokens IS NULL OR chunk_overlap_tokens >= 0',
+        name='ck_documents_chunk_overlap_tokens_positive',
+    ),
     CheckConstraint(
         'chunk_overlap_tokens IS NULL OR max_chunk_tokens IS NULL OR chunk_overlap_tokens < max_chunk_tokens',
         name='ck_documents_chunk_overlap_tokens_range',
@@ -158,19 +190,33 @@ document_chunks = Table(
     Column(
         'search_vector',
         TSVECTOR,
-        Computed("to_tsvector('english', coalesce(embedding_text, ''))", persisted=True),
+        Computed(
+            "to_tsvector('english', coalesce(embedding_text, ''))", persisted=True
+        ),
     ),
-    Column('created_at', DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
     UniqueConstraint('document_id', 'chunk_index', name='uq_document_chunks_index'),
     CheckConstraint('chunk_index >= 0', name='ck_document_chunks_index_positive'),
     CheckConstraint(
         'section_chunk_index IS NULL OR section_chunk_index >= 0',
         name='ck_document_chunks_section_index_positive',
     ),
-    CheckConstraint('character_count > 0', name='ck_document_chunks_character_count_positive'),
-    CheckConstraint('token_count IS NULL OR token_count > 0', name='ck_document_chunks_token_count_positive'),
-    CheckConstraint('page_start IS NULL OR page_start > 0', name='ck_document_chunks_page_start_positive'),
-    CheckConstraint('page_end IS NULL OR page_end > 0', name='ck_document_chunks_page_end_positive'),
+    CheckConstraint(
+        'character_count > 0', name='ck_document_chunks_character_count_positive'
+    ),
+    CheckConstraint(
+        'token_count IS NULL OR token_count > 0',
+        name='ck_document_chunks_token_count_positive',
+    ),
+    CheckConstraint(
+        'page_start IS NULL OR page_start > 0',
+        name='ck_document_chunks_page_start_positive',
+    ),
+    CheckConstraint(
+        'page_end IS NULL OR page_end > 0', name='ck_document_chunks_page_end_positive'
+    ),
     CheckConstraint(
         'page_start IS NULL OR page_end IS NULL OR page_end >= page_start',
         name='ck_document_chunks_page_range',
@@ -183,7 +229,11 @@ document_chunks = Table(
 
 Index('ix_documents_embedding_model_id', documents.c.embedding_model_id)
 Index('ix_documents_source_checksum', documents.c.source_checksum)
-Index('ix_document_chunks_search_vector', document_chunks.c.search_vector, postgresql_using='gin')
+Index(
+    'ix_document_chunks_search_vector',
+    document_chunks.c.search_vector,
+    postgresql_using='gin',
+)
 Index(
     'ix_document_chunks_section_order',
     document_chunks.c.document_id,

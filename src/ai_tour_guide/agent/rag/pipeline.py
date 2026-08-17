@@ -14,7 +14,6 @@ from ai_tour_guide.agent.rag.sources import validate_citations
 from ai_tour_guide.agent.responses import (
     GENERATION_ERROR_ANSWER,
     INSUFFICIENT_CONTEXT_ANSWER,
-    LLM_CONFIGURATION_REQUIRED_ANSWER,
     RETRIEVAL_ERROR_ANSWER,
 )
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
@@ -51,10 +50,10 @@ def answer_question(
 
     try:
         contexts = retrieve_context(
-                question,
-                search_mode=selected_mode,
-                k=k,
-            )
+            question,
+            search_mode=selected_mode,
+            k=k,
+        )
     except (OSError, SQLAlchemyError) as exc:
         retrieval_latency = (perf_counter() - retrieval_started) * 1000
 
@@ -88,9 +87,7 @@ def answer_question(
     generation_started = perf_counter()
 
     try:
-        generated = asyncio.run(
-            selected_client.answer_question(messages)
-        )
+        generated = asyncio.run(selected_client.answer_question(messages))
     except GenerationError as exc:
         generation_latency = (perf_counter() - generation_started) * 1000
 

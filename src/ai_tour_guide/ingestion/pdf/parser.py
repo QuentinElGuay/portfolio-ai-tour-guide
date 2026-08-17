@@ -4,13 +4,13 @@ import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from datetime import UTC, date, datetime, timedelta, timezone
 from hashlib import sha256
 from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -507,7 +507,7 @@ def _extract_page_lines(
     document: IngestionDocument,
 ) -> list[_TextLine]:
     """Extract and reconstruct visual text lines from one PDF page."""
-    page_data: dict[str, Any] = page.get_text('dict', sort=False)
+    page_data = cast(dict[str, Any], page.get_text('dict', sort=False))
     fragments: list[_TextLine] = []
 
     for block_number, block in enumerate(page_data.get('blocks', [])):
@@ -521,9 +521,13 @@ def _extract_page_lines(
             if not text:
                 continue
 
+            page_number = page.number
+            if page_number is None:
+                raise RuntimeError('PDF page has no page number')
+
             fragments.append(
                 _TextLine(
-                    page_number=page.number + 1,
+                    page_number=page_number + 1,
                     block_number=block_number,
                     line_number=line_number,
                     text=text,
@@ -1225,16 +1229,16 @@ def _resolve_pdf_metadata(
     embedded_keywords = _normalise_keywords(_metadata_value(pdf_metadata, 'Keywords'))
 
     return DocumentMetadata(
-        title=_clean_optional_text(document.title) or embedded_title,
+        title=_clean_optional_text(document.title) or embedded_title or 'document',
         source_url=document.source_url.strip(),
         publisher=(_clean_optional_text(document.publisher) or embedded_publisher),
         publication_date=(
             document.publication_date
             or _parse_pdf_metadata_date(embedded_creation_date)
         ),
-        authors=(ingestion_authors or xmp_resolved_authors or legacy_authors),
+        authors=tuple(ingestion_authors or xmp_resolved_authors or legacy_authors),
         subject=_metadata_value(pdf_metadata, 'Subject'),
-        keywords=ingestion_keywords or embedded_keywords,
+        keywords=tuple(ingestion_keywords or embedded_keywords),
         creator=_metadata_value(pdf_metadata, 'Creator'),
         producer=_metadata_value(pdf_metadata, 'Producer'),
         format=_metadata_value(pdf_metadata, 'Format'),
@@ -1480,7 +1484,7 @@ def _parse_pdf_metadata_datetime(value: str | None) -> datetime | None:
 
 
 def _normalise_metadata(
-    metadata: dict[str, str] | None,
+    metadata: Mapping[str, object] | None,
 ) -> dict[str, str]:
     """Return non-empty PDF metadata with stable title-cased keys."""
     if not metadata:

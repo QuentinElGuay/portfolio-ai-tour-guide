@@ -31,7 +31,7 @@ class OpenAIClient:
             response = await self._client.responses.create(
                 model=self.model,
                 input=[
-                    {'role': message['role'], 'content': message['content']}
+                    {'role': message['role'].value, 'content': message['content']}
                     for message in messages
                 ],
                 text={
@@ -78,25 +78,13 @@ class OpenAIClient:
         try:
             import json
 
-            payload = json.loads(content)
-            answer = payload['answer']
-            citations = tuple(
-                LLMCitation(**citation) for citation in payload['citations']
-            )
+            answer, citations = _parse_answer(json.loads(content))
         except (TypeError, ValueError, KeyError) as exc:
             raise GenerationError(
                 'OpenAI returned malformed structured output.'
             ) from exc
-        if not isinstance(answer, str) or not answer.strip():
-            raise GenerationError('OpenAI returned an empty structured answer.')
         usage = getattr(response, 'usage', None)
-        usage_payload = (
-            usage.model_dump()
-            if hasattr(usage, 'model_dump')
-            else str(usage)
-            if usage is not None
-            else None
-        )
+        usage_payload = usage.model_dump() if usage is not None else None
         return GeneratedAnswer(
             answer=answer,
             citations=citations,
@@ -109,6 +97,42 @@ class OpenAIClient:
             },
             raw_provider_response=response,
         )
+
+
+def _parse_answer(payload: object) -> tuple[str, tuple[LLMCitation, ...]]:
+    if not isinstance(payload, dict):
+        raise TypeError('answer must be an object')
+
+    answer = payload.get('answer')
+    citations = payload.get('citations')
+    if not isinstance(answer, str) or not answer.strip():
+        raise ValueError('answer must be a non-empty string')
+    if not isinstance(citations, list):
+        raise TypeError('citations must be a list')
+
+    parsed_citations: list[LLMCitation] = []
+    for citation in citations:
+        if not isinstance(citation, dict):
+            raise TypeError('citation must be an object')
+        source_url = citation.get('source_url')
+        version = citation.get('version')
+        page_start = citation.get('page_start')
+        page_end = citation.get('page_end')
+        if not isinstance(source_url, str) or not source_url.strip():
+            raise ValueError('citation source_url must be a non-empty string')
+        if version is not None and not isinstance(version, str):
+            raise TypeError('citation version must be a string or null')
+        if page_start is not None and (
+            not isinstance(page_start, int) or isinstance(page_start, bool)
+        ):
+            raise TypeError('citation page_start must be an integer or null')
+        if page_end is not None and (
+            not isinstance(page_end, int) or isinstance(page_end, bool)
+        ):
+            raise TypeError('citation page_end must be an integer or null')
+        parsed_citations.append(LLMCitation(source_url, version, page_start, page_end))
+
+    return answer, tuple(parsed_citations)
 
 
 __all__ = ['OpenAIClient']
