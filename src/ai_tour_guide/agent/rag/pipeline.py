@@ -4,6 +4,7 @@ import asyncio
 import logging
 from time import perf_counter
 
+from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
@@ -37,6 +38,7 @@ def answer_question(
     mode: SearchMode = SearchMode.VECTOR,
     k: int = 5,
     client: LLMClient | None = None,
+    engine: Engine | None = None,
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
@@ -53,6 +55,7 @@ def answer_question(
             question,
             search_mode=selected_mode,
             k=k,
+            engine=engine,
         )
     except (OSError, SQLAlchemyError) as exc:
         retrieval_latency = (perf_counter() - retrieval_started) * 1000

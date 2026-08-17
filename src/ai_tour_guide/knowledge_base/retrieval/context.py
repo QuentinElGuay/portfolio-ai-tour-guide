@@ -2,10 +2,10 @@
 
 from collections.abc import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.knowledge_base.database.connection import create_database_engine
+from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.search.models import (
     HybridSearchSettings,
@@ -87,22 +87,14 @@ def retrieve_context(
     search_mode: SearchMode = SearchMode.VECTOR,
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
+    engine: Engine | None = None,
 ) -> tuple[RetrievedContext, ...]:
     """Search for relevant chunks and expand their sections into temporary LLM contexts."""
-    engine = create_database_engine()
-
     strategy = create_search_strategy(search_mode, hybrid_settings=hybrid_settings)
 
-    try:
-        with Session(engine) as session:
-            results = strategy.search(
-                session,
-                query,
-                k=k,
-            )
-            return build_retrieved_contexts(session, results)
-    finally:
-        engine.dispose()
+    with database_engine(engine) as db_engine, Session(db_engine) as session:
+        results = strategy.search(session, query, k=k)
+        return build_retrieved_contexts(session, results)
 
 
 __all__ = ['build_retrieved_contexts', 'retrieve_context', 'retrieve_section_chunks']

@@ -12,12 +12,13 @@ K ?= 5
 ANNOTATOR_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
 EVALUATION ?= both
+JUDGE ?= 0
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate validate-db-schema vector_search text_search ask annotate-dataset app
+.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-all validate-db-schema vector_search text_search ask annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -33,10 +34,12 @@ help: ## Show the available commands.
 	@echo "  make export-corpus                   Overwrite the current corpus export"
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
-	@echo "  make evaluate                        Load corpus and run both evaluations"
+	@echo "  make evaluate                        Run search and RAG checks"
+	@echo "  make evaluate-search                 Run search metrics only"
+	@echo "  make evaluate-rag                    Run RAG citation and latency metrics"
+	@echo "  make evaluate JUDGE=1                Also run the optional, costlier LLM judge"
+	@echo "  make evaluate-all                    Alias for make evaluate JUDGE=1"
 	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
-	@echo "  make evaluate EVALUATION=rag        Load corpus and run RAG evaluation"
-	@echo "  make evaluate EVALUATION=both       Run both evaluations"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
@@ -90,16 +93,30 @@ load-corpus: ## Replace the knowledge-base corpus in the selected DB_SCHEMA.
 		|| (echo "Corpus files are missing from $(CORPUS_ROOT). Run 'make export-corpus' first." >&2; exit 1)
 	uv run python scripts/setup_corpus.py --root "$(CORPUS_ROOT)" --schema "$(DB_SCHEMA)" --allow-destructive
 
-evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluations.
-	@case "$(EVALUATION)" in retrieval|rag|both) ;; *) echo "EVALUATION must be retrieval, rag, or both" >&2; exit 1;; esac
+evaluate: ## Run search and RAG checks, optionally including the LLM judge.
+	@case "$(JUDGE)" in 0|1) ;; *) echo "JUDGE must be 0 or 1" >&2; exit 1;; esac
+	@case "$(EVALUATION)" in search|retrieval|rag|both) ;; *) echo "EVALUATION must be search, rag, or both" >&2; exit 1;; esac
 	$(COMPOSE) up -d --wait database
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
-	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
+	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
 		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
 	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = both ]; then \
-		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
+	@if [ "$(JUDGE)" = 1 ]; then \
+		echo "RAG answer judging is not implemented yet. Use 'make evaluate' for citation and latency metrics." >&2; \
+		exit 2; \
+	fi
+
+evaluate-search: EVALUATION=search
+evaluate-search: evaluate
+
+evaluate-rag: EVALUATION=rag
+evaluate-rag: evaluate
+
+evaluate-all: JUDGE=1
+evaluate-all: evaluate
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)

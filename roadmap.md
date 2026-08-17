@@ -1258,6 +1258,30 @@ its aggregate metrics and diagnostics as a deployment quality gate.
 
 ______________________________________________________________________
 
+### [P3] Add deterministic RAG integration tests
+
+**Labels:** `testing`, `rag`, `post-capstone`
+
+Add a deterministic integration-test path for the RAG pipeline after the current
+capstone goals are complete. These tests should exercise retrieval, prompt construction,
+structured generation, citation reconciliation, and `RAGResult` assembly without calling
+an external LLM provider.
+
+- [ ] Add a small fake LLM client implementing the existing `LLMClient` contract
+- [ ] Add recorded structured responses for representative answer and refusal cases
+- [ ] Test valid, repeated, unsupported, and page-less citations
+- [ ] Test derived citation section paths in `RAGResult`
+- [ ] Keep live-provider evaluation separate from the deterministic integration suite
+
+**Acceptance criteria**
+
+- [ ] The RAG pipeline can be tested without an API key or network access
+- [ ] Tests cover the complete local pipeline from retrieval to normalized sources
+- [ ] Recorded responses remain versioned and easy to update
+- [ ] The fake client is used only for tests, not for benchmark conclusions
+
+______________________________________________________________________
+
 ### [P3] Deploy to the cloud
 
 - [ ] Select hosting provider
