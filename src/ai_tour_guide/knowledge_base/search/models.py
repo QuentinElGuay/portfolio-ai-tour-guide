@@ -9,15 +9,7 @@ from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, Docum
 
 
 class SearchMode(StrEnum):
-    """Supported ranking strategies."""
-
-    VECTOR = 'vector'
-    TEXT = 'text'
-    HYBRID = 'hybrid'
-
-
-class SearchMode(StrEnum):
-    """Supported knowledge-base retrieval strategies."""
+    """Supported search strategies for knowledge base retrieval."""
 
     VECTOR = 'vector'
     TEXT = 'text'
