@@ -2,7 +2,6 @@
 
 from collections.abc import Iterable
 from dataclasses import replace
-from enum import StrEnum
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,17 +11,10 @@ from ai_tour_guide.knowledge_base.models import DocumentChunkRow
 from ai_tour_guide.knowledge_base.retrieval_models import (
     HybridSearchSettings,
     RetrievedChunk,
+    SearchMode,
     SiblingChunks,
 )
 from ai_tour_guide.knowledge_base.retrieval_strategies import _create_search_strategy
-
-
-class SearchMode(StrEnum):
-    """Supported knowledge-base retrieval strategies."""
-
-    VECTOR = 'vector'
-    TEXT = 'text'
-    HYBRID = 'hybrid'
 
 
 def retrieve_siblings(

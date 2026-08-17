@@ -6,6 +6,14 @@ from math import isfinite
 from ai_tour_guide.knowledge_base.models import DocumentChunkRow
 
 
+class SearchMode(StrEnum):
+    """Supported knowledge-base retrieval strategies."""
+
+    VECTOR = 'vector'
+    TEXT = 'text'
+    HYBRID = 'hybrid'
+
+
 class ScoreKind(StrEnum):
     """Meaning of a retrieval score."""
 

@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 from ai_tour_guide.embedding.fastembed import FastEmbedder
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import SearchMode
 from ai_tour_guide.knowledge_base.retrieval_models import (
     HybridSearchSettings,
     RetrievedChunk,
     ScoreKind,
+    SearchMode,
     SourceMetadata,
 )
 from ai_tour_guide.knowledge_base.search import search_text, search_vector
