@@ -94,7 +94,7 @@ evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluati
 	$(COMPOSE) up -d --wait database
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
 	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
-		uv run python -m evaluation.retrieval.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
 	fi
 	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = both ]; then \
 		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \

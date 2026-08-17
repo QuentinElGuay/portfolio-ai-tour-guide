@@ -167,7 +167,7 @@ Run `make help` for every available shortcut.
 | `make ingest`                           | Ingest documents defined in `source_files.json`.     |
 | `make export-corpus`                    | Overwrite the current knowledge-base corpus export.  |
 | `make load-corpus DB_SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
-| `make evaluate`                         | Load the corpus and run retrieval evaluation.        |
+| `make evaluate`                         | Load the corpus and run search evaluation.           |
 | `make evaluate EVALUATION=rag`          | Load the corpus and run RAG evaluation.              |
 | `make evaluate EVALUATION=both`         | Load the corpus and run both evaluations.            |
 | `make vector_search QUESTION='...'`     | Search chunks semantically.                          |

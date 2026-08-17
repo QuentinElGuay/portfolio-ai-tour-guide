@@ -29,7 +29,7 @@ def search(
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
 ) -> list[SearchResult]:
-    """Return raw ranked matches for production callers and retrieval evaluation."""
+    """Return raw ranked matches for production callers and search evaluation."""
     engine = create_database_engine()
     try:
         with Session(engine) as session:

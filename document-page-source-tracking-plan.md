@@ -413,9 +413,9 @@ local `_format_pages()` if no longer needed.
 - Retrieved but uncited sources do not appear in `ask` output.
 - API and chat perform no source selection or deduplication.
 
-## Phase 8 — Update retrieval evaluation
+## Phase 8 — Update search evaluation
 
-Keep retrieval evaluation separate from pytest and from RAG/LLM evaluation.
+Keep search evaluation separate from pytest and from RAG/LLM evaluation.
 
 The retrieval evaluator should call `retrieve()` directly. For each golden-dataset
 example, retain every returned `RetrievedChunk` with:

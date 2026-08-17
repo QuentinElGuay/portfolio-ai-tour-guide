@@ -555,7 +555,7 @@ evaluation are tracked separately and do not block this milestone.
 
 ______________________________________________________________________
 
-### [P0] Create retrieval evaluation dataset
+### [P0] Create search evaluation dataset
 
 **Labels:** `evaluation`, `data`, `retrieval`
 
@@ -620,7 +620,7 @@ service behind an evaluation profile, not an always-on application service.
 
 - [ ] Add an `ai_tour_guide.evaluation` package with retrieval and LLM evaluation entry
   points
-- [ ] Add a CLI command for retrieval evaluation
+- [ ] Add a CLI command for search evaluation
 - [ ] Add a CLI command for LLM evaluation
 - [ ] Add `make eval-retrieval` and `make eval-llm` shortcuts for the evaluation
   commands
@@ -857,7 +857,7 @@ ______________________________________________________________________
 
 Ships when **Milestone 5** passes its exit criteria:
 
-- Versioned retrieval evaluation dataset
+- Versioned search evaluation dataset
 - Vector, full-text, and hybrid retrieval comparison
 - Selected retrieval configuration used by the application
 - Versioned LLM evaluation dataset

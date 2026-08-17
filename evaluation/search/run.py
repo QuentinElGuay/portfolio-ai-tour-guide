@@ -1,4 +1,4 @@
-"""Standalone retrieval benchmark runner."""
+"""Standalone search benchmark runner."""
 
 import argparse
 import json
@@ -9,16 +9,14 @@ from typing import Any, TypedDict
 from tqdm import tqdm
 
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
-from ai_tour_guide.knowledge_base.retrieval import retrieve_context
-from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search import SearchMode, SearchResult, search
 from evaluation.dataset import (
     DEFAULT_DATASET_ROOT,
     GoldenCase,
     load_golden_dataset,
     slugify_section_path,
 )
-from evaluation.retrieval.metrics import (
+from evaluation.search.metrics import (
     hit_rate_at_k,
     recall_at_k,
     reciprocal_rank,
@@ -57,16 +55,16 @@ def _expected_evidence(case: GoldenCase) -> tuple[str, ...]:
 
 
 def _retrieved_evidence(
-    retrieved_contexts: Iterable[RetrievedContext],
+    results: Iterable[SearchResult],
 ) -> list[str]:
-    """Return unique retrieved evidence keys in ranking order."""
+    """Return unique section evidence keys in raw search ranking order."""
     evidence: dict[str, None] = {}
-    for retrieved_context in retrieved_contexts:
-        source_document = retrieved_context.source_document
+    for result in results:
+        source_document = result.document
         key = _evidence_key(
             source_document.source_url,
             source_document.version,
-            slugify_section_path(list(retrieved_context.section_path[:-1])),
+            slugify_section_path(list(result.chunk.section_path[:-1])),
         )
         evidence.setdefault(key, None)
     return list(evidence)
@@ -74,21 +72,19 @@ def _retrieved_evidence(
 
 def _case_metrics(case: GoldenCase, search_mode: SearchMode, *, k: int) -> CaseMetrics:
     expected: tuple[str, ...] = _expected_evidence(case)
-    retrieved_contexts: tuple[RetrievedContext, ...] = retrieve_context(
-        case.question, search_mode=search_mode, k=k
+    results = search(
+        case.question,
+        mode=search_mode,
+        k=k,
     )
-    retrieved_evidence = _retrieved_evidence(retrieved_contexts)
+    retrieved_evidence = _retrieved_evidence(results)
     return {
         'id': case.case_id,
         'category': case.category,
         'hit_rate_at_k': hit_rate_at_k(retrieved_evidence, expected, k=k),
         'recall_at_k': recall_at_k(retrieved_evidence, expected, k=k),
         'reciprocal_rank': reciprocal_rank(retrieved_evidence, expected),
-        'retrieved_chunks': [
-            result.chunk.chunk_id
-            for context in retrieved_contexts
-            for result in context.search_results
-        ],
+        'retrieved_chunks': [result.chunk.chunk_id for result in results],
     }
 
 
@@ -97,7 +93,7 @@ def run(
     corpus_root: Path = DEFAULT_CORPUS_ROOT,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
 ) -> None:
-    """Run retrieval evaluation over one corpus and one golden dataset."""
+    """Run search evaluation over one corpus and one golden dataset."""
     cases = load_golden_dataset(root=dataset_root)
 
     with corpus_context(root=corpus_root, schema_name='evaluation'):
@@ -113,7 +109,7 @@ def run(
                 _case_metrics(case, mode, k=DEFAULT_K)
                 for case in tqdm(
                     cases,
-                    desc=f'Retrieval ({mode.value})',
+                    desc=f'Search ({mode.value})',
                     unit='case',
                 )
             ]
