@@ -12,6 +12,24 @@ x-app-environment: &app-environment
   EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:-true}"
 
 services:
+  ai-tour-guide-base:
+    image: ai-tour-guide-base:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/base.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+
+    profiles:
+      - tools
+      - ingestion
+      - agent
+      - app
+
+    scale: 0
+
   database:
     image: pgvector/pgvector:pg17
 
@@ -49,8 +67,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - tools
@@ -84,8 +102,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - ingestion
@@ -112,8 +130,8 @@ services:
     build:
       context: .
       dockerfile: docker/agent.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - agent
@@ -151,13 +169,7 @@ services:
 
   chat:
     image: ai-tour-guide-agent:local
-    pull_policy: build
-
-    build:
-      context: .
-      dockerfile: docker/agent.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+    pull_policy: never
 
     profiles:
       - app
