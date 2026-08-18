@@ -696,6 +696,17 @@ case ordering used by reports.
 
 ______________________________________________________________________
 
+### [P1] Performance improvements
+
+**Labels:** `quality`, `performance`, `developer-experience`
+
+- [x] Reuse the embedding model across requests with a process-local embedder cache
+- [x] Run RAG evaluation cases asynchronously with progress based on completed cases
+- [x] Rate-limit asynchronous LLM requests to a shared default of 5 requests per second
+- [x] Centralize section-path slugification across ingestion and evaluation
+
+______________________________________________________________________
+
 ### [P0] Evaluate retrieval approaches
 
 **Labels:** `evaluation`, `retrieval`
