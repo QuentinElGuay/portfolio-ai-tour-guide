@@ -33,7 +33,7 @@ def _error(stage: str, exc: Exception) -> RAGError:
     return RAGError(stage=stage, type=type(exc).__name__, message=str(exc))
 
 
-def answer_question(
+async def answer_question_async(
     question: str,
     *,
     mode: SearchMode = SearchMode.VECTOR,
@@ -93,7 +93,7 @@ def answer_question(
     generation_started = perf_counter()
 
     try:
-        generated = asyncio.run(selected_client.answer_question(messages))
+        generated = await selected_client.answer_question(messages)
     except GenerationError as exc:
         generation_latency = (perf_counter() - generation_started) * 1000
 
@@ -144,4 +144,26 @@ def answer_question(
     )
 
 
-__all__ = ['RetrievalError', 'answer_question']
+def answer_question(
+    question: str,
+    *,
+    mode: SearchMode = SearchMode.VECTOR,
+    k: int = 5,
+    client: LLMClient | None = None,
+    engine: Engine | None = None,
+    strategy: SearchStrategy | None = None,
+) -> RAGResult:
+    """Synchronously answer a question for CLI and synchronous callers."""
+    return asyncio.run(
+        answer_question_async(
+            question,
+            mode=mode,
+            k=k,
+            client=client,
+            engine=engine,
+            strategy=strategy,
+        )
+    )
+
+
+__all__ = ['RetrievalError', 'answer_question', 'answer_question_async']

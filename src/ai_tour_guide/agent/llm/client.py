@@ -6,6 +6,7 @@ from openai import APIError, AsyncOpenAI
 
 from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.llm.interfaces import GenerationError
+from ai_tour_guide.agent.llm.rate_limit import AsyncRateLimiter
 from ai_tour_guide.agent.llm.settings import OpenAISettings
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
 
@@ -21,12 +22,14 @@ class OpenAIClient:
     ) -> None:
         selected_settings = settings or OpenAISettings()
         self.model = selected_settings.model
+        self._rate_limiter = AsyncRateLimiter(selected_settings.requests_per_second)
         self._client = client or AsyncOpenAI(
             api_key=selected_settings.api_key.get_secret_value(),
         )
 
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
         """Generate one assistant response for the supplied messages."""
+        await self._rate_limiter.acquire()
         try:
             response = await self._client.responses.create(
                 model=self.model,

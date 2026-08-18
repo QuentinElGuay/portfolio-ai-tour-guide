@@ -28,12 +28,10 @@ def _case(*, answerable: bool = True) -> GoldenCase:
         expected=ExpectedOutcome(
             answerable=answerable,
             reference_answer='An answer',
-            relevant_sources=(
-                SourceExpectation(
-                    source_url='https://example.test/guide',
-                    version='2026',
-                    section_path=('guide', 'activities'),
-                ),
+            relevant_source=SourceExpectation(
+                source_url='https://example.test/guide',
+                version='2026',
+                section_path=('guide', 'activities'),
             ),
         ),
     )

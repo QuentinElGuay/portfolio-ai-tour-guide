@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
-from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
@@ -97,8 +97,8 @@ def health() -> dict[str, str]:
 
 
 @app.post('/ask', response_model=AskResponse)
-def ask(request: AskRequest) -> AskResponse:
+async def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result: RAGResult = answer_question(request.question)
+    result: RAGResult = await answer_question_async(request.question)
     sources = [SourceResponse.from_reference(source) for source in result.sources]
     return AskResponse(answer=result.answer, sources=sources)

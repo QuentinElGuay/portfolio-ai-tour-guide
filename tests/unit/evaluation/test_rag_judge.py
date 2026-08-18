@@ -25,12 +25,10 @@ def _case() -> GoldenCase:
         expected=ExpectedOutcome(
             answerable=True,
             reference_answer='Typical summer temperatures range from 18°C to 24°C.',
-            relevant_sources=(
-                SourceExpectation(
-                    source_url='https://example.test/guide',
-                    version=None,
-                    section_path=('guide', 'climate'),
-                ),
+            relevant_source=SourceExpectation(
+                source_url='https://example.test/guide',
+                version=None,
+                section_path=('guide', 'climate'),
             ),
         ),
     )

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from tqdm import tqdm
 
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
-from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
@@ -22,7 +22,7 @@ from evaluation.rag.metrics import score_case, summarize, summarize_judgements
 DEFAULT_K = 5
 
 
-def run(
+async def run_async(
     *,
     corpus_root: Path = DEFAULT_CORPUS_ROOT,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
@@ -55,10 +55,8 @@ def run(
                     'loading a corpus.'
                 )
 
-        case_metrics = []
-        verdicts = []
-        for case in tqdm(cases, desc=f'RAG ({selected_mode.value})', unit='case'):
-            result = answer_question(
+        async def evaluate_case(index: int, case):
+            return index, await answer_question_async(
                 case.question,
                 mode=selected_mode,
                 k=k,
@@ -66,9 +64,32 @@ def run(
                 engine=engine,
                 strategy=strategy,
             )
-            case_metrics.append(score_case(case, result))
-            if answer_judge is not None:
-                verdicts.append(asyncio.run(answer_judge.judge(case, result.answer)))
+
+        results = [None] * len(cases)
+        tasks = [
+            asyncio.create_task(evaluate_case(index, case))
+            for index, case in enumerate(cases)
+        ]
+        with tqdm(
+            total=len(tasks), desc=f'RAG ({selected_mode.value})', unit='case'
+        ) as progress:
+            for completed in asyncio.as_completed(tasks):
+                index, result = await completed
+                results[index] = result
+                progress.update()
+        case_metrics = [
+            score_case(case, result) for case, result in zip(cases, results)
+        ]
+        verdicts = (
+            await asyncio.gather(
+                *(
+                    answer_judge.judge(case, result.answer)
+                    for case, result in zip(cases, results)
+                )
+            )
+            if answer_judge is not None
+            else []
+        )
 
     report = {
         'dataset': str(dataset_root),
@@ -84,6 +105,26 @@ def run(
             'metrics': summarize_judgements(verdicts),
         }
     print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+def run(
+    *,
+    corpus_root: Path = DEFAULT_CORPUS_ROOT,
+    dataset_root: Path = DEFAULT_DATASET_ROOT,
+    mode: SearchMode = SearchMode.VECTOR,
+    k: int = DEFAULT_K,
+    judge: bool = False,
+) -> None:
+    """Run the asynchronous RAG evaluation from synchronous callers."""
+    asyncio.run(
+        run_async(
+            corpus_root=corpus_root,
+            dataset_root=dataset_root,
+            mode=mode,
+            k=k,
+            judge=judge,
+        )
+    )
 
 
 def main() -> None:

@@ -16,6 +16,10 @@ from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_tour_guide.agent.llm.interfaces import GenerationError
+from ai_tour_guide.agent.llm.rate_limit import (
+    DEFAULT_REQUESTS_PER_SECOND,
+    AsyncRateLimiter,
+)
 from evaluation.dataset import GoldenCase
 
 
@@ -32,6 +36,7 @@ class JudgeSettings(BaseSettings):
         extra='ignore',
         populate_by_name=True,
     )
+    requests_per_second: float = Field(default=DEFAULT_REQUESTS_PER_SECOND, gt=0)
 
     api_key: SecretStr = Field(
         validation_alias=AliasChoices(
@@ -69,6 +74,7 @@ class OpenAIAnswerJudge:
     ) -> None:
         selected_settings = settings or JudgeSettings()
         self.model = selected_settings.model
+        self._rate_limiter = AsyncRateLimiter(selected_settings.requests_per_second)
         self._client = client or AsyncOpenAI(
             api_key=selected_settings.api_key.get_secret_value(),
         )
@@ -76,6 +82,7 @@ class OpenAIAnswerJudge:
     async def judge(self, case: GoldenCase, answer: str) -> JudgeVerdict:
         """Assess whether ``answer`` satisfies the golden expectation for ``case``."""
         started = perf_counter()
+        await self._rate_limiter.acquire()
         try:
             response = await self._client.responses.create(
                 model=self.model,
