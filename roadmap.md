@@ -893,7 +893,7 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.3.0 — Evaluation
 
-**🟢 Ready to ship — publication pending**
+**📦 Shipped**
 
 The verified v0.3.0 scope is complete:
 
