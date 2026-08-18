@@ -16,6 +16,9 @@ class SearchMode(StrEnum):
     HYBRID = 'hybrid'
 
 
+DEFAULT_SEARCH_MODE = SearchMode.HYBRID
+
+
 class ScoreKind(StrEnum):
     """Meaning of a normalized search score."""
 
@@ -84,6 +87,7 @@ class HybridSearchSettings:
 
 __all__ = [
     'DEFAULT_RRF_RANK_CONSTANT',
+    'DEFAULT_SEARCH_MODE',
     'HybridSearchSettings',
     'ScoreKind',
     'SearchMetadata',

@@ -18,7 +18,7 @@ from ai_tour_guide.agent.responses import (
     RETRIEVAL_ERROR_ANSWER,
 )
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
-from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def _error(stage: str, exc: Exception) -> RAGError:
 async def answer_question_async(
     question: str,
     *,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     client: LLMClient | None = None,
     engine: Engine | None = None,
@@ -147,7 +147,7 @@ async def answer_question_async(
 def answer_question(
     question: str,
     *,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     client: LLMClient | None = None,
     engine: Engine | None = None,

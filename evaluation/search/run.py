@@ -141,7 +141,11 @@ def run(
     """Run search evaluation over one corpus and one golden dataset."""
     if k <= 0:
         raise ValueError('k must be greater than zero')
-    cases = load_golden_dataset(root=dataset_root)
+    cases = [
+        case
+        for case in load_golden_dataset(root=dataset_root)
+        if case.expected.answerable
+    ]
     selected_modes = tuple(SearchMode(mode) for mode in modes)
 
     with (

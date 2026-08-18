@@ -13,7 +13,7 @@ from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
-from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
 from evaluation.dataset import DEFAULT_DATASET_ROOT, load_golden_dataset
 from evaluation.rag.judge import OpenAIAnswerJudge
@@ -26,7 +26,7 @@ async def run_async(
     *,
     corpus_root: Path = DEFAULT_CORPUS_ROOT,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = DEFAULT_K,
     judge: bool = False,
 ) -> None:
@@ -111,7 +111,7 @@ def run(
     *,
     corpus_root: Path = DEFAULT_CORPUS_ROOT,
     dataset_root: Path = DEFAULT_DATASET_ROOT,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = DEFAULT_K,
     judge: bool = False,
 ) -> None:
@@ -134,7 +134,7 @@ def main() -> None:
     parser.add_argument(
         '--mode',
         choices=tuple(mode.value for mode in SearchMode),
-        default=SearchMode.VECTOR.value,
+        default=DEFAULT_SEARCH_MODE.value,
     )
     parser.add_argument('--k', type=int, default=DEFAULT_K)
     parser.add_argument(

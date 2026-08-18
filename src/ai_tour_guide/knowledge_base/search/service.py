@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 
-from .models import HybridSearchSettings, SearchMode, SearchResult
+from .models import DEFAULT_SEARCH_MODE, HybridSearchSettings, SearchMode, SearchResult
 from .strategies import create_search_strategy
 
 
@@ -12,7 +12,7 @@ def search_with_session(
     session: Session,
     query: str,
     *,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
 ) -> list[SearchResult]:
@@ -25,7 +25,7 @@ def search_with_session(
 def search(
     query: str,
     *,
-    mode: SearchMode = SearchMode.VECTOR,
+    mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
 ) -> list[SearchResult]:

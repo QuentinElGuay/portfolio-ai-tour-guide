@@ -13,22 +13,20 @@ in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
   "expected": {
     "answerable": true,
     "reference_answer": "...",
-    "relevant_sources": [
-      {
-        "source_url": "https://example.com/brittany-guide.pdf",
-        "version": null,
-        "section_path": [
-          "guide-to-the-region-of-brittany",
-          "geography-and-climate",
-          "climate"
-        ]
-      }
-    ]
+    "relevant_source": {
+      "source_url": "https://example.com/brittany-guide.pdf",
+      "version": null,
+      "section_path": [
+        "guide-to-the-region-of-brittany",
+        "geography-and-climate",
+        "climate"
+      ]
+    }
   }
 }
 ```
 
-Use `answerable: false`, `reference_answer: null`, and `relevant_sources: []` for an
+Use `answerable: false` and `reference_answer: null` without a `relevant_source` for an
 intentional insufficient-context case. Do not include expected provider, database, or
 parsing errors here; those are operational-failure tests, not corpus-ground-truth data.
 

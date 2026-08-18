@@ -21,7 +21,7 @@ class SourceExpectation:
 class ExpectedOutcome:
     answerable: bool
     reference_answer: str | None
-    relevant_source: SourceExpectation
+    relevant_source: SourceExpectation | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,19 +56,24 @@ def load_golden_dataset(
                 if not isinstance(case_id, int) or isinstance(case_id, bool):
                     raise TypeError('id must be an integer')
                 expected = raw['expected']
-                relevant_source = SourceExpectation(
-                    source_url=expected['relevant_source']['source_url'],
-                    version=expected['relevant_source']['version'],
-                    section_path=slugify_section_path(
-                        expected['relevant_source']['section_path']
-                    ),
+                answerable = expected['answerable']
+                relevant_source = (
+                    SourceExpectation(
+                        source_url=expected['relevant_source']['source_url'],
+                        version=expected['relevant_source']['version'],
+                        section_path=slugify_section_path(
+                            expected['relevant_source']['section_path']
+                        ),
+                    )
+                    if answerable
+                    else None
                 )
                 case = GoldenCase(
                     case_id=case_id,
                     question=raw['question'],
                     category=raw['category'],
                     expected=ExpectedOutcome(
-                        answerable=expected['answerable'],
+                        answerable=answerable,
                         reference_answer=expected['reference_answer'],
                         relevant_source=relevant_source,
                     ),

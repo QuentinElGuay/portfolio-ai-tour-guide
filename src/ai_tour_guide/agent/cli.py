@@ -7,7 +7,11 @@ from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
 from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.retrieval import retrieve_context
-from ai_tour_guide.knowledge_base.search import SearchMode, SearchResult
+from ai_tour_guide.knowledge_base.search import (
+    DEFAULT_SEARCH_MODE,
+    SearchMode,
+    SearchResult,
+)
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -20,7 +24,7 @@ def main() -> None:
 @click.option(
     '--mode',
     type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
-    default='vector',
+    default=DEFAULT_SEARCH_MODE.value,
     show_default=True,
     help='Use semantic vector search or PostgreSQL full-text search.',
 )
@@ -52,7 +56,7 @@ def search_command(query: str, mode: str, k: int) -> None:
 @click.option(
     '--mode',
     type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
-    default='vector',
+    default=DEFAULT_SEARCH_MODE.value,
     show_default=True,
     help='Use semantic vector search or PostgreSQL full-text search.',
 )

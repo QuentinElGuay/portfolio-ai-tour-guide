@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.search.models import (
+    DEFAULT_SEARCH_MODE,
     HybridSearchSettings,
     SearchMode,
     SearchResult,
@@ -85,7 +86,7 @@ def build_retrieved_contexts(
 def retrieve_context(
     query: str,
     *,
-    search_mode: SearchMode = SearchMode.VECTOR,
+    search_mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
     engine: Engine | None = None,

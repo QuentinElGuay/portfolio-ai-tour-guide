@@ -626,11 +626,13 @@ service behind an evaluation profile, not an always-on application service.
   shortcuts for the evaluation commands
 - [x] Allow evaluation commands to run against an isolated PostgreSQL schema, for
   example `DB_SCHEMA=evaluation`
+- [x] Add runnable notebooks for current search, RAG, and judge-quality baselines
+- [x] Save the latest reports and concise conclusions in the evaluation notebooks
 - [ ] Allow an experiment/configuration name to be recorded with each run
 - [ ] Persist machine-readable results for every run
 - [ ] Produce a concise human-readable comparison table or Markdown report
-- [ ] Record the dataset version, retrieval configuration, prompt version, model, and
-  key parameters used by each experiment
+- [x] Record the current dataset, retrieval configuration, model, and key parameters
+  used by the baseline notebooks
 - [ ] Make repeated runs with the same dataset and deterministic configuration
   comparable
 
@@ -653,7 +655,7 @@ existing `uv run` workflow without adding an unrelated project-specific command.
   summary
 - documented winning retrieval configuration
 - documented winning LLM/prompt configuration
-- README section showing the comparison and explaining why each winner was selected
+- [x] README section showing the retrieval comparison and explaining the current choice
 
 **Acceptance criteria**
 
@@ -662,7 +664,7 @@ existing `uv run` workflow without adding an unrelated project-specific command.
   implementations
 - [ ] Every experiment records enough configuration to reproduce the comparison
 - [ ] Results from multiple approaches can be compared in one report
-- [ ] The selected retrieval and LLM configurations are applied to the application
+- [x] The selected hybrid retrieval configuration is applied to the application
 
 **Tools**
 
@@ -680,9 +682,9 @@ RAG and judge evaluations call external LLMs and currently process cases seriall
 bounded asynchronous scheduling without exceeding provider limits or losing the stable
 case ordering used by reports.
 
-- [ ] Extract an async RAG evaluation path instead of creating one event loop per case
-- [ ] Run independent cases concurrently with a configurable in-flight limit
-- [ ] Add a shared requests-per-second limiter for answer and judge calls
+- [x] Extract an async RAG evaluation path instead of creating one event loop per case
+- [x] Run independent cases concurrently with a shared asynchronous scheduler
+- [x] Add a shared requests-per-second limiter for answer and judge calls
 - [ ] Retry transient failures and rate limits with bounded exponential backoff
 - [ ] Preserve case order and aggregate failures without aborting the whole run
 - [ ] Keep search evaluation independent from the online LLM scheduler
@@ -716,9 +718,9 @@ dataset, `top_k`, and scoring procedure.
 
 **Approaches to compare**
 
-- [ ] Vector search
-- [ ] PostgreSQL full-text search
-- [ ] Hybrid search with reciprocal rank fusion
+- [x] Vector search
+- [x] PostgreSQL full-text search
+- [x] Hybrid search with reciprocal rank fusion
 - [ ] Optionally compare a small number of justified hybrid configurations if needed to
   select the final weights or RRF rank constant
 
@@ -728,9 +730,9 @@ independent variable.
 
 **Primary metrics**
 
-- [ ] Hit Rate at K
-- [ ] Recall at K
-- [ ] Mean Reciprocal Rank
+- [x] Hit Rate at K
+- [x] Recall at K
+- [x] Mean Reciprocal Rank
 
 **Secondary metrics**
 
@@ -752,9 +754,9 @@ break ties or explain tradeoffs.
 
 - [ ] At least two materially different retrieval approaches are evaluated
 - [ ] Vector, full-text, and hybrid retrieval are compared if all three remain available
-- [ ] Results are reproducible from the evaluation runner
-- [ ] A results table compares all approaches using the same metrics
-- [ ] The best-performing retrieval configuration is selected and used by the
+- [x] Results are reproducible from the evaluation runner
+- [x] A results table compares all approaches using the same metrics
+- [x] The best-performing retrieval configuration is selected and used by the
   application
 - [ ] The selection rationale is documented, including any quality/latency tradeoff
 
@@ -778,7 +780,7 @@ should receive the same question and the same retrieved context so that prompt q
 can be compared independently from retrieval quality.
 
 - [ ] Include representative answerable questions
-- [ ] Include unsupported questions
+- [x] Include unsupported questions
 - [ ] Include questions about prices or opening hours when the retrieved context does
   not contain that information
 - [ ] Include questions requiring synthesis across multiple retrieved chunks
@@ -801,7 +803,7 @@ can be compared independently from retrieval quality.
 - [ ] Dataset is versioned
 - [ ] Expected behaviour is manually reviewed
 - [ ] Every compared LLM approach receives equivalent input context
-- [ ] Cases include both answerable and unsupported questions
+- [x] Cases include both answerable and unsupported questions
 
 **Tools**
 
