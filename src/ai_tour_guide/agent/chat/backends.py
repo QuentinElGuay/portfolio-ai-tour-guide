@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -25,6 +23,10 @@ class ChatBackend(ABC):
     @abstractmethod
     async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
         """Return a validated answer payload."""
+
+    @abstractmethod
+    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
+        """Accept answer feedback without persisting it yet."""
 
     @staticmethod
     def validate_response(payload: object) -> dict[str, object]:
@@ -53,6 +55,10 @@ class DemoBackend(ChatBackend):
                 'sources': [],
             }
         )
+
+    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
+        """Provide the feedback seam without performing any action."""
+        del request_id, helpful
 
 
 class HttpChatBackend(ChatBackend):
@@ -110,3 +116,7 @@ class HttpChatBackend(ChatBackend):
             ) from exc
 
         return payload
+
+    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
+        """Provide the feedback seam until a feedback endpoint exists."""
+        del request_id, helpful

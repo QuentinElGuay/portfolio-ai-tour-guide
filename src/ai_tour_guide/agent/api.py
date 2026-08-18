@@ -1,5 +1,6 @@
 """HTTP API exposing the tour-guide RAG pipeline."""
 
+import logging
 from datetime import date
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from ai_tour_guide.knowledge_base.database.connection import create_database_eng
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 ASK_RESPONSE_SCHEMA_VERSION = 1
+logger = logging.getLogger(__name__)
 
 
 class AskRequest(BaseModel):
@@ -74,6 +76,10 @@ def _ensure_knowledge_base_ready() -> None:
         with engine.connect() as connection:
             document_id = connection.scalar(select(DocumentRow.document_id).limit(1))
     except SQLAlchemyError as exc:
+        logger.warning(
+            'Knowledge-base health check failed: PostgreSQL is unavailable. '
+            'Check the database service and run `make init-db`.',
+        )
         raise HTTPException(
             status_code=503,
             detail='The knowledge base is unavailable. Check the database service.',
@@ -82,11 +88,15 @@ def _ensure_knowledge_base_ready() -> None:
         engine.dispose()
 
     if document_id is None:
+        logger.warning(
+            'Knowledge-base health check failed: the public schema contains no '
+            'documents. Run `make ingest` or `make load-corpus DB_SCHEMA=public`.'
+        )
         raise HTTPException(
             status_code=503,
             detail=(
-                'The knowledge base is empty. Run `make load-corpus DB_SCHEMA=public` '
-                'before starting the application.'
+                'The knowledge base is empty. Run `make ingest` or '
+                '`make load-corpus DB_SCHEMA=public` before starting the application.'
             ),
         )
 

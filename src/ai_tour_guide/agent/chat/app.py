@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import os
 from collections.abc import Sequence
@@ -14,6 +12,32 @@ from ai_tour_guide.agent.chat.backends import (
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Message, Role
 from ai_tour_guide.agent.source_formatting import format_pages
+
+CHAT_CSS = """
+#rag-chat .message-row.bot .feedback {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+#rag-chat .message-row.bot .feedback::before {
+    content: "Was this answer helpful?";
+    margin-right: 0.25rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    #rag-chat .message-row.bot .feedback::before {
+        flex-basis: 100%;
+    }
+}
+"""
+
+
+def placeholder_request_id(assistant_message_index: int) -> str:
+    """Return the temporary request ID used until the API exposes one to chat."""
+    return f'TODO: request_id:{assistant_message_index}'
 
 
 def normalize_history(history: Sequence[ChatHistoryItem]) -> list[Message]:
@@ -32,46 +56,90 @@ def normalize_history(history: Sequence[ChatHistoryItem]) -> list[Message]:
     return messages
 
 
-def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
+async def submit_feedback(
+    request_ids: dict[int, str], backend: ChatBackend, data: gr.LikeData
+) -> None:
+    """Forward valid feedback for the assistant message that was selected."""
+    if not isinstance(data.index, int):
+        return
+    if not isinstance(data.liked, bool):
+        return
+
+    request_id = request_ids.get(data.index)
+    if request_id is None:
+        return
+
+    await backend.submit_feedback(request_id, data.liked)
+
+
+def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
 
     async def respond(
         message: str,
         history: list[ChatHistoryItem],
-    ) -> str:
+        request_ids: dict[int, str],
+    ) -> tuple[str, dict[int, str]]:
         messages = normalize_history(history)
         messages.append({'role': Role.USER, 'content': message})
+        assistant_message_index = len(history) + 1
 
         try:
-            return _render_response(await selected_backend.ask(messages))
+            reply = _render_response(await selected_backend.ask(messages))
         except RuntimeError as exc:
-            return f'**Backend error:** {exc}'
+            reply = f'**Backend error:** {exc}'
 
-    return gr.ChatInterface(
-        fn=respond,
-        chatbot=gr.Chatbot(
+        updated_request_ids = dict(request_ids)
+        updated_request_ids[assistant_message_index] = placeholder_request_id(
+            assistant_message_index
+        )
+        return reply, updated_request_ids
+
+    async def on_like(request_ids: dict[int, str], data: gr.LikeData) -> None:
+        """Adapt Gradio's event payload to the shared feedback handler."""
+        await submit_feedback(request_ids, selected_backend, data)
+
+    with gr.Blocks() as app:
+        request_ids = gr.State({})
+        chatbot = gr.Chatbot(
+            elem_id='rag-chat',
+            feedback_options=('Like', 'Dislike'),
             height=560,
             placeholder=(
                 '<h2>Explore Brittany</h2>'
                 '<p>Ask a question grounded in the tourism guide.</p>'
             ),
-        ),
-        textbox=gr.Textbox(
-            placeholder='Write a message...',
-            container=False,
-            autofocus=True,
-        ),
-        title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
-        description=(
-            'Ask questions about Brittany and receive answers grounded in the guide.'
-        ),
-        examples=[
-            'What are the main places to visit in Brittany?',
-            'What is special about Breton culture?',
-        ],
-        cache_examples=False,
-    )
+        )
+        gr.ChatInterface(
+            fn=respond,
+            chatbot=chatbot,
+            additional_inputs=request_ids,
+            additional_outputs=request_ids,
+            textbox=gr.Textbox(
+                placeholder='Write a message...',
+                container=False,
+                autofocus=True,
+            ),
+            title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
+            description=(
+                'Ask questions about Brittany and receive answers grounded in the guide.'
+            ),
+            examples=[
+                ['What are the main places to visit in Brittany?'],
+                ['What is special about Breton culture?'],
+            ],
+            cache_examples=False,
+        )
+        chatbot.like(
+            on_like,
+            inputs=request_ids,
+            outputs=None,
+            api_visibility='private',
+            show_progress='hidden',
+        )
+
+    return app
 
 
 def _render_response(payload: dict[str, object]) -> str:
@@ -108,6 +176,7 @@ def main() -> None:
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),
         show_error=True,
+        css=CHAT_CSS,
     )
 
 
