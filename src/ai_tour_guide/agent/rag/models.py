@@ -6,6 +6,7 @@ from datetime import date, datetime
 from enum import Enum, StrEnum
 from types import MappingProxyType
 from typing import Any
+from uuid import UUID, uuid4
 
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
@@ -196,6 +197,7 @@ class RAGResult:
     retrieval_latency_ms: float | None = None
     generation_latency_ms: float | None = None
     total_latency_ms: float | None = None
+    request_id: UUID = field(default_factory=uuid4)
     retrieval_metadata: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -229,6 +231,7 @@ class RAGResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             'schema_version': RAG_RESULT_SCHEMA_VERSION,
+            'request_id': str(self.request_id),
             'question': self.question,
             'mode': self.mode.value,
             'k': self.k,

@@ -1,5 +1,6 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 
@@ -8,7 +9,7 @@ from ai_tour_guide.agent.rag.models import (
     GeneratedAnswer,
     SourceReference,
 )
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.agent.rag.pipeline import answer_question, answer_question_async
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
@@ -83,8 +84,23 @@ def test_answer_question_retrieves_context_and_returns_sources(
     build_messages.assert_called_once_with('Question', (context,))
     client.answer_question.assert_awaited_once_with(build_messages.return_value)
     assert result.answer == 'Answer.'
+    assert isinstance(result.request_id, UUID)
     assert result.contexts == (context,)
     assert result.sources == (source,)
+
+
+@patch('ai_tour_guide.agent.rag.pipeline.answer_question_async', new_callable=AsyncMock)
+def test_answer_question_assigns_and_propagates_request_id(
+    answer_question_async_mock: AsyncMock,
+) -> None:
+    expected = MagicMock()
+    answer_question_async_mock.return_value = expected
+
+    result = answer_question('Question')
+
+    request_id = answer_question_async_mock.call_args.kwargs['request_id']
+    assert isinstance(request_id, UUID)
+    assert result is expected
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve_context', return_value=())

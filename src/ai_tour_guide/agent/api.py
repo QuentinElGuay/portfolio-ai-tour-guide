@@ -1,6 +1,7 @@
 """HTTP API exposing the tour-guide RAG pipeline."""
 
 from datetime import date
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
@@ -8,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
@@ -58,6 +59,7 @@ class AskResponse(BaseModel):
     """Grounded answer and the sources used to produce it."""
 
     schema_version: int = ASK_RESPONSE_SCHEMA_VERSION
+    request_id: UUID
     answer: str
     sources: list[SourceResponse]
 
@@ -97,8 +99,10 @@ def health() -> dict[str, str]:
 
 
 @app.post('/ask', response_model=AskResponse)
-async def ask(request: AskRequest) -> AskResponse:
+def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result: RAGResult = await answer_question_async(request.question)
+    result: RAGResult = answer_question(request.question)
     sources = [SourceResponse.from_reference(source) for source in result.sources]
-    return AskResponse(answer=result.answer, sources=sources)
+    return AskResponse(
+        request_id=result.request_id, answer=result.answer, sources=sources
+    )

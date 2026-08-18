@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from time import perf_counter
+from uuid import UUID, uuid4
 
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -41,9 +42,11 @@ async def answer_question_async(
     client: LLMClient | None = None,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
+    request_id: UUID | None = None,
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
+    selected_request_id = request_id or uuid4()
     selected_mode = SearchMode(mode)
 
     selected_client = client or create_default_llm_client()
@@ -65,6 +68,7 @@ async def answer_question_async(
 
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=(),
@@ -79,6 +83,7 @@ async def answer_question_async(
     if not contexts:
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=(),
@@ -99,6 +104,7 @@ async def answer_question_async(
 
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=messages,
@@ -125,6 +131,7 @@ async def answer_question_async(
 
     return RAGResult(
         question=question,
+        request_id=selected_request_id,
         mode=selected_mode,
         k=k,
         messages=messages,
@@ -154,6 +161,7 @@ def answer_question(
     strategy: SearchStrategy | None = None,
 ) -> RAGResult:
     """Synchronously answer a question for CLI and synchronous callers."""
+    request_id = uuid4()
     return asyncio.run(
         answer_question_async(
             question,
@@ -162,6 +170,7 @@ def answer_question(
             client=client,
             engine=engine,
             strategy=strategy,
+            request_id=request_id,
         )
     )
 
