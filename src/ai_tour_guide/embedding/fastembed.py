@@ -1,6 +1,7 @@
 """FastEmbed implementation of the shared text embedding interface."""
 
 from collections.abc import Iterable, Sequence
+from functools import cache
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -216,3 +217,18 @@ class FastEmbedder(Embedder):
             raise EmbeddingError('Cannot normalize a zero-length vector')
 
         return np.asarray(vectors / norms, dtype=np.float32)
+
+
+@cache
+def get_cached_embedder(
+    model_name: str,
+    *,
+    normalize: bool = True,
+    cache_dir: Path | None = None,
+) -> FastEmbedder:
+    """Return one process-local embedder for each configuration."""
+    return FastEmbedder(
+        model_name=model_name,
+        normalize=normalize,
+        cache_dir=cache_dir,
+    )

@@ -4,7 +4,7 @@ from typing import Protocol
 
 from sqlalchemy.orm import Session
 
-from ai_tour_guide.embedding.fastembed import FastEmbedder
+from ai_tour_guide.embedding.fastembed import FastEmbedder, get_cached_embedder
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 
 from .fusion import reciprocal_rank_fusion
@@ -110,7 +110,7 @@ def create_search_strategy(
         return TextSearchStrategy()
 
     settings = EmbeddingSettings()
-    embedder = FastEmbedder(
+    embedder = get_cached_embedder(
         model_name=settings.model_name,
         normalize=settings.normalize,
         cache_dir=settings.cache_dir,
