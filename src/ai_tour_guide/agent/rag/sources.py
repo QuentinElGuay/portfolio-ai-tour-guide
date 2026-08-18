@@ -80,6 +80,7 @@ def validate_citations(
 
     valid: OrderedDict[DocumentIdentity, CitationEvidence] = OrderedDict()
     invalid: list[InvalidCitation] = []
+
     for citation in citations:
         identity = DocumentIdentity(citation.source_url, citation.version)
         document_sources = documents.get(identity)

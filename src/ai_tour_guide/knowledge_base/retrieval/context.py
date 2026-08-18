@@ -14,6 +14,7 @@ from ai_tour_guide.knowledge_base.search.models import (
 )
 from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
 
+from ..search.strategies import SearchStrategy
 from .models import RetrievedContext
 
 ContextIdentity = tuple[int, str]
@@ -88,12 +89,15 @@ def retrieve_context(
     k: int = 5,
     hybrid_settings: HybridSearchSettings | None = None,
     engine: Engine | None = None,
+    strategy: SearchStrategy | None = None,
 ) -> tuple[RetrievedContext, ...]:
     """Search for relevant chunks and expand their sections into temporary LLM contexts."""
-    strategy = create_search_strategy(search_mode, hybrid_settings=hybrid_settings)
+    selected_strategy = strategy or create_search_strategy(
+        search_mode, hybrid_settings=hybrid_settings
+    )
 
     with database_engine(engine) as db_engine, Session(db_engine) as session:
-        results = strategy.search(session, query, k=k)
+        results = selected_strategy.search(session, query, k=k)
         return build_retrieved_contexts(session, results)
 
 

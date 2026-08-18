@@ -1,12 +1,10 @@
 """Golden-dataset loading utilities."""
 
 import json
-import re
-import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-_NON_ALPHANUMERIC_RE = re.compile(r'[^a-z0-9]+')
+from ai_tour_guide.knowledge_base import slugify_section_path
 
 DEFAULT_DATASET_ROOT = Path('evaluation/datasets')
 GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
@@ -23,7 +21,7 @@ class SourceExpectation:
 class ExpectedOutcome:
     answerable: bool
     reference_answer: str | None
-    relevant_sources: tuple[SourceExpectation, ...]
+    relevant_source: SourceExpectation
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,20 +35,6 @@ class GoldenCase:
 def golden_dataset_path(*, root: Path = DEFAULT_DATASET_ROOT) -> Path:
     """Return the path to the unversioned golden dataset."""
     return root / GOLDEN_DATASET_FILENAME
-
-
-def slugify_section_path(section_path: list[str]) -> tuple[str, ...]:
-    """Normalize section titles for stable evaluation comparisons."""
-    return tuple(
-        _NON_ALPHANUMERIC_RE.sub(
-            '-',
-            unicodedata.normalize('NFKD', title)
-            .encode('ascii', 'ignore')
-            .decode('ascii')
-            .lower(),
-        ).strip('-')
-        for title in section_path
-    )
 
 
 def load_golden_dataset(
@@ -72,13 +56,12 @@ def load_golden_dataset(
                 if not isinstance(case_id, int) or isinstance(case_id, bool):
                     raise TypeError('id must be an integer')
                 expected = raw['expected']
-                relevant_sources = tuple(
-                    SourceExpectation(
-                        source_url=source['source_url'],
-                        version=source['version'],
-                        section_path=slugify_section_path(source['section_path']),
-                    )
-                    for source in expected['relevant_sources']
+                relevant_source = SourceExpectation(
+                    source_url=expected['relevant_source']['source_url'],
+                    version=expected['relevant_source']['version'],
+                    section_path=slugify_section_path(
+                        expected['relevant_source']['section_path']
+                    ),
                 )
                 case = GoldenCase(
                     case_id=case_id,
@@ -87,7 +70,7 @@ def load_golden_dataset(
                     expected=ExpectedOutcome(
                         answerable=expected['answerable'],
                         reference_answer=expected['reference_answer'],
-                        relevant_sources=relevant_sources,
+                        relevant_source=relevant_source,
                     ),
                 )
             except (KeyError, TypeError) as exc:

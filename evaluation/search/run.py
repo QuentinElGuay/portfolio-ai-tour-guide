@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
+from ai_tour_guide.knowledge_base import slugify_section_path
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
@@ -26,8 +27,8 @@ from evaluation.dataset import (
     DEFAULT_DATASET_ROOT,
     GoldenCase,
     load_golden_dataset,
-    slugify_section_path,
 )
+from evaluation.metrics import mean
 from evaluation.search.metrics import (
     hit_rate_at_k,
     recall_at_k,
@@ -178,26 +179,21 @@ def run(
                 report['modes'][mode.value] = {
                     'configuration': _strategy_configuration(strategy),
                     'chunk_ranking': {
-                        'hit_rate_at_k': _mean(
+                        'hit_rate_at_k': mean(
                             case['raw_hit_rate_at_k'] for case in case_results
                         ),
-                        'recall_at_k': _mean(
+                        'recall_at_k': mean(
                             case['raw_recall_at_k'] for case in case_results
                         ),
-                        'mean_reciprocal_rank': _mean(
+                        'mean_reciprocal_rank': mean(
                             case['raw_reciprocal_rank'] for case in case_results
                         ),
                     },
-                    'mean_search_latency_ms': _mean(
+                    'mean_search_latency_ms': mean(
                         case['search_latency_ms'] for case in case_results
                     ),
                 }
     print(json.dumps(report, indent=2, ensure_ascii=False))
-
-
-def _mean(values: Iterable[float]) -> float:
-    values = list(values)
-    return sum(values) / len(values) if values else 0.0
 
 
 def _strategy_configuration(strategy: SearchStrategy) -> dict[str, object]:

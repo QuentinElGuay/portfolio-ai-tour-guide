@@ -1,5 +1,7 @@
 """Knowledge-base persistence, search, and LLM-context retrieval."""
 
+from ai_tour_guide.domain.sections import slugify_section_path
+
 from .retrieval import RetrievedContext, retrieve_context
 from .search import (
     HybridSearchSettings,
@@ -19,4 +21,5 @@ __all__ = [
     'SearchResult',
     'retrieve_context',
     'search',
+    'slugify_section_path',
 ]

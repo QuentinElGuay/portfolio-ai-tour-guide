@@ -33,17 +33,18 @@ class RAGCaseMetrics:
 
 def score_case(case: GoldenCase, result: RAGResult) -> RAGCaseMetrics:
     """Score deterministic retrieval, citation, refusal, and latency behavior."""
-    expected_sources = {
-        _source_key(source.source_url, source.version)
-        for source in case.expected.relevant_sources
-    }
+    case_source = case.expected.relevant_source
+
+    expected_source = _source_key(case_source.source_url, case_source.version)
     actual_sources = {
         _source_key(source.source_url, source.version) for source in result.sources
     }
-    expected_sections = {
-        (_source_key(source.source_url, source.version), source.section_path)
-        for source in case.expected.relevant_sources
-    }
+
+    expected_section = (
+        _source_key(case_source.source_url, case_source.version),
+        case_source.section_path,
+    )
+
     actual_sections = _citation_sections(result)
 
     citation_count = len(result.generated.citations)
@@ -52,12 +53,12 @@ def score_case(case: GoldenCase, result: RAGResult) -> RAGCaseMetrics:
 
     refused = result.answer.strip() == INSUFFICIENT_CONTEXT_ANSWER
     return RAGCaseMetrics(
-        source_precision=_precision(actual_sources, expected_sources),
-        source_recall=_recall(actual_sources, expected_sources),
-        section_precision=_precision(actual_sections, expected_sections),
-        section_recall=_recall(actual_sections, expected_sections),
+        source_precision=_precision(actual_sources, {expected_source}),
+        source_recall=_recall(actual_sources, {expected_source}),
+        section_precision=_precision(actual_sections, {expected_section}),
+        section_recall=_recall(actual_sections, {expected_section}),
         citation_validity=(valid_count / citation_count if citation_count else 1.0),
-        citation_coverage=_recall(actual_sources, expected_sources),
+        citation_coverage=_recall(actual_sources, {expected_source}),
         refused=refused,
         refusal_correct=(
             result.error is None and refused == (not case.expected.answerable)
@@ -69,7 +70,7 @@ def score_case(case: GoldenCase, result: RAGResult) -> RAGCaseMetrics:
     )
 
 
-def summarize(metrics: Iterable[RAGCaseMetrics]) -> dict[str, float | int]:
+def summarize(metrics: Iterable[RAGCaseMetrics]) -> dict[str, float | int | None]:
     """Aggregate case metrics into one report suitable for JSON serialization."""
     cases = list(metrics)
     if not cases:
@@ -126,11 +127,11 @@ def _source_key(source_url: str, version: str | None) -> tuple[str, str | None]:
     return source_url, version
 
 
-def _precision(actual: set[object], expected: set[object]) -> float:
+def _precision[T](actual: set[T], expected: set[T]) -> float:
     return len(actual & expected) / len(actual) if actual else 0.0
 
 
-def _recall(actual: set[object], expected: set[object]) -> float:
+def _recall[T](actual: set[T], expected: set[T]) -> float:
     return len(actual & expected) / len(expected) if expected else 0.0
 
 

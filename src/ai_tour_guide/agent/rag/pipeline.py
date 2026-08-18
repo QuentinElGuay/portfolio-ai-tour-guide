@@ -19,6 +19,7 @@ from ai_tour_guide.agent.responses import (
 )
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ def answer_question(
     k: int = 5,
     client: LLMClient | None = None,
     engine: Engine | None = None,
+    strategy: SearchStrategy | None = None,
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
@@ -56,6 +58,7 @@ def answer_question(
             search_mode=selected_mode,
             k=k,
             engine=engine,
+            strategy=strategy,
         )
     except (OSError, SQLAlchemyError) as exc:
         retrieval_latency = (perf_counter() - retrieval_started) * 1000

@@ -35,8 +35,8 @@ def _format_source(source_document: DocumentRow, source_pages: tuple[int, ...]) 
     return (
         f'Source: {source_document.title}\n'
         f'URL: {source_document.source_url}\n'
-        f'Version: {source_document.version or "unavailable"}\n'
-        f'Pages: {", ".join(str(source_pages))}'
+        f'Version: {source_document.version if source_document.version is not None else "null"}\n'
+        f'Pages: {", ".join(str(page) for page in source_pages)}'
     )
 
 

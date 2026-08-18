@@ -14,6 +14,7 @@ from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_cont
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
 from evaluation.dataset import DEFAULT_DATASET_ROOT, load_golden_dataset
 from evaluation.rag.judge import OpenAIAnswerJudge
 from evaluation.rag.metrics import score_case, summarize, summarize_judgements
@@ -42,6 +43,7 @@ def run(
 
     selected_mode = SearchMode(mode)
     answer_judge = OpenAIAnswerJudge() if judge else None
+    strategy = create_search_strategy(selected_mode)
     with (
         corpus_context(root=corpus_root, schema_name='evaluation'),
         database_engine(schema_name='evaluation') as engine,
@@ -62,6 +64,7 @@ def run(
                 k=k,
                 client=client,
                 engine=engine,
+                strategy=strategy,
             )
             case_metrics.append(score_case(case, result))
             if answer_judge is not None:
