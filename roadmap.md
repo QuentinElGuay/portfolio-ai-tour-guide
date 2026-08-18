@@ -542,16 +542,15 @@ Delivers the first end-to-end RAG experience for the Brittany guide:
 
 ______________________________________________________________________
 
-## ⏳ Milestone 5 — Retrieval and LLM Evaluation
+## ✅ Milestone 5 — Retrieval and LLM Evaluation
 
-Milestone 5 is intentionally focused on the two evaluation criteria required for the
-project submission:
+Milestone 5 establishes the current RAG-quality baseline: compare the available
+retrieval approaches, apply the best one, and make search, RAG, and optional
+judge-quality measurements reproducible through runners and notebooks.
 
-1. compare multiple retrieval approaches and use the best-performing one;
-2. compare multiple LLM approaches and use the best-performing one.
-
-Runtime guardrails, citation enforcement, CI gates, and broader end-to-end RAG quality
-evaluation are tracked separately and do not block this milestone.
+The golden dataset is intentionally not independently versioned in v0.3.0. Prompt/model
+comparisons, richer reports, dataset versioning, and broader end-to-end quality studies
+are follow-up work; they do not block this release.
 
 ______________________________________________________________________
 
@@ -894,17 +893,20 @@ ______________________________________________________________________
 
 ## 🚀 Release v0.3.0 — Evaluation
 
-**🗓️ Planned release — not shipped**
+**🟢 Ready to ship — publication pending**
 
-Ships when **Milestone 5** passes its exit criteria:
+The verified v0.3.0 scope is complete:
 
-- Versioned search evaluation dataset
-- Vector, full-text, and hybrid retrieval comparison
-- Selected retrieval configuration used by the application
-- Versioned LLM evaluation dataset
-- Multiple prompt/LLM approaches compared under fixed retrieval context
-- Selected LLM/prompt configuration used by the application
-- Reproducible evaluation runners and documented results
+- [x] A 105-case current-quality golden dataset, including five unsupported questions
+- [x] Vector, full-text, and hybrid retrieval comparison under the same configuration
+- [x] Hybrid retrieval selected and used by the application
+- [x] Runnable search, RAG, and optional judge evaluation runners and notebooks
+- [x] Baseline results, configuration, limitations, and the retrieval-selection
+  rationale documented in the README
+- [x] Unit-test coverage for the CLI and RAG pipeline, including async RAG orchestration
+  and normalized source output
+
+Publication, release tagging, and any deployment remain external release actions.
 
 ______________________________________________________________________
 

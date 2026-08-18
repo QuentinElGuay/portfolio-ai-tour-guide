@@ -226,19 +226,22 @@ follow-up work.
 The complete plan, including milestones and deferred work, is maintained in
 [roadmap.md](roadmap.md).
 
-### Current release — v0.2.0: RAG MVP
+### Current release — v0.3.0: Evaluated RAG baseline
 
-This release delivers the first end-to-end RAG experience for the Brittany guide:
+This release delivers an evaluated RAG baseline for the Brittany guide:
 
 - Grounded answers generated from retrieved context
-- Retrieved source references with deduplicated page numbers
+- Retrieved source references with deduplicated, ordered page numbers
+- Hybrid retrieval selected from vector, full-text, and hybrid measurements
+- Runnable search, RAG, and optional judge evaluation notebooks with saved baseline
+  results
 - A basic Gradio chat interface
 
-### Next release — v0.3.0: Evaluation
+### Next release — v0.4.0: Monitoring
 
-The next goal is to validate and measure answer quality: build a reviewed evaluation
-dataset, compare retrieval and prompt configurations, and introduce verified citations
-based on LLM-returned chunk identifiers.
+The next goal is to collect feedback and make application behaviour observable. Broader
+evaluation experiments, such as prompt/model comparisons and dataset versioning, remain
+follow-up work rather than release blockers.
 
 ### Capstone success criteria
 

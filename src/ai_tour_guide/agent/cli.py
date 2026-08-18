@@ -26,7 +26,7 @@ def main() -> None:
     type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
     default=DEFAULT_SEARCH_MODE.value,
     show_default=True,
-    help='Use semantic vector search or PostgreSQL full-text search.',
+    help='Use vector, PostgreSQL full-text, or hybrid search.',
 )
 @click.option(
     '--k',
@@ -38,7 +38,7 @@ def main() -> None:
 def search_command(query: str, mode: str, k: int) -> None:
     """Search for document chunks matching QUERY."""
     try:
-        contexts = retrieve_context(query, mode=mode, k=k)
+        contexts = retrieve_context(query, search_mode=SearchMode(mode), k=k)
     except (OSError, RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -58,7 +58,7 @@ def search_command(query: str, mode: str, k: int) -> None:
     type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
     default=DEFAULT_SEARCH_MODE.value,
     show_default=True,
-    help='Use semantic vector search or PostgreSQL full-text search.',
+    help='Use vector, PostgreSQL full-text, or hybrid search.',
 )
 @click.option(
     '--k',

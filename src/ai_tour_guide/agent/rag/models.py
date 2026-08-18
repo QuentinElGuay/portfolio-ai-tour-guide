@@ -54,6 +54,10 @@ class SourceReference:
     publication_date: date | None
     pages: tuple[int, ...] = ()
 
+    def __post_init__(self) -> None:
+        """Normalize source pages for stable API and CLI output."""
+        object.__setattr__(self, 'pages', tuple(sorted(set(self.pages))))
+
     def to_dict(self) -> dict[str, Any]:
         return {
             'source_url': self.source_url,
@@ -64,6 +68,29 @@ class SourceReference:
             'publication_date': _json_value(self.publication_date),
             'pages': list(self.pages),
         }
+
+
+def _normalize_sources(
+    sources: tuple[SourceReference, ...],
+) -> tuple[SourceReference, ...]:
+    """Merge repeated versioned documents while preserving their first appearance."""
+    normalized: dict[tuple[str, str | None], SourceReference] = {}
+    for source in sources:
+        identity = (source.source_url, source.version)
+        existing = normalized.get(identity)
+        if existing is None:
+            normalized[identity] = source
+            continue
+        normalized[identity] = SourceReference(
+            source_url=existing.source_url,
+            version=existing.version,
+            title=existing.title,
+            publisher=existing.publisher,
+            collection=existing.collection,
+            publication_date=existing.publication_date,
+            pages=existing.pages + source.pages,
+        )
+    return tuple(normalized.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,7 +208,7 @@ class RAGResult:
         object.__setattr__(
             self, 'messages', tuple(dict(message) for message in self.messages)
         )
-        object.__setattr__(self, 'sources', tuple(self.sources))
+        object.__setattr__(self, 'sources', _normalize_sources(tuple(self.sources)))
         object.__setattr__(self, 'invalid_citations', tuple(self.invalid_citations))
         object.__setattr__(
             self,
