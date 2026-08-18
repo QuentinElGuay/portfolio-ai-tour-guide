@@ -910,26 +910,30 @@ Publication, release tagging, and any deployment remain external release actions
 
 ______________________________________________________________________
 
-## ⏳ Milestone 6 — User Feedback
+## ✅ Milestone 6 — User Feedback
 
 ### [P1] Add user feedback
 
 **Labels:** `monitoring`, `feedback`
 
-- [ ] Add thumbs-up and thumbs-down
-- [ ] Add optional feedback comment
-- [ ] Store feedback with request ID
-- [ ] Confirm feedback submission
+- [x] Add thumbs-up and thumbs-down to the Gradio chat
+- [x] Add optional feedback comments to the API and CLI
+- [x] Store feedback with request ID
+- [x] Confirm feedback submission in the Gradio chat and CLI
+- [x] Store every normal CLI and chat RAG result for feedback association
+- [x] Keep evaluation RAG results isolated in the `evaluation` schema
 
 **Acceptance criteria**
 
-- [ ] Feedback is persisted
-- [ ] Feedback can be linked to a question and answer
+- [x] Feedback is persisted in PostgreSQL
+- [x] Feedback can be linked to a question and answer through the stored RAG result
+- [x] The CLI supports the same question, answer, feedback, and next-question flow
 
 **Tools**
 
-- SQLite
+- PostgreSQL
 - Gradio
+- Click
 
 ______________________________________________________________________
 

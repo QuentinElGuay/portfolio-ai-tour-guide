@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from collections.abc import Sequence
 
@@ -13,22 +14,42 @@ from ai_tour_guide.agent.chat.backends import (
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Message, Role
 from ai_tour_guide.agent.source_formatting import format_pages
 
+logger = logging.getLogger(__name__)
+
+FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
+
 CHAT_CSS = """
-#rag-chat .message-row.bot .feedback {
+#rag-chat .message-buttons-left {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
 }
 
-#rag-chat .message-row.bot .feedback::before {
+#rag-chat {
+    max-height: calc(100vh - 250px);
+}
+
+#rag-chat .message-buttons-left::before {
     content: "Was this answer helpful?";
     margin-right: 0.25rem;
     white-space: nowrap;
 }
 
+#rag-chat .message-buttons-left button[aria-label="Liked"],
+#rag-chat .message-buttons-left button[aria-label="clicked like"] {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+}
+
+#rag-chat .message-buttons-left button[aria-label="Disliked"],
+#rag-chat .message-buttons-left button[aria-label="clicked dislike"] {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+}
+
 @media (max-width: 480px) {
-    #rag-chat .message-row.bot .feedback::before {
+    #rag-chat .message-buttons-left::before {
         flex-basis: 100%;
     }
 }
@@ -56,20 +77,61 @@ def normalize_history(history: Sequence[ChatHistoryItem]) -> list[Message]:
     return messages
 
 
-async def submit_feedback(
-    request_ids: dict[int, str], backend: ChatBackend, data: gr.LikeData
-) -> None:
-    """Forward valid feedback for the assistant message that was selected."""
+def select_feedback(
+    request_ids: dict[int, str], data: gr.LikeData
+) -> dict[str, object] | None:
+    """Resolve a Gradio like event to the selected message and rating."""
     if not isinstance(data.index, int):
-        return
+        return None
     if not isinstance(data.liked, bool):
-        return
+        return None
 
     request_id = request_ids.get(data.index)
     if request_id is None:
+        return None
+
+    return {'request_id': request_id, 'helpful': data.liked}
+
+
+def update_feedback_values(
+    history: Sequence[ChatHistoryItem],
+    feedback_values: Sequence[str | None],
+    message_index: int,
+    helpful: bool,
+) -> list[str | None]:
+    """Return native Gradio feedback values with the selected answer updated."""
+    assistant_indexes = [
+        index for index, item in enumerate(history) if item['role'] == Role.ASSISTANT
+    ]
+    try:
+        feedback_index = assistant_indexes.index(message_index)
+    except ValueError:
+        return list(feedback_values)
+
+    updated_values = list(feedback_values[: len(assistant_indexes)])
+    updated_values.extend([None] * (len(assistant_indexes) - len(updated_values)))
+    updated_values[feedback_index] = 'Like' if helpful else 'Dislike'
+    return updated_values
+
+
+async def submit_feedback(
+    selection: dict[str, object] | None,
+    backend: ChatBackend,
+) -> None:
+    """Submit a valid thumbs up or thumbs down selection."""
+    if not isinstance(selection, dict):
+        return
+    request_id = selection.get('request_id')
+    helpful = selection.get('helpful')
+    if not isinstance(request_id, str) or not isinstance(helpful, bool):
         return
 
-    await backend.submit_feedback(request_id, data.liked)
+    logger.info(
+        'chat feedback submitted: request_id=%s helpful=%s',
+        request_id,
+        helpful,
+    )
+    await backend.submit_feedback(request_id, helpful)
 
 
 def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
@@ -81,31 +143,75 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         history: list[ChatHistoryItem],
         request_ids: dict[int, str],
     ) -> tuple[str, dict[int, str]]:
+        logger.info('chat question received: question=%r', message)
         messages = normalize_history(history)
         messages.append({'role': Role.USER, 'content': message})
         assistant_message_index = len(history) + 1
 
         try:
-            reply = _render_response(await selected_backend.ask(messages))
+            payload = await selected_backend.ask(messages)
+            reply = _render_response(payload)
         except RuntimeError as exc:
             reply = f'**Backend error:** {exc}'
+            request_id = placeholder_request_id(assistant_message_index)
+        else:
+            response_request_id = payload.get('request_id')
+            request_id = (
+                response_request_id
+                if isinstance(response_request_id, str)
+                else placeholder_request_id(assistant_message_index)
+            )
 
         updated_request_ids = dict(request_ids)
-        updated_request_ids[assistant_message_index] = placeholder_request_id(
-            assistant_message_index
+        updated_request_ids[assistant_message_index] = request_id
+        return (
+            reply,
+            updated_request_ids,
         )
-        return reply, updated_request_ids
 
-    async def on_like(request_ids: dict[int, str], data: gr.LikeData) -> None:
+    async def on_like(
+        request_ids: dict[int, str],
+        history: list[ChatHistoryItem],
+        feedback_values: list[str | None],
+        data: gr.LikeData,
+    ) -> tuple[dict[str, object], list[str | None]]:
         """Adapt Gradio's event payload to the shared feedback handler."""
-        await submit_feedback(request_ids, selected_backend, data)
+        if not isinstance(data.index, int) or not isinstance(data.liked, bool):
+            return gr.update(), feedback_values
+        selection = select_feedback(request_ids, data)
+        if selection is None:
+            return gr.update(), feedback_values
+        await submit_feedback(selection, selected_backend)
+        logger.info(
+            'chat feedback selected: request_id=%s helpful=%s',
+            selection['request_id'],
+            selection['helpful'],
+        )
+        updated_feedback_values = update_feedback_values(
+            history,
+            feedback_values,
+            data.index,
+            data.liked,
+        )
+        gr.Info(FEEDBACK_ACKNOWLEDGEMENT)
+        return (
+            gr.update(feedback_value=updated_feedback_values),
+            updated_feedback_values,
+        )
 
     with gr.Blocks() as app:
         request_ids = gr.State({})
+        feedback_values = gr.State([])
+        textbox = gr.Textbox(
+            placeholder='Write a message...',
+            container=False,
+            autofocus=True,
+        )
         chatbot = gr.Chatbot(
             elem_id='rag-chat',
             feedback_options=('Like', 'Dislike'),
-            height=560,
+            feedback_value=[],
+            height=400,
             placeholder=(
                 '<h2>Explore Brittany</h2>'
                 '<p>Ask a question grounded in the tourism guide.</p>'
@@ -116,11 +222,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             chatbot=chatbot,
             additional_inputs=request_ids,
             additional_outputs=request_ids,
-            textbox=gr.Textbox(
-                placeholder='Write a message...',
-                container=False,
-                autofocus=True,
-            ),
+            textbox=textbox,
+            show_progress='full',
             title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
             description=(
                 'Ask questions about Brittany and receive answers grounded in the guide.'
@@ -133,8 +236,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         )
         chatbot.like(
             on_like,
-            inputs=request_ids,
-            outputs=None,
+            inputs=[request_ids, chatbot, feedback_values],
+            outputs=[chatbot, feedback_values],
             api_visibility='private',
             show_progress='hidden',
         )
@@ -165,6 +268,10 @@ def _render_response(payload: dict[str, object]) -> str:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+    )
     backend = create_backend()
     if isinstance(backend, HttpChatBackend):
         try:

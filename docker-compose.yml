@@ -79,8 +79,6 @@ services:
 
     command:
       [
-        "uv",
-        "run",
         "python",
         "-m",
         "ai_tour_guide.knowledge_base.database.init",

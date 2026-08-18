@@ -25,8 +25,10 @@ class ChatBackend(ABC):
         """Return a validated answer payload."""
 
     @abstractmethod
-    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
-        """Accept answer feedback without persisting it yet."""
+    async def submit_feedback(
+        self, request_id: str, helpful: bool, comment: str | None = None
+    ) -> None:
+        """Submit answer feedback to the configured backend."""
 
     @staticmethod
     def validate_response(payload: object) -> dict[str, object]:
@@ -56,9 +58,11 @@ class DemoBackend(ChatBackend):
             }
         )
 
-    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
+    async def submit_feedback(
+        self, request_id: str, helpful: bool, comment: str | None = None
+    ) -> None:
         """Provide the feedback seam without performing any action."""
-        del request_id, helpful
+        del request_id, helpful, comment
 
 
 class HttpChatBackend(ChatBackend):
@@ -117,6 +121,25 @@ class HttpChatBackend(ChatBackend):
 
         return payload
 
-    async def submit_feedback(self, request_id: str, helpful: bool) -> None:
-        """Provide the feedback seam until a feedback endpoint exists."""
-        del request_id, helpful
+    async def submit_feedback(
+        self, request_id: str, helpful: bool, comment: str | None = None
+    ) -> None:
+        """Forward feedback to the agent API endpoint."""
+        feedback_url = f'{self.api_url.rsplit("/", 1)[0]}/feedback'
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    feedback_url,
+                    json={
+                        'request_id': request_id,
+                        'helpful': helpful,
+                        'comment': comment,
+                    },
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(
+                f'Unable to store feedback: agent returned HTTP {exc.response.status_code}.'
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f'Unable to store feedback: {exc}') from exc

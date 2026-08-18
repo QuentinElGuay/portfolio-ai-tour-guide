@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
 
+from ai_tour_guide.embedding import Embedder
 from ai_tour_guide.ingestion import pipeline
 from ai_tour_guide.ingestion.cli import main
 from ai_tour_guide.ingestion.config import ChunkingConfig
@@ -64,7 +64,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
     parsed = object()
     chunked = object()
     embedded = object()
-    embedder = SimpleNamespace()
+    embedder: Embedder = MagicMock(spec=Embedder)
 
     download_stage = MagicMock(return_value=downloaded)
     parse_stage = MagicMock(return_value=parsed)

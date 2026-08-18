@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from pydantic import SecretStr
 
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.llm.client import OpenAIClient
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
 from ai_tour_guide.agent.llm.settings import LLMSettings, OpenAISettings
@@ -43,8 +43,8 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
         model='test-model',
     )
     messages: list[Message] = [
-        {'role': 'system', 'content': 'Use the context.'},
-        {'role': 'user', 'content': 'What should I visit?'},
+        {'role': Role.SYSTEM, 'content': 'Use the context.'},
+        {'role': Role.USER, 'content': 'What should I visit?'},
     ]
 
     result = asyncio.run(
@@ -52,7 +52,9 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     )
 
     assert result.answer == 'A grounded answer.'
-    request = client.responses.create.await_args.kwargs
+    await_args = client.responses.create.await_args
+    assert await_args is not None
+    request = await_args.kwargs
     assert request['model'] == 'test-model'
     assert request['input'] == [
         {'role': 'system', 'content': 'Use the context.'},

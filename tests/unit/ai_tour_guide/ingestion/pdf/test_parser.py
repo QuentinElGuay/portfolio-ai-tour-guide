@@ -2,6 +2,7 @@ import json
 import re
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import cast
 
 import httpx
 import pymupdf
@@ -581,8 +582,9 @@ def test_to_dict_serializes_nested_sections() -> None:
 
     result = level_one.to_dict()
 
-    departments = result['subsections'][0]
-    key_features = departments['subsections'][0]
+    subsections = cast(list[dict[str, object]], result['subsections'])
+    departments = subsections[0]
+    key_features = cast(list[dict[str, object]], departments['subsections'])[0]
 
     assert departments['level'] == 2
     assert key_features['level'] == 3

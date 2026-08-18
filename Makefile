@@ -17,7 +17,7 @@ ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask annotate-dataset app
+.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -42,6 +42,7 @@ help: ## Show the available commands.
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
+	@echo "  make cli-chat                        Start the interactive terminal chat"
 	@echo "  make annotate-dataset                Fill answers and source pages interactively"
 	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
 	@echo "  make app                             Start the agent API and Gradio chat"
@@ -130,6 +131,11 @@ ask: ## Answer a QUESTION using retrieved context and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
+
+cli-chat: ## Start the interactive terminal chat after the agent is ready.
+	$(COMPOSE) --profile agent up -d --wait agent
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent chat --k "$(K)"
 
 annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)

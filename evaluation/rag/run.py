@@ -9,9 +9,11 @@ from sqlalchemy import select
 from tqdm import tqdm
 
 from ai_tour_guide.agent.llm.factory import create_default_llm_client
+from ai_tour_guide.agent.rag.models import RAGResult
 from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
+from ai_tour_guide.knowledge_base.database.feedback import store_rag_result
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
@@ -65,7 +67,7 @@ async def run_async(
                 strategy=strategy,
             )
 
-        results = [None] * len(cases)
+        results: list[RAGResult | None] = [None] * len(cases)
         tasks = [
             asyncio.create_task(evaluate_case(index, case))
             for index, case in enumerate(cases)
@@ -75,16 +77,22 @@ async def run_async(
         ) as progress:
             for completed in asyncio.as_completed(tasks):
                 index, result = await completed
+                store_rag_result(
+                    result.request_id,
+                    result.to_dict(),
+                    engine=engine,
+                )
                 results[index] = result
                 progress.update()
+        evaluated_results = [result for result in results if result is not None]
         case_metrics = [
-            score_case(case, result) for case, result in zip(cases, results)
+            score_case(case, result) for case, result in zip(cases, evaluated_results)
         ]
         verdicts = (
             await asyncio.gather(
                 *(
                     answer_judge.judge(case, result.answer)
-                    for case, result in zip(cases, results)
+                    for case, result in zip(cases, evaluated_results)
                 )
             )
             if answer_judge is not None

@@ -9,9 +9,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.api import (
     AskRequest,
+    FeedbackRequest,
     SourceResponse,
     _ensure_knowledge_base_ready,
     ask,
+    feedback,
     health,
 )
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGResult, SourceReference
@@ -63,8 +65,12 @@ def test_health_logs_when_postgresql_is_unavailable(
     engine.dispose.assert_called_once_with()
 
 
+@patch('ai_tour_guide.agent.api.store_rag_result')
 @patch('ai_tour_guide.agent.api.answer_question')
-def test_ask_returns_the_answer_and_sources(answer_question: MagicMock) -> None:
+def test_ask_returns_the_answer_and_sources(
+    answer_question: MagicMock,
+    store_rag_result: MagicMock,
+) -> None:
     """Verify that the ask endpoint returns the generated answer with its source references."""
     answer_question.return_value = RAGResult(
         question='Where?',
@@ -102,9 +108,43 @@ def test_ask_returns_the_answer_and_sources(answer_question: MagicMock) -> None:
         )
     ]
     answer_question.assert_called_once_with('Where?')
+    store_rag_result.assert_called_once_with(
+        answer_question.return_value.request_id,
+        answer_question.return_value.to_dict(),
+    )
 
 
 def test_ask_rejects_an_empty_question() -> None:
     """Verify that ask requests reject questions containing only whitespace."""
     with pytest.raises(ValidationError, match='question must not be empty'):
         AskRequest(question='  ')
+
+
+@patch('ai_tour_guide.agent.api.store_feedback', return_value=True)
+def test_feedback_stores_a_rating(store_feedback: MagicMock) -> None:
+    request_id = UUID('12345678-1234-5678-1234-567812345678')
+
+    response = feedback(
+        FeedbackRequest(
+            request_id=request_id,
+            helpful=True,
+            comment='  Accurate answer.  ',
+        )
+    )
+
+    assert response.request_id == request_id
+    store_feedback.assert_called_once_with(request_id, True, 'Accurate answer.')
+
+
+@patch('ai_tour_guide.agent.api.store_feedback', return_value=False)
+def test_feedback_rejects_unknown_rag_result(store_feedback: MagicMock) -> None:
+    with pytest.raises(HTTPException, match='Unknown RAG result') as exc_info:
+        feedback(
+            FeedbackRequest(
+                request_id=UUID('12345678-1234-5678-1234-567812345678'),
+                helpful=False,
+            )
+        )
+
+    assert exc_info.value.status_code == 404
+    store_feedback.assert_called_once()
