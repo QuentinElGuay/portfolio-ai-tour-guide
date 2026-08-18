@@ -73,11 +73,8 @@ def _evidence_key(
 
 
 def _expected_evidence(case: GoldenCase) -> tuple[str, ...]:
-    evidence = {
-        _evidence_key(source.source_url, source.version, source.section_path)
-        for source in case.expected.relevant_sources
-    }
-    return tuple(sorted(evidence))
+    source = case.expected.relevant_source
+    return (_evidence_key(source.source_url, source.version, source.section_path),)
 
 
 def _section_evidence_key(result: SearchResult) -> str:
