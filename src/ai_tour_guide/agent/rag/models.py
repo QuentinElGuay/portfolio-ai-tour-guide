@@ -8,20 +8,12 @@ from types import MappingProxyType
 from typing import Any
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.knowledge_base.models import DocumentChunkRow
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, SearchMode
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
+from ai_tour_guide.knowledge_base.search import SearchMode
+from ai_tour_guide.knowledge_base.search.models import SearchResult
 
 RAG_RESULT_SCHEMA_VERSION = 1
 
-
-@dataclass(frozen=True, slots=True)
-class Context:
-    """One deduplicated section of LLM context and its retrieval evidence."""
-
-    section_id: str | None
-    text: str
-    chunks: tuple[RetrievedChunk, ...]
-   
 
 class CitationInvalidReason(StrEnum):
     UNKNOWN_DOCUMENT = 'unknown_document'
@@ -62,6 +54,10 @@ class SourceReference:
     publication_date: date | None
     pages: tuple[int, ...] = ()
 
+    def __post_init__(self) -> None:
+        """Normalize source pages for stable API and CLI output."""
+        object.__setattr__(self, 'pages', tuple(sorted(set(self.pages))))
+
     def to_dict(self) -> dict[str, Any]:
         return {
             'source_url': self.source_url,
@@ -72,6 +68,29 @@ class SourceReference:
             'publication_date': _json_value(self.publication_date),
             'pages': list(self.pages),
         }
+
+
+def _normalize_sources(
+    sources: tuple[SourceReference, ...],
+) -> tuple[SourceReference, ...]:
+    """Merge repeated versioned documents while preserving their first appearance."""
+    normalized: dict[tuple[str, str | None], SourceReference] = {}
+    for source in sources:
+        identity = (source.source_url, source.version)
+        existing = normalized.get(identity)
+        if existing is None:
+            normalized[identity] = source
+            continue
+        normalized[identity] = SourceReference(
+            source_url=existing.source_url,
+            version=existing.version,
+            title=existing.title,
+            publisher=existing.publisher,
+            collection=existing.collection,
+            publication_date=existing.publication_date,
+            pages=existing.pages + source.pages,
+        )
+    return tuple(normalized.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +110,7 @@ class InvalidCitation:
 class CitationValidationResult:
     references: tuple[SourceReference, ...]
     invalid_citations: tuple[InvalidCitation, ...]
+    matched_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +129,7 @@ def _json_value(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Enum):
         return value.value
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return {key: _json_value(item) for key, item in asdict(value).items()}
     if isinstance(value, Mapping):
         return {str(key): _json_value(item) for key, item in value.items()}
@@ -120,26 +140,44 @@ def _json_value(value: Any) -> Any:
     return str(value)
 
 
-def _serialize_retrieved(result: RetrievedChunk) -> dict[str, Any]:
-    source = result.source
-    chunk = result.chunk
+def _serialize_search_result(search_result: SearchResult) -> dict[str, Any]:
+    source = search_result.document
+    search = search_result.search
+    chunk = search_result.chunk
+
     return {
-        'rank': result.rank,
-        'score': result.score,
-        'score_kind': result.score_kind.value,
+        'rank': search.rank,
+        'score': search.score,
+        'score_kind': search.score_kind.value,
         'document_id': source.document_id,
-        'chunk_id': source.chunk_id,
+        'chunk_id': chunk.chunk_id,
         'source_url': source.source_url,
         'version': source.version,
         'title': source.title,
         'publisher': source.publisher,
         'collection': source.collection,
         'publication_date': _json_value(source.publication_date),
-        'section_path': list(source.section_path),
-        'page_start': source.page_start,
-        'page_end': source.page_end,
+        'section_id': chunk.section_id,
+        'section_path': list(chunk.section_path),
+        'page_start': search_result.page_start,
+        'page_end': search_result.page_end,
         'content_hash': getattr(chunk, 'content_hash', None),
         'text': chunk.text,
+    }
+
+
+def _serialize_context(context: RetrievedContext) -> dict[str, Any]:
+    return {
+        'section_id': context.section_id,
+        'text': context.text,
+        'search_results': [
+            _serialize_search_result(result) for result in context.search_results
+        ],
+        'source': {
+            'source_url': context.source_document.source_url,
+            'version': context.source_document.version,
+            'title': context.source_document.title,
+        },
     }
 
 
@@ -148,12 +186,12 @@ class RAGResult:
     question: str
     mode: SearchMode
     k: int
-    context: str  #TODO: check the use after merge
     messages: tuple[Message, ...]
     generated: GeneratedAnswer
-    retrieved: tuple[RetrievedChunk, ...] = ()
+    contexts: tuple[RetrievedContext, ...] = field(default_factory=tuple)
     sources: tuple[SourceReference, ...] = ()
     invalid_citations: tuple[InvalidCitation, ...] = ()
+    citation_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
     error: RAGError | None = None
     retrieval_latency_ms: float | None = None
     generation_latency_ms: float | None = None
@@ -165,20 +203,20 @@ class RAGResult:
         default_factory=lambda: MappingProxyType({})
     )
     raw_provider_response: Any = None
-    contexts: tuple[Context, ...] = field(default_factory=tuple)
-
-    @property
-    def chunks(self) -> list[DocumentChunkRow]:
-        """Return the retrieved chunks without their ranking metadata."""
-        return [chunk for context in self.contexts for chunk in context.chunks]
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self, 'messages', tuple(dict(message) for message in self.messages)
         )
-        object.__setattr__(self, 'retrieved', tuple(self.retrieved))
-        object.__setattr__(self, 'sources', tuple(self.sources))
+        object.__setattr__(self, 'sources', _normalize_sources(tuple(self.sources)))
         object.__setattr__(self, 'invalid_citations', tuple(self.invalid_citations))
+        object.__setattr__(
+            self,
+            'citation_section_paths',
+            tuple(
+                tuple(path for path in paths) for paths in self.citation_section_paths
+            ),
+        )
         object.__setattr__(
             self, 'retrieval_metadata', _freeze_mapping(self.retrieval_metadata)
         )
@@ -194,15 +232,20 @@ class RAGResult:
             'question': self.question,
             'mode': self.mode.value,
             'k': self.k,
-            'context': self.context,
             'messages': _json_value(self.messages),
             'generated': {
                 'answer': self.generated.answer,
                 'citations': _json_value(self.generated.citations),
             },
-            'retrieved': [_serialize_retrieved(item) for item in self.retrieved],
+            'search_results': [
+                _serialize_search_result(result)
+                for context in self.contexts
+                for result in context.search_results
+            ],
+            'contexts': [_serialize_context(context) for context in self.contexts],
             'sources': [source.to_dict() for source in self.sources],
             'invalid_citations': _json_value(self.invalid_citations),
+            'citation_section_paths': _json_value(self.citation_section_paths),
             'error': _json_value(self.error),
             'retrieval_latency_ms': self.retrieval_latency_ms,
             'generation_latency_ms': self.generation_latency_ms,
@@ -217,7 +260,6 @@ __all__ = [
     'RAG_RESULT_SCHEMA_VERSION',
     'CitationInvalidReason',
     'CitationValidationResult',
-    'Context',
     'GeneratedAnswer',
     'InvalidCitation',
     'LLMCitation',

@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai_tour_guide.knowledge_base import slugify_section_path
+
 DEFAULT_DATASET_ROOT = Path('evaluation/datasets')
 GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
 
@@ -12,15 +14,14 @@ GOLDEN_DATASET_FILENAME = 'golden_dataset.jsonl'
 class SourceExpectation:
     source_url: str
     version: str | None
-    pages: tuple[int, ...]
-    section_paths: tuple[tuple[str, ...], ...]
+    section_path: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ExpectedOutcome:
     answerable: bool
     reference_answer: str | None
-    relevant_sources: tuple[SourceExpectation, ...]
+    relevant_source: SourceExpectation | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +41,7 @@ def load_golden_dataset(
     *,
     root: Path = DEFAULT_DATASET_ROOT,
 ) -> list[GoldenCase]:
-    """Load document/page and answer expectations from a JSONL dataset."""
+    """Load section-based answer expectations from a JSONL dataset."""
     path = golden_dataset_path(root=root)
     cases: list[GoldenCase] = []
 
@@ -55,26 +56,26 @@ def load_golden_dataset(
                 if not isinstance(case_id, int) or isinstance(case_id, bool):
                     raise TypeError('id must be an integer')
                 expected = raw['expected']
-                relevant_sources = tuple(
+                answerable = expected['answerable']
+                relevant_source = (
                     SourceExpectation(
-                        source_url=source['source_url'],
-                        version=source['version'],
-                        pages=tuple(source['pages']),
-                        section_paths=tuple(
-                            tuple(section_path)
-                            for section_path in source.get('section_paths', [])
+                        source_url=expected['relevant_source']['source_url'],
+                        version=expected['relevant_source']['version'],
+                        section_path=slugify_section_path(
+                            expected['relevant_source']['section_path']
                         ),
                     )
-                    for source in expected['relevant_sources']
+                    if answerable
+                    else None
                 )
                 case = GoldenCase(
                     case_id=case_id,
                     question=raw['question'],
                     category=raw['category'],
                     expected=ExpectedOutcome(
-                        answerable=expected['answerable'],
+                        answerable=answerable,
                         reference_answer=expected['reference_answer'],
-                        relevant_sources=relevant_sources,
+                        relevant_source=relevant_source,
                     ),
                 )
             except (KeyError, TypeError) as exc:

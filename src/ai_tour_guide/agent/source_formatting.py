@@ -1,21 +1,15 @@
 """Formatting shared by terminal output and RAG source context."""
 
 from collections.abc import Sequence
-from typing import Protocol
 
 
-class HasPageRange(Protocol):
-    page_start: int | None
-    page_end: int | None
-
-
-def format_page_range(chunk: HasPageRange) -> str:
+def format_page_range(page_start: int | None, page_end: int | None) -> str:
     """Render a chunk's source-page range when it is available."""
-    if chunk.page_start is None:
+    if page_start is None:
         return 'page unavailable'
-    if chunk.page_end is None or chunk.page_end == chunk.page_start:
-        return f'page {chunk.page_start}'
-    return f'pages {chunk.page_start}-{chunk.page_end}'
+    if page_end is None or page_end == page_start:
+        return f'page {page_start}'
+    return f'pages {page_start}-{page_end}'
 
 
 def format_pages(pages: Sequence[int]) -> str:

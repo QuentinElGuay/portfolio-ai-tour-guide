@@ -542,20 +542,19 @@ Delivers the first end-to-end RAG experience for the Brittany guide:
 
 ______________________________________________________________________
 
-## ⏳ Milestone 5 — Retrieval and LLM Evaluation
+## ✅ Milestone 5 — Retrieval and LLM Evaluation
 
-Milestone 5 is intentionally focused on the two evaluation criteria required for the
-project submission:
+Milestone 5 establishes the current RAG-quality baseline: compare the available
+retrieval approaches, apply the best one, and make search, RAG, and optional
+judge-quality measurements reproducible through runners and notebooks.
 
-1. compare multiple retrieval approaches and use the best-performing one;
-2. compare multiple LLM approaches and use the best-performing one.
-
-Runtime guardrails, citation enforcement, CI gates, and broader end-to-end RAG quality
-evaluation are tracked separately and do not block this milestone.
+The golden dataset is intentionally not independently versioned in v0.3.0. Prompt/model
+comparisons, richer reports, dataset versioning, and broader end-to-end quality studies
+are follow-up work; they do not block this release.
 
 ______________________________________________________________________
 
-### [P0] Create retrieval evaluation dataset
+### [P0] Create search evaluation dataset
 
 **Labels:** `evaluation`, `data`, `retrieval`
 
@@ -601,12 +600,13 @@ LLM, for example:
 
 ______________________________________________________________________
 
-### [P0] Build the offline evaluation runner
+### [P0] Build the evaluation runners
 
 **Labels:** `evaluation`, `developer-experience`
 
-Create a reproducible offline evaluation entry point that can execute retrieval and LLM
-experiments against versioned datasets and persist comparable results.
+Create reproducible evaluation entry points against versioned datasets. Search
+evaluation is offline; RAG and judge evaluation call live LLM providers and are
+therefore online.
 
 The evaluation runner is a development tool, not a long-running application service. It
 should reuse the same retrieval and LLM application components used by the agent, but
@@ -618,27 +618,29 @@ implementation detail when it provides the right database, network, and dependen
 environment. If a Compose entry is added for evaluation, it should be a short-lived tool
 service behind an evaluation profile, not an always-on application service.
 
-- [ ] Add an `ai_tour_guide.evaluation` package with retrieval and LLM evaluation entry
-  points
-- [ ] Add a CLI command for retrieval evaluation
-- [ ] Add a CLI command for LLM evaluation
-- [ ] Add `make eval-retrieval` and `make eval-llm` shortcuts for the evaluation
-  commands
-- [ ] Allow evaluation commands to run against an isolated PostgreSQL schema, for
+- [x] Add evaluation entry points for search, RAG, and optional LLM judging
+- [x] Add a CLI command for search evaluation
+- [x] Add a CLI command for RAG and LLM-judge evaluation
+- [x] Add `make evaluate-search`, `make evaluate-rag`, and `make evaluate-judge`
+  shortcuts for the evaluation commands
+- [x] Allow evaluation commands to run against an isolated PostgreSQL schema, for
   example `DB_SCHEMA=evaluation`
+- [x] Add runnable notebooks for current search, RAG, and judge-quality baselines
+- [x] Save the latest reports and concise conclusions in the evaluation notebooks
 - [ ] Allow an experiment/configuration name to be recorded with each run
 - [ ] Persist machine-readable results for every run
 - [ ] Produce a concise human-readable comparison table or Markdown report
-- [ ] Record the dataset version, retrieval configuration, prompt version, model, and
-  key parameters used by each experiment
+- [x] Record the current dataset, retrieval configuration, model, and key parameters
+  used by the baseline notebooks
 - [ ] Make repeated runs with the same dataset and deterministic configuration
   comparable
 
 **Suggested interface**
 
 ```text
-make eval-retrieval -> uv run python -m ai_tour_guide.evaluation retrieval --dataset evals/retrieval.jsonl
-make eval-llm -> uv run python -m ai_tour_guide.evaluation llm --dataset evals/llm.jsonl
+make evaluate-search -> uv run python -m evaluation.search.run
+make evaluate-rag -> uv run python -m evaluation.rag.run
+make evaluate-judge -> uv run python -m evaluation.rag.run --judge
 ```
 
 This is a proposed interface for the new evaluation module. It follows the project's
@@ -647,27 +649,62 @@ existing `uv run` workflow without adding an unrelated project-specific command.
 **Deliverables**
 
 - `evals/` — versioned evaluation datasets and experiment definitions
-- offline evaluation runner/CLI — executes retrieval and LLM experiments
+- evaluation runners/CLI — executes search, RAG, and optional judge evaluations
 - `results/` or equivalent generated artifacts — JSON/CSV metrics plus a Markdown
   summary
 - documented winning retrieval configuration
 - documented winning LLM/prompt configuration
-- README section showing the comparison and explaining why each winner was selected
+- [x] README section showing the retrieval comparison and explaining the current choice
 
 **Acceptance criteria**
 
-- [ ] Retrieval and LLM evaluations can be executed without the chat UI
-- [ ] The runner uses production retrieval and LLM components rather than duplicate
+- [x] Search, RAG, and LLM-judge evaluations can be executed without the chat UI
+- [x] The runner uses production retrieval and LLM components rather than duplicate
   implementations
 - [ ] Every experiment records enough configuration to reproduce the comparison
 - [ ] Results from multiple approaches can be compared in one report
-- [ ] The selected retrieval and LLM configurations are applied to the application
+- [x] The selected hybrid retrieval configuration is applied to the application
 
 **Tools**
 
 - Python
 - Click
 - JSONL
+
+______________________________________________________________________
+
+### [P1] Speed up online evaluations safely
+
+**Labels:** `evaluation`, `performance`, `llm`
+
+RAG and judge evaluations call external LLMs and currently process cases serially. Add
+bounded asynchronous scheduling without exceeding provider limits or losing the stable
+case ordering used by reports.
+
+- [x] Extract an async RAG evaluation path instead of creating one event loop per case
+- [x] Run independent cases concurrently with a shared asynchronous scheduler
+- [x] Add a shared requests-per-second limiter for answer and judge calls
+- [ ] Retry transient failures and rate limits with bounded exponential backoff
+- [ ] Preserve case order and aggregate failures without aborting the whole run
+- [ ] Keep search evaluation independent from the online LLM scheduler
+
+**Acceptance criteria**
+
+- [ ] Online evaluations complete faster for the same dataset
+- [ ] Concurrency and rate limits are configurable from the evaluation command
+- [ ] The evaluator remains within the configured provider limits
+- [ ] Results remain comparable with serial execution
+
+______________________________________________________________________
+
+### [P1] Performance improvements
+
+**Labels:** `quality`, `performance`, `developer-experience`
+
+- [x] Reuse the embedding model across requests with a process-local embedder cache
+- [x] Run RAG evaluation cases asynchronously with progress based on completed cases
+- [x] Rate-limit asynchronous LLM requests to a shared default of 5 requests per second
+- [x] Centralize section-path slugification across ingestion and evaluation
 
 ______________________________________________________________________
 
@@ -680,9 +717,9 @@ dataset, `top_k`, and scoring procedure.
 
 **Approaches to compare**
 
-- [ ] Vector search
-- [ ] PostgreSQL full-text search
-- [ ] Hybrid search with reciprocal rank fusion
+- [x] Vector search
+- [x] PostgreSQL full-text search
+- [x] Hybrid search with reciprocal rank fusion
 - [ ] Optionally compare a small number of justified hybrid configurations if needed to
   select the final weights or RRF rank constant
 
@@ -692,9 +729,9 @@ independent variable.
 
 **Primary metrics**
 
-- [ ] Hit Rate at K
-- [ ] Recall at K
-- [ ] Mean Reciprocal Rank
+- [x] Hit Rate at K
+- [x] Recall at K
+- [x] Mean Reciprocal Rank
 
 **Secondary metrics**
 
@@ -716,9 +753,9 @@ break ties or explain tradeoffs.
 
 - [ ] At least two materially different retrieval approaches are evaluated
 - [ ] Vector, full-text, and hybrid retrieval are compared if all three remain available
-- [ ] Results are reproducible from the evaluation runner
-- [ ] A results table compares all approaches using the same metrics
-- [ ] The best-performing retrieval configuration is selected and used by the
+- [x] Results are reproducible from the evaluation runner
+- [x] A results table compares all approaches using the same metrics
+- [x] The best-performing retrieval configuration is selected and used by the
   application
 - [ ] The selection rationale is documented, including any quality/latency tradeoff
 
@@ -742,7 +779,7 @@ should receive the same question and the same retrieved context so that prompt q
 can be compared independently from retrieval quality.
 
 - [ ] Include representative answerable questions
-- [ ] Include unsupported questions
+- [x] Include unsupported questions
 - [ ] Include questions about prices or opening hours when the retrieved context does
   not contain that information
 - [ ] Include questions requiring synthesis across multiple retrieved chunks
@@ -765,7 +802,7 @@ can be compared independently from retrieval quality.
 - [ ] Dataset is versioned
 - [ ] Expected behaviour is manually reviewed
 - [ ] Every compared LLM approach receives equivalent input context
-- [ ] Cases include both answerable and unsupported questions
+- [x] Cases include both answerable and unsupported questions
 
 **Tools**
 
@@ -792,6 +829,8 @@ variations.
 
 **Evaluation dimensions**
 
+- [x] Optional structured LLM judge compares generated answers with the golden
+  `reference_answer`; it is available through `make evaluate-judge`
 - [ ] Answer correctness
 - [ ] Groundedness / faithfulness to the supplied context
 - [ ] Unsupported-question handling
@@ -800,8 +839,9 @@ variations.
 - [ ] Citation accuracy if citations are part of an evaluated approach
 - [ ] Manual review of representative successes and failures
 
-Automated LLM-as-a-judge tooling is optional. A small, clearly documented manual rubric
-is acceptable for the core milestone as long as every prompt is evaluated consistently.
+The optional automated LLM judge is implemented for semantic answer correctness. A
+small, clearly documented manual rubric remains useful for qualities the judge does not
+measure reliably, such as nuanced groundedness and usefulness.
 
 **Experiment rules**
 
@@ -847,23 +887,26 @@ ______________________________________________________________________
 - [ ] A reviewer can see evidence for both project evaluation criteria
 - [ ] The documented winner matches the configuration used by the application
 - [ ] Evaluation limitations are explicit
-- [ ] Results can be regenerated with the offline evaluation runner
+- [ ] Results can be regenerated with the evaluation runners
 
 ______________________________________________________________________
 
 ## 🚀 Release v0.3.0 — Evaluation
 
-**🗓️ Planned release — not shipped**
+**🟢 Ready to ship — publication pending**
 
-Ships when **Milestone 5** passes its exit criteria:
+The verified v0.3.0 scope is complete:
 
-- Versioned retrieval evaluation dataset
-- Vector, full-text, and hybrid retrieval comparison
-- Selected retrieval configuration used by the application
-- Versioned LLM evaluation dataset
-- Multiple prompt/LLM approaches compared under fixed retrieval context
-- Selected LLM/prompt configuration used by the application
-- Reproducible offline evaluation runner and documented results
+- [x] A 105-case current-quality golden dataset, including five unsupported questions
+- [x] Vector, full-text, and hybrid retrieval comparison under the same configuration
+- [x] Hybrid retrieval selected and used by the application
+- [x] Runnable search, RAG, and optional judge evaluation runners and notebooks
+- [x] Baseline results, configuration, limitations, and the retrieval-selection
+  rationale documented in the README
+- [x] Unit-test coverage for the CLI and RAG pipeline, including async RAG orchestration
+  and normalized source output
+
+Publication, release tagging, and any deployment remain external release actions.
 
 ______________________________________________________________________
 
@@ -899,6 +942,7 @@ ______________________________________________________________________
 - [ ] Log questions and answers
 - [ ] Log retrieved chunks
 - [ ] Log model and prompt version
+- [ ] Log input, output, cached, and reasoning token usage
 - [ ] Log latency
 - [ ] Log errors
 - [ ] Avoid storing unnecessary personal data
@@ -1157,7 +1201,7 @@ where retrieval and generation run together exactly as they do in the applicatio
 
 **Tools**
 
-- Existing offline evaluation runner
+- Existing evaluation runners
 - Ragas, DeepEval, or a documented manual rubric
 
 ______________________________________________________________________
@@ -1195,7 +1239,8 @@ performance into a Milestone 5 scoring requirement.
 - [ ] Measure retrieval latency
 - [ ] Measure end-to-end answer latency
 - [ ] Record retrieved context size
-- [ ] Record LLM input and output token usage
+- [x] Capture provider usage metadata in generated-answer and judge traces
+- [ ] Aggregate LLM input, output, cached, and reasoning token usage in reports
 - [ ] Estimate per-request LLM cost for evaluated configurations
 - [ ] Compare quality/latency/cost tradeoffs for major configuration changes
 
@@ -1204,6 +1249,9 @@ performance into a Milestone 5 scoring requirement.
 - [ ] Measurements are collected with a documented methodology
 - [ ] The project can explain the main quality-versus-cost tradeoffs
 - [ ] Performance measurements do not replace the quality metrics from Milestone 5
+
+The current implementation captures provider usage metadata in memory, but does not yet
+aggregate, persist, price, or alert on token consumption.
 
 ______________________________________________________________________
 
@@ -1225,6 +1273,60 @@ capture reliably.
 - [ ] Review criteria are documented before scoring
 - [ ] Reviewed examples and aggregate results are retained
 - [ ] Disagreements between automated and human evaluation are discussed
+
+______________________________________________________________________
+
+### [P3] Add CI/CD search evaluation quality gates
+
+**Labels:** `evaluation`, `ci`, `deployment`, `experiments`, `post-capstone`
+
+Run the search evaluation automatically before production deployment after the current
+capstone goals are complete. The evaluator should remain runnable locally, while CI uses
+its aggregate metrics and diagnostics as a deployment quality gate.
+
+- [ ] Add a CI job that starts the evaluation database, loads the pinned corpus, and
+  runs the search evaluation before deployment
+- [ ] Define minimum thresholds for hit rate@K, recall@K, and MRR per search mode
+- [ ] Fail the deployment when a metric regresses beyond the accepted tolerance
+- [ ] Record run metadata: commit, dataset, corpus, search mode, `k`, embedding
+  configuration, and execution timestamp
+- [ ] Upload aggregate reports and representative failure diagnostics as CI artifacts
+- [ ] Compare the current run with the main-branch or last-release baseline
+- [ ] Add an optional durable store for historical runs after the CI artifact flow is
+  reliable
+- [ ] Keep local evaluation independent from CI services and historical persistence
+
+**Acceptance criteria**
+
+- [ ] Search evaluation runs automatically before production deployment
+- [ ] A search regression blocks deployment with an actionable report
+- [ ] Evaluation runs can be reproduced from their recorded configuration
+- [ ] Aggregate results and failure diagnostics are retained as CI artifacts
+- [ ] Historical persistence is additive and does not become a runtime dependency
+
+______________________________________________________________________
+
+### [P3] Add deterministic RAG integration tests
+
+**Labels:** `testing`, `rag`, `post-capstone`
+
+Add a deterministic integration-test path for the RAG pipeline after the current
+capstone goals are complete. These tests should exercise retrieval, prompt construction,
+structured generation, citation reconciliation, and `RAGResult` assembly without calling
+an external LLM provider.
+
+- [ ] Add a small fake LLM client implementing the existing `LLMClient` contract
+- [ ] Add recorded structured responses for representative answer and refusal cases
+- [ ] Test valid, repeated, unsupported, and page-less citations
+- [ ] Test derived citation section paths in `RAGResult`
+- [ ] Keep live-provider evaluation separate from the deterministic integration suite
+
+**Acceptance criteria**
+
+- [ ] The RAG pipeline can be tested without an API key or network access
+- [ ] Tests cover the complete local pipeline from retrieval to normalized sources
+- [ ] Recorded responses remain versioned and easy to update
+- [ ] The fake client is used only for tests, not for benchmark conclusions
 
 ______________________________________________________________________
 

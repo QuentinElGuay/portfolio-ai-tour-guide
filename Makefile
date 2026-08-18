@@ -11,13 +11,13 @@ QUESTION ?=
 K ?= 5
 ANNOTATOR_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
-EVALUATION ?= retrieval
+EVALUATION ?= all
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate validate-db-schema vector_search text_search ask annotate-dataset app
+.PHONY: help init-db reset-db ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -33,9 +33,11 @@ help: ## Show the available commands.
 	@echo "  make export-corpus                   Overwrite the current corpus export"
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus DB_SCHEMA=evaluation Replace the evaluation corpus"
-	@echo "  make evaluate                        Load corpus and run retrieval evaluation"
-	@echo "  make evaluate EVALUATION=rag        Load corpus and run RAG evaluation"
-	@echo "  make evaluate EVALUATION=both       Run both evaluations"
+	@echo "  make evaluate                        Run search, RAG, and judge evaluation"
+	@echo "  make evaluate-search                 Run offline search metrics only"
+	@echo "  make evaluate-rag                    Run online RAG metrics without judging"
+	@echo "  make evaluate-judge                  Generate and judge RAG answers only"
+	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
@@ -89,15 +91,30 @@ load-corpus: ## Replace the knowledge-base corpus in the selected DB_SCHEMA.
 		|| (echo "Corpus files are missing from $(CORPUS_ROOT). Run 'make export-corpus' first." >&2; exit 1)
 	uv run python scripts/setup_corpus.py --root "$(CORPUS_ROOT)" --schema "$(DB_SCHEMA)" --allow-destructive
 
-evaluate: ## Load the evaluation corpus and run retrieval, RAG, or both evaluations.
-	@case "$(EVALUATION)" in retrieval|rag|both) ;; *) echo "EVALUATION must be retrieval, rag, or both" >&2; exit 1;; esac
+evaluate: ## Run all evaluation metrics.
+	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
+	$(COMPOSE) up -d --wait database
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" DB_SCHEMA=evaluation
-	@if [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = both ]; then \
-		uv run python -m evaluation.retrieval.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = all ]; then \
+		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
-	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = both ]; then \
-		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets; \
+	@if [ "$(EVALUATION)" = rag ]; then \
+		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
+	@if [ "$(EVALUATION)" = judge ] || [ "$(EVALUATION)" = all ]; then \
+		uv run python -m evaluation.rag.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)" --judge; \
+	fi
+
+evaluate-search: EVALUATION=search
+evaluate-search: evaluate
+
+evaluate-rag: EVALUATION=rag
+evaluate-rag: evaluate
+
+evaluate-judge: EVALUATION=judge
+evaluate-judge: evaluate
+
+evaluate-all: evaluate
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)

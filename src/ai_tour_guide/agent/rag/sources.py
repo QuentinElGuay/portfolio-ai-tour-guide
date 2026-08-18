@@ -3,6 +3,7 @@
 import logging
 from collections import OrderedDict
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from ai_tour_guide.agent.rag.models import (
     CitationInvalidReason,
@@ -11,12 +12,30 @@ from ai_tour_guide.agent.rag.models import (
     LLMCitation,
     SourceReference,
 )
-from ai_tour_guide.knowledge_base.retrieval import RetrievedChunk, SourceMetadata
+from ai_tour_guide.knowledge_base.database.models import DocumentRow
+from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 
 logger = logging.getLogger(__name__)
 
 
-def _reference(source: SourceMetadata, pages: Sequence[int] = ()) -> SourceReference:
+@dataclass(slots=True)
+class CitationEvidence:
+    """A document and the pages confirmed for a citation."""
+
+    document: DocumentRow
+    pages: set[int]
+    section_paths: set[tuple[str, ...]]
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentIdentity:
+    """Stable identity of a versioned source document."""
+
+    source_url: str
+    version: str | None
+
+
+def _reference(source: DocumentRow, pages: Sequence[int] = ()) -> SourceReference:
     return SourceReference(
         source_url=source.source_url,
         version=source.version,
@@ -31,7 +50,7 @@ def _reference(source: SourceMetadata, pages: Sequence[int] = ()) -> SourceRefer
 def _invalid(
     citation: LLMCitation,
     reason: CitationInvalidReason,
-    source: SourceMetadata | None = None,
+    source: DocumentRow | None = None,
 ) -> InvalidCitation:
     if reason is CitationInvalidReason.UNKNOWN_REASON:
         logger.error('Unknown citation validation reason for %r', citation)
@@ -49,33 +68,35 @@ def _invalid(
 
 
 def validate_citations(
-    citations: Sequence[LLMCitation], retrieved: Sequence[RetrievedChunk]
+    citations: Sequence[LLMCitation], retrieved: Sequence[RetrievedContext]
 ) -> CitationValidationResult:
     """Trust only page evidence actually supplied by the knowledge base."""
-    documents: OrderedDict[tuple[str, str | None], list[SourceMetadata]] = OrderedDict()
-    for item in retrieved:
-        documents.setdefault((item.source.source_url, item.source.version), []).append(
-            item.source
-        )
+    documents: OrderedDict[DocumentIdentity, list[RetrievedContext]] = OrderedDict()
+    for context in retrieved:
+        document = context.source_document
+        documents.setdefault(
+            DocumentIdentity(document.source_url, document.version), []
+        ).append(context)
 
-    valid: OrderedDict[tuple[str, str | None], tuple[SourceMetadata, set[int]]] = (
-        OrderedDict()
-    )
+    valid: OrderedDict[DocumentIdentity, CitationEvidence] = OrderedDict()
     invalid: list[InvalidCitation] = []
+
     for citation in citations:
-        document_sources = documents.get((citation.source_url, citation.version))
+        identity = DocumentIdentity(citation.source_url, citation.version)
+        document_sources = documents.get(identity)
         if not document_sources:
             invalid.append(_invalid(citation, CitationInvalidReason.UNKNOWN_DOCUMENT))
             continue
-        source = document_sources[0]
+        source = document_sources[0].source_document
         start, end = citation.page_start, citation.page_end
         if start is None and end is None:
-            if all(
-                item.page_start is None and item.page_end is None
-                for item in document_sources
-            ):
+            if all(not context.pages for context in document_sources):
                 valid.setdefault(
-                    (citation.source_url, citation.version), (source, set())
+                    identity,
+                    CitationEvidence(source, set(), set()),
+                )
+                valid[identity].section_paths.update(
+                    tuple(context.section_path) for context in document_sources
                 )
             else:
                 invalid.append(
@@ -94,26 +115,35 @@ def validate_citations(
             continue
         end = start if end is None else end
         supported: set[int] = set()
-        for item in document_sources:
-            if item.page_start is None:
-                continue
-            item_end = item.page_start if item.page_end is None else item.page_end
-            supported.update(range(item.page_start, item_end + 1))
+        for context in document_sources:
+            supported.update(context.pages)
         cited_pages = set(range(start, end + 1))
         confirmed = cited_pages & supported
         if confirmed:
             existing = valid.setdefault(
-                (citation.source_url, citation.version), (source, set())
+                identity, CitationEvidence(source, set(), set())
             )
-            existing[1].update(confirmed)
+            existing.pages.update(confirmed)
+            existing.section_paths.update(
+                tuple(context.section_path)
+                for context in document_sources
+                if confirmed & set(context.pages)
+            )
         if confirmed != cited_pages:
             invalid.append(
                 _invalid(citation, CitationInvalidReason.UNSUPPORTED_PAGE, source)
             )
 
+    evidence_values = tuple(valid.values())
     return CitationValidationResult(
-        references=tuple(_reference(source, pages) for source, pages in valid.values()),
+        references=tuple(
+            _reference(evidence.document, tuple(evidence.pages))
+            for evidence in evidence_values
+        ),
         invalid_citations=tuple(invalid),
+        matched_section_paths=tuple(
+            tuple(sorted(evidence.section_paths)) for evidence in evidence_values
+        ),
     )
 
 

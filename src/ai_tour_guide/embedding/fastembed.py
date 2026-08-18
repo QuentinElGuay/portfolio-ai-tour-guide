@@ -1,12 +1,26 @@
 """FastEmbed implementation of the shared text embedding interface."""
 
 from collections.abc import Iterable, Sequence
+from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from .interfaces import Embedder, EmbeddingError, EmbeddingMetadata
+
+
+class _EmbeddingModel(Protocol):
+    def embed(
+        self, texts: Sequence[str], *, batch_size: int
+    ) -> Iterable[Sequence[float]]: ...
+
+    def passage_embed(
+        self, texts: Sequence[str], *, batch_size: int
+    ) -> Iterable[Sequence[float]]: ...
+
+    def query_embed(self, text: str) -> Iterable[Sequence[float]]: ...
 
 
 class FastEmbedder(Embedder):
@@ -22,7 +36,7 @@ class FastEmbedder(Embedder):
         *,
         normalize: bool = True,
         cache_dir: Path | None = None,
-        model: Any | None = None,
+        model: _EmbeddingModel | None = None,
     ) -> None:
         if not model_name.strip():
             raise ValueError('model_name must not be empty')
@@ -35,7 +49,7 @@ class FastEmbedder(Embedder):
         )
 
     @staticmethod
-    def _load_model(model_name: str, cache_dir: Path | None) -> Any:
+    def _load_model(model_name: str, cache_dir: Path | None) -> _EmbeddingModel:
         try:
             from fastembed import TextEmbedding
         except ImportError as exc:
@@ -45,10 +59,15 @@ class FastEmbedder(Embedder):
             ) from exc
 
         try:
-            options: dict[str, str] = {'model_name': model_name}
             if cache_dir is not None:
-                options['cache_dir'] = str(cache_dir)
-            return TextEmbedding(**options)
+                return cast(
+                    _EmbeddingModel,
+                    TextEmbedding(
+                        model_name=model_name,
+                        cache_dir=str(cache_dir),
+                    ),
+                )
+            return cast(_EmbeddingModel, TextEmbedding(model_name=model_name))
         except Exception as exc:
             raise EmbeddingError(
                 f'Could not load embedding model {model_name!r}'
@@ -83,9 +102,12 @@ class FastEmbedder(Embedder):
             # back to embed for compatibility with older runtimes and stubs.
             passage_embed = getattr(self._model, 'passage_embed', None)
             if callable(passage_embed):
-                generated = passage_embed(
-                    validated_texts,
-                    batch_size=batch_size,
+                generated = cast(
+                    Iterable[Sequence[float]],
+                    passage_embed(
+                        validated_texts,
+                        batch_size=batch_size,
+                    ),
                 )
             else:
                 generated = self._model.embed(
@@ -114,7 +136,7 @@ class FastEmbedder(Embedder):
         try:
             query_embed = getattr(self._model, 'query_embed', None)
             if callable(query_embed):
-                generated = query_embed(text)
+                generated = cast(Iterable[Sequence[float]], query_embed(text))
             else:
                 generated = self._model.embed([text], batch_size=1)
 
@@ -150,8 +172,8 @@ class FastEmbedder(Embedder):
         *,
         expected_count: int,
         context: str,
-    ) -> np.ndarray:
-        matrix = np.asarray(list(generated), dtype=np.float32)
+    ) -> NDArray[np.float32]:
+        matrix: NDArray[np.float32] = np.asarray(list(generated), dtype=np.float32)
 
         if matrix.ndim != 2:
             raise EmbeddingError(
@@ -174,7 +196,7 @@ class FastEmbedder(Embedder):
 
         return matrix
 
-    def _prepare_vectors(self, matrix: np.ndarray) -> np.ndarray:
+    def _prepare_vectors(self, matrix: NDArray[np.float32]) -> NDArray[np.float32]:
         """Validate dimensions and apply the configured normalization policy."""
         dimensions = int(matrix.shape[1])
 
@@ -185,7 +207,7 @@ class FastEmbedder(Embedder):
             )
 
         self._dimensions = dimensions
-        vectors = np.asarray(matrix, dtype=np.float32)
+        vectors: NDArray[np.float32] = np.asarray(matrix, dtype=np.float32)
 
         if not self._normalize_vectors:
             return vectors
@@ -195,3 +217,18 @@ class FastEmbedder(Embedder):
             raise EmbeddingError('Cannot normalize a zero-length vector')
 
         return np.asarray(vectors / norms, dtype=np.float32)
+
+
+@cache
+def get_cached_embedder(
+    model_name: str,
+    *,
+    normalize: bool = True,
+    cache_dir: Path | None = None,
+) -> FastEmbedder:
+    """Return one process-local embedder for each configuration."""
+    return FastEmbedder(
+        model_name=model_name,
+        normalize=normalize,
+        cache_dir=cache_dir,
+    )

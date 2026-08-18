@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -35,6 +36,7 @@ from ai_tour_guide.ingestion.serialization import (
     CHUNKED_DOCUMENT_JSON,
     EMBEDDED_DOCUMENT_JSON,
     PARSED_DOCUMENT_JSON,
+    ArtifactJsonSerializer,
 )
 
 
@@ -158,8 +160,8 @@ def _parsed_artifact() -> ParsedDocumentArtifact:
 )
 def test_stage_artifacts_round_trip_as_self_contained_json(
     tmp_path: Path,
-    serializer: object,
-    artifact: object,
+    serializer: ArtifactJsonSerializer[Any],
+    artifact: Any,
 ) -> None:
     output_path = tmp_path / 'artifact.json'
 

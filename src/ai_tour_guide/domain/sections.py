@@ -36,3 +36,8 @@ def _slugify(value: str) -> str:
     normalized = unicodedata.normalize('NFKD', value)
     ascii_value = normalized.encode('ascii', 'ignore').decode('ascii').lower()
     return _NON_ALPHANUMERIC_RE.sub('-', ascii_value).strip('-')
+
+
+def slugify_section_path(section_path: Sequence[str]) -> tuple[str, ...]:
+    """Return the stable slugs for a section path."""
+    return tuple(_slugify(title) for title in section_path)

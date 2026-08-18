@@ -1,0 +1,55 @@
+flowchart LR
+    Q[User query]
+
+    subgraph RET[Shared retrieval pipeline]
+        direction TB
+        F[Retrieval facade]
+        S[Search strategy<br/>vector / text / hybrid]
+        H[Ranked SearchResult]
+        G[Group by document section]
+        X[Expand section siblings]
+        C[RetrievedContext<br/>document + context_chunks + search_results]
+
+        F --> S --> H --> G --> X --> C
+    end
+
+    DB[(Knowledge base<br/>documents and chunks)]
+    Q --> F
+    S <--> DB
+    X <--> DB
+
+    subgraph CONSUMERS[Retrieval consumers]
+        CLI[Search CLI<br/>inspect ranked hits]
+        PROMPT[Prompt builder<br/>render grounded context]
+        EVAL_RETRIEVAL[Retrieval evaluation<br/>metrics on hits]
+        EVAL_RAG[RAG evaluation<br/>answer + citations]
+    end
+
+    H --> CLI
+    H --> EVAL_RETRIEVAL
+    C --> PROMPT
+    C --> EVAL_RAG
+
+    LLM[LLM provider]
+    PROMPT --> LLM
+    LLM --> A[GeneratedAnswer<br/>answer + citations]
+    A --> EVAL_RAG
+
+    subgraph APPS[Application interfaces]
+        CHAT[Chat UI / Chat backend]
+        API[Chat API /ask]
+    end
+
+    PROMPT --> CHAT
+    A --> API
+    A --> CHAT
+
+    classDef retrieval fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
+    classDef consumer fill:#eef6ff,stroke:#4a90e2,stroke-width:1.5px;
+    classDef interface fill:#eefcf3,stroke:#2f9e44,stroke-width:1.5px;
+    classDef shared fill:#fff7e6,stroke:#d99000,stroke-width:2px;
+
+    class F,S,H,G,X,C retrieval;
+    class CLI,PROMPT,EVAL_RETRIEVAL,EVAL_RAG consumer;
+    class CHAT,API interface;
+    class DB,LLM,A shared;

@@ -3,7 +3,7 @@
 The dataset lives in `evaluation/datasets/golden_dataset.jsonl` and contains questions
 plus expected outcomes for evaluation against the current corpus. The example schema is
 in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
-`(source_url, version)` plus individual source pages, never chunk IDs.
+`(source_url, version)` plus one slugified section path, never chunk IDs or pages.
 
 ```json
 {
@@ -13,25 +13,27 @@ in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
   "expected": {
     "answerable": true,
     "reference_answer": "...",
-    "relevant_sources": [
-      {
-        "source_url": "https://example.com/brittany-guide.pdf",
-        "version": null,
-        "pages": [8],
-        "section_paths": [
-          ["Climate and seasonal weather"]
-        ]
-      }
-    ]
+    "relevant_source": {
+      "source_url": "https://example.com/brittany-guide.pdf",
+      "version": null,
+      "section_path": [
+        "guide-to-the-region-of-brittany",
+        "geography-and-climate",
+        "climate"
+      ]
+    }
   }
 }
 ```
 
-Use `answerable: false`, `reference_answer: null`, and `relevant_sources: []` for an
+Use `answerable: false` and `reference_answer: null` without a `relevant_source` for an
 intentional insufficient-context case. Do not include expected provider, database, or
 parsing errors here; those are operational-failure tests, not corpus-ground-truth data.
 
-`pages` and `section_paths` identify expected provenance. Section paths are more
-specific than pages when available, but neither one alone proves that a chunk contains
-the answer. Retrieval evaluation should treat an exact section-and-page match as the
-strongest signal, a section-only match as weaker, and a page-only match as the weakest.
+`section_path` identifies expected provenance. It is slugified and contains the document
+section path with its final heading removed. A result matches when its reduced,
+slugified section path is equal to the expected path.
+
+When `make evaluate-judge` is used, `reference_answer` is supplied to the optional LLM
+judge to assess the generated answer semantically. It is not used by search or the
+deterministic citation and latency metrics.

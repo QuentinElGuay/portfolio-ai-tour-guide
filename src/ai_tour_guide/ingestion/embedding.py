@@ -104,7 +104,7 @@ def embed_chunks(
     if batch_size <= 0:
         raise ValueError('batch_size must be greater than zero')
 
-    validated_chunks: tuple[Chunk] = _validate_chunks(chunks)
+    validated_chunks: tuple[Chunk, ...] = _validate_chunks(chunks)
 
     initial_metadata = embedder.metadata
     if embedder is not None and initial_metadata.normalized != normalize:

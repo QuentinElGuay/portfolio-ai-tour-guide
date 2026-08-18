@@ -11,3 +11,8 @@ settings, or a pipeline entry point, and pass explicit values to lower-level fun
 When several related configuration values would otherwise be forwarded through multiple
 function calls, create a focused immutable dataclass to aggregate them. Pass that
 configuration object instead of a growing list of individual arguments.
+
+## Markdown formatting
+
+When a task modifies one or more Markdown files, run `mdformat` on the modified files
+before completing the task, then verify them with `mdformat --check`.
