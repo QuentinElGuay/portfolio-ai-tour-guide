@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Sequence
 
@@ -8,21 +9,23 @@ import gradio as gr
 from ai_tour_guide.agent.chat.backends import (
     ChatBackend,
     DemoBackend,
+    HttpChatBackend,
     create_backend,
 )
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import ChatHistoryItem, Message, Role
+from ai_tour_guide.agent.source_formatting import format_pages
 
 
-def normalize_history(history: Sequence[dict[str, object]]) -> list[Message]:
+def normalize_history(history: Sequence[ChatHistoryItem]) -> list[Message]:
     messages: list[Message] = []
 
     for item in history:
-        role = item.get('role')
-        content = item.get('content')
-
-        if role not in {'user', 'assistant', 'system'}:
+        try:
+            role = Role(item['role'])
+        except ValueError:
             continue
 
+        content = item['content']
         if isinstance(content, str):
             messages.append({'role': role, 'content': content})
 
@@ -35,13 +38,13 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
 
     async def respond(
         message: str,
-        history: list[dict[str, object]],
+        history: list[ChatHistoryItem],
     ) -> str:
         messages = normalize_history(history)
-        messages.append({'role': 'user', 'content': message})
+        messages.append({'role': Role.USER, 'content': message})
 
         try:
-            return await selected_backend.generate_reply(messages)
+            return _render_response(await selected_backend.ask(messages))
         except RuntimeError as exc:
             return f'**Backend error:** {exc}'
 
@@ -71,8 +74,36 @@ def create_app(backend: ChatBackend | None = None) -> gr.ChatInterface:
     )
 
 
+def _render_response(payload: dict[str, object]) -> str:
+    """Default display only; source selection is already complete in RAG."""
+    answer = payload['answer']
+    if not isinstance(answer, str):
+        raise TypeError('The chat response has no answer.')
+    rendered = [answer]
+    sources = payload.get('sources', [])
+    if not isinstance(sources, list):
+        raise TypeError('The chat response has invalid sources.')
+    for source in sources:
+        if not isinstance(source, dict) or not isinstance(source.get('title'), str):
+            raise TypeError('The chat response has an invalid source.')
+        pages = source.get('pages', [])
+        if not isinstance(pages, list) or not all(
+            isinstance(page, int) for page in pages
+        ):
+            raise RuntimeError('The chat response has invalid source pages.')
+        suffix = f', {format_pages(pages)}' if pages else ''
+        rendered.append(f'({source["title"]}{suffix})')
+    return '\n'.join(rendered)
+
+
 def main() -> None:
-    app = create_app(create_backend())
+    backend = create_backend()
+    if isinstance(backend, HttpChatBackend):
+        try:
+            asyncio.run(backend.check_ready())
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+    app = create_app(backend)
     app.launch(
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),

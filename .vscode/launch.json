@@ -27,6 +27,18 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": true
+    },
+    {
+      "name": "Debug evaluation: RAG (without judge)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "evaluation.rag.run",
+      "args": [
+        "--k",
+        "5"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
     }
   ]
 }

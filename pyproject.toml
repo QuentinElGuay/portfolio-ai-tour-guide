@@ -1,6 +1,6 @@
 [project]
 name = "portfolio-ai-tour-guide"
-version = "0.1.0"
+version = "0.3.0"
 description = "Add your description here"
 authors = [
     { name = "Quentin Leguay", email = "33553005+QuentinElGuay@users.noreply.github.com" }
@@ -46,6 +46,13 @@ number = true
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 
+[tool.pyright]
+typeCheckingMode = "standard"
+reportCallIssue = "none"
+venvPath = "."
+venv = ".venv"
+include = ["src", "tests"]
+
 [dependency-groups]
 dev = [
     "mdformat>=1.0.0",
@@ -56,4 +63,6 @@ dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "ruff>=0.16.1",
+    "questionary>=2.1.1",
+    "pyright>=1.1.411",
 ]

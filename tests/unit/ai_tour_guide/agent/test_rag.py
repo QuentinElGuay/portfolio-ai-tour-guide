@@ -1,211 +1,154 @@
-import os
-from types import SimpleNamespace
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-os.environ.setdefault('EMBEDDING_DIMENSIONS', '384')
-os.environ.setdefault('EMBEDDING_MODEL_NAME', 'test-model')
+import pytest
 
-from ai_tour_guide.agent.rag.models import Context, RAGResult
-from ai_tour_guide.agent.rag.pipeline import (
-    INSUFFICIENT_CONTEXT_ANSWER,
-    answer_question,
+from ai_tour_guide.agent.rag.models import (
+    CitationValidationResult,
+    GeneratedAnswer,
+    SourceReference,
 )
-from ai_tour_guide.agent.rag.prompting import (
-    build_context_from_chunks,
-    build_llm_context,
-)
-from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
-from ai_tour_guide.knowledge_base.retrieval import (
-    RetrievedChunk,
+from ai_tour_guide.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
+from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
+from ai_tour_guide.knowledge_base.search.models import (
     ScoreKind,
-    SourceMetadata,
+    SearchMetadata,
+    SearchResult,
 )
 
 
-def _chunk():
-    return SimpleNamespace(
-        chunk_id='chunk-123',
-        page_start=12,
-        page_end=12,
-        text='The museum opens at ten.',
+def _document() -> DocumentRow:
+    return DocumentRow(
+        document_id=1,
+        title='Guide',
+        source_url='https://example.test/guide',
     )
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve')
-def test_answer_question_retrieves_context_and_returns_sources(
-    retrieve: MagicMock,
-) -> None:
-    chunk = _chunk()
-    retrieve.return_value = [
-        RetrievedChunk(
-            chunk=chunk,
-            rank=1,
+def _chunk(
+    document: DocumentRow, *, chunk_id: str, index: int, page: int
+) -> DocumentChunkRow:
+    return DocumentChunkRow(
+        document_id=document.document_id,
+        chunk_id=chunk_id,
+        chunk_index=index,
+        section_id='coast',
+        section_chunk_index=index,
+        section_path=['Guide', 'Coast'],
+        text=chunk_id,
+        embedding_text=chunk_id,
+        page_start=page,
+        page_end=page,
+        character_count=len(chunk_id),
+        document=document,
+    )
+
+
+def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
+    return SearchResult(
+        chunk=chunk,
+        search=SearchMetadata(
+            rank=rank,
             score=0.9,
-            score_kind=ScoreKind.TEXT_RANK,
-            source=SourceMetadata(
-                document_id=7,
-                chunk_id='chunk-123',
-                title='A museum guide',
-                source_url='https://example.com/museum',
-                publisher=None,
-                publication_date=None,
-                collection=None,
-                version=None,
-                section_path=('Museum',),
-                page_start=12,
-                page_end=12,
-            ),
-        )
-    ]
-    client = MagicMock()
-    client.generate_reply = AsyncMock(return_value='It opens at ten.')
-
-    result = answer_question('When does it open?', mode='text', k=3, client=client)
-
-    assert result == RAGResult(
-        answer='It opens at ten.',
-        contexts=(
-            Context(
-                section_id=None,
-                text='The museum opens at ten.',
-                chunks=(
-                    RetrievedChunk(
-                        chunk=chunk,
-                        rank=1,
-                        score=0.9,
-                        score_kind=ScoreKind.TEXT_RANK,
-                        source=SourceMetadata(
-                            document_id=7,
-                            chunk_id='chunk-123',
-                            title='A museum guide',
-                            source_url='https://example.com/museum',
-                            publisher=None,
-                            publication_date=None,
-                            collection=None,
-                            version=None,
-                            section_path=('Museum',),
-                            page_start=12,
-                            page_end=12,
-                        ),
-                    ),
-                ),
-            ),
+            score_kind=ScoreKind.COSINE_SIMILARITY,
         ),
     )
-    retrieve.assert_called_once_with('When does it open?', mode='text', k=3)
-    messages = client.generate_reply.call_args.args[0]
-    assert 'chunk-123' in messages[1]['content']
-    assert 'The museum opens at ten.' in messages[1]['content']
-    assert 'When does it open?' in messages[1]['content']
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve', return_value=[])
-def test_answer_question_handles_empty_retrieval(
-    retrieve: MagicMock,
+@patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
+@patch('ai_tour_guide.agent.rag.pipeline.build_messages')
+@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context')
+def test_answer_question_retrieves_context_and_returns_sources(
+    retrieve_context: MagicMock,
+    build_messages: MagicMock,
+    validate_citations: MagicMock,
 ) -> None:
-    result = answer_question('Unknown question', client=MagicMock())
+    """Verify that answering a question retrieves context, sends it to the LLM, and preserves its sources."""
+    context = MagicMock()
+    retrieve_context.return_value = (context,)
+    build_messages.return_value = ({'role': 'user', 'content': 'Question'},)
+    source = SourceReference(
+        'https://example.test/guide', None, 'Guide', None, None, None, (3,)
+    )
+    validate_citations.return_value = CitationValidationResult((source,), ())
+    client = MagicMock()
+    client.answer_question = AsyncMock(return_value=GeneratedAnswer('Answer.'))
+
+    result = asyncio.run(answer_question_async('Question', client=client))
+
+    retrieve_context.assert_called_once()
+    assert retrieve_context.call_args.kwargs['search_mode'].value == 'hybrid'
+    build_messages.assert_called_once_with('Question', (context,))
+    client.answer_question.assert_awaited_once_with(build_messages.return_value)
+    assert result.answer == 'Answer.'
+    assert result.contexts == (context,)
+    assert result.sources == (source,)
+
+
+@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context', return_value=())
+def test_answer_question_handles_empty_retrieval(retrieve_context: MagicMock) -> None:
+    """Verify that an unanswered retrieval returns the insufficient-context response without sources."""
+    client = MagicMock()
+    client.answer_question = AsyncMock()
+
+    result = asyncio.run(answer_question_async('Question', client=client))
 
     assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
-    assert result.chunks == []
+    assert result.contexts == ()
+    assert result.sources == ()
+    client.answer_question.assert_not_awaited()
+    retrieve_context.assert_called_once()
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve')
 @patch('ai_tour_guide.agent.rag.pipeline.create_default_llm_client', return_value=None)
 def test_answer_question_requires_llm_configuration(
     create_default_llm_client: MagicMock,
-    retrieve: MagicMock,
 ) -> None:
-    result = answer_question('What should I visit?')
+    """Verify that question answering fails gracefully when no LLM client is configured."""
+    with pytest.raises(RuntimeError, match='No LLM client is configured'):
+        asyncio.run(answer_question_async('Question'))
 
-    assert result.answer == LLM_CONFIGURATION_REQUIRED_ANSWER
-    assert result.chunks == []
-    retrieve.assert_not_called()
+    create_default_llm_client.assert_called_once_with()
 
 
 def test_build_context_preserves_source_identity_and_pages() -> None:
-    retrieved = RetrievedChunk(
-        chunk=_chunk(),
-        rank=1,
-        score=0.9,
-        score_kind=ScoreKind.TEXT_RANK,
-        source=SourceMetadata(
-            document_id=7,
-            chunk_id='chunk-123',
-            title='A museum guide',
-            source_url='https://example.com/museum',
-            publisher=None,
-            publication_date=None,
-            collection=None,
-            version=None,
-            section_path=('Museum',),
-            page_start=12,
-            page_end=12,
-        ),
-    )
-    contexts = build_context_from_chunks([retrieved])
+    """Verify that LLM context preserves the identity, page, rank, and score of the retrieved source chunk."""
+    document = _document()
+    chunk = _chunk(document, chunk_id='chunk-1', index=0, page=3)
+    result = _search_result(chunk, rank=1)
+    session = MagicMock()
+    with patch(
+        'ai_tour_guide.knowledge_base.retrieval.context.retrieve_section_chunks',
+        return_value=(chunk,),
+    ):
+        contexts = build_retrieved_contexts(session, (result,))
 
-    assert build_llm_context(contexts) == (
-        '[Section: unavailable; Retrieved by: chunk-123 '
-        '(page 12, rank 1, score 0.9000 text_rank)]\n'
-        'The museum opens at ten.'
-    )
+    context = contexts[0]
+    assert context.source_document is document
+    assert context.pages == (3,)
+    assert context.search_results == (result,)
+    assert context.search_results[0].search.rank == 1
+    assert context.search_results[0].search.score == 0.9
 
 
 def test_build_contexts_deduplicates_a_section_and_keeps_all_retrievals() -> None:
-    first = RetrievedChunk(
-        chunk=_chunk(),
-        rank=1,
-        score=0.9,
-        score_kind=ScoreKind.TEXT_RANK,
-        source=SourceMetadata(
-            document_id=7,
-            chunk_id='chunk-123',
-            title='A museum guide',
-            source_url='https://example.com/museum',
-            publisher=None,
-            publication_date=None,
-            collection=None,
-            version=None,
-            section_path=('Museum',),
-            page_start=12,
-            page_end=12,
-        ),
-        section_id='museum-opening-hours',
-        text='The museum opens at ten.\n\nThe last entry is at five.',
-    )
-    second = RetrievedChunk(
-        chunk=SimpleNamespace(
-            chunk_id='chunk-124',
-            page_start=12,
-            page_end=12,
-            text='The last entry is at five.',
-        ),
-        rank=2,
-        score=0.7,
-        score_kind=ScoreKind.TEXT_RANK,
-        source=SourceMetadata(
-            document_id=7,
-            chunk_id='chunk-124',
-            title='A museum guide',
-            source_url='https://example.com/museum',
-            publisher=None,
-            publication_date=None,
-            collection=None,
-            version=None,
-            section_path=('Museum',),
-            page_start=12,
-            page_end=12,
-        ),
-        section_id='museum-opening-hours',
-        text='The museum opens at ten.\n\nThe last entry is at five.',
-    )
+    """Verify that chunks from the same section share one context while retaining every retrieval that matched it."""
+    document = _document()
+    first = _chunk(document, chunk_id='chunk-1', index=0, page=3)
+    second = _chunk(document, chunk_id='chunk-2', index=1, page=4)
+    results = (_search_result(first, rank=1), _search_result(second, rank=2))
+    session = MagicMock()
+    with patch(
+        'ai_tour_guide.knowledge_base.retrieval.context.retrieve_section_chunks',
+        return_value=(first, second),
+    ) as retrieve_section_chunks:
+        contexts = build_retrieved_contexts(session, results)
 
-    contexts = build_context_from_chunks([first, second])
-
-    assert contexts == (
-        Context(
-            section_id='museum-opening-hours',
-            text='The museum opens at ten.\n\nThe last entry is at five.',
-            chunks=(first, second),
-        ),
+    assert len(contexts) == 1
+    assert contexts[0].context_chunks == (first, second)
+    assert contexts[0].search_results == results
+    retrieve_section_chunks.assert_called_once_with(
+        session, document=document, section_id='coast'
     )

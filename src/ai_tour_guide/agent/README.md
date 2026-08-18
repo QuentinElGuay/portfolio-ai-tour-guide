@@ -19,14 +19,15 @@ Return to the [project overview](../../../README.md).
 1. The agent receives a question through the CLI or `POST /ask`.
 2. It retrieves the most relevant chunks from PostgreSQL using vector search by default.
 3. It builds a prompt containing the retrieved context and question.
-4. The configured `LLMClient` generates an answer.
-5. The agent returns the answer and retrieved source metadata.
+4. The configured `LLMClient` generates an answer and document/page citations.
+5. The agent validates citations against the retrieved provenance, then returns only
+   validated source references to user interfaces.
 
 The project currently supports the OpenAI API for answer generation. Additional LLM
 providers may be added in the future.
 
-If no OpenAI API key is configured, the agent returns a clear configuration-required
-answer and does not query the knowledge base.
+If no OpenAI API key is configured, the service raises a configuration error before
+querying the knowledge base.
 
 ## Run the services
 
@@ -74,6 +75,7 @@ agent dependencies:
 make vector_search QUESTION='Where is the Brittany coast?'
 make text_search QUESTION='Brittany coast'
 make ask QUESTION='What are the best places to visit in Brittany?' K=5
+make ask QUESTION='What are the best places to visit in Brittany?' K=5 VERBOSE=1
 ```
 
 Run directly with Python after configuring `DB_*`, `EMBEDDING_*`, and `AGENT_OPENAI_*`:
@@ -84,7 +86,10 @@ uv run portfolio-ai-tour-guide-agent ask --k 5 'What should I visit in Brittany?
 ```
 
 `search` supports `vector`, `text`, and `hybrid` modes. `ask` uses vector retrieval by
-default and accepts the same `--mode` and `--k` options.
+default and accepts the same `--mode` and `--k` options. Its default output is the same
+JSON payload as the HTTP API. `VERBOSE=1` adds the full `RAGResult` trace: ranked
+retrieval, prompt context, raw citations, validated sources, invalid citations, timing,
+metadata, and any handled operational error.
 
 ## HTTP API
 
@@ -106,19 +111,35 @@ It returns an answer and source references:
 
 ```json
 {
+  "schema_version": 1,
   "answer": "The guide recommends ...",
   "sources": [
     {
+      "source_url": "https://example.com/brittany-guide.pdf",
+      "version": "2026",
       "title": "Guide to the Region of Brittany",
-      "page_start": 12,
-      "page_end": 13
+      "publisher": "Regional Tourism Board",
+      "collection": "Tour Guides",
+      "publication_date": "2026-01-01",
+      "pages": [12, 13]
     }
   ]
 }
 ```
 
-The chat groups repeated documents and deduplicates their page numbers for display.
-These are retrieved sources supplied as context, not model-validated citations.
+Each source is a document identity `(source_url, version)` with sorted, deduplicated
+pages. Sources are citations claimed by the model and validated against retrieved
+knowledge-base evidence; retrieved-but-uncited chunks are not exposed through `/ask`.
+The detailed retrieval and citation trace remains available through `make ask VERBOSE=1`
+and `RAGResult.to_dict()` for diagnostics and future evaluation.
+
+The document identity constraint changed from `source_url` to `(source_url, version)`.
+Reinitialize the database schema before using this version of the agent:
+
+```bash
+make reset-db
+make ingest
+```
 
 ## Configuration
 

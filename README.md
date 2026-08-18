@@ -20,6 +20,7 @@ to answer travellers' questions from an indexed tourism guide.
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
 - [Common commands](#common-commands)
+- [Evaluation](#evaluation)
 - [Roadmap](#roadmap)
 - [Capstone success criteria](#capstone-success-criteria)
 - [Contributing](#contributing)
@@ -133,6 +134,10 @@ Set an OpenAI API key in `.env` to generate answers:
 AGENT_OPENAI_API_KEY=your-api-key
 ```
 
+`make evaluate` and `make evaluate-judge` can optionally use a separate judge
+configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MODEL`.
+When these are absent, it reuses `AGENT_OPENAI_API_KEY` and `AGENT_OPENAI_MODEL`.
+
 > [!NOTE]
 > OpenAI is the only currently supported LLM provider at the moment but more might be
 > added in the future.
@@ -150,9 +155,10 @@ Open `http://localhost:7860` to use the chat. The agent API is available at
 `http://localhost:8000/docs`.
 
 The first ingestion or image build can download the configured embedding model. To
-recreate the local database and ingest the same source URL again, use `make reset-db`.
-Use `DB_SCHEMA` to target another schema in the same PostgreSQL database, for example
-when isolating future evaluation data from local development data.
+recreate the local database, use `make reset-db`, then run `make ingest` to populate the
+public schema. A reset intentionally leaves the database empty until ingestion
+completes. Use `DB_SCHEMA` to target another schema in the same PostgreSQL database, for
+example when isolating future evaluation data from local development data.
 
 > [!WARNING]
 > `make reset-db` permanently deletes the project's PostgreSQL volume.
@@ -161,37 +167,81 @@ when isolating future evaluation data from local development data.
 
 Run `make help` for every available shortcut.
 
-| Command                             | Description                                          |
-| ----------------------------------- | ---------------------------------------------------- |
-| `make init-db`                      | Start PostgreSQL and initialise the pgvector schema. |
-| `make ingest`                       | Ingest documents defined in `source_files.json`.     |
-| `make vector_search QUESTION='...'` | Search chunks semantically.                          |
-| `make text_search QUESTION='...'`   | Search chunks with PostgreSQL full-text search.      |
-| `make ask QUESTION='...'`           | Generate an answer from retrieved context.           |
-| `make app`                          | Start the agent API and Gradio chat interface.       |
+| Command                                 | Description                                          |
+| --------------------------------------- | ---------------------------------------------------- |
+| `make init-db`                          | Start PostgreSQL and initialise the pgvector schema. |
+| `make ingest`                           | Ingest documents defined in `source_files.json`.     |
+| `make export-corpus`                    | Overwrite the current knowledge-base corpus export.  |
+| `make load-corpus DB_SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
+| `make evaluate`                         | Run search, RAG, and judge evaluation.               |
+| `make evaluate-search`                  | Run offline search metrics only.                     |
+| `make evaluate-rag`                     | Run RAG metrics without answer judging.              |
+| `make evaluate-judge`                   | Generate and judge RAG answers only.                 |
+| `make evaluate-all`                     | Alias for `make evaluate`.                           |
+| `make vector_search QUESTION='...'`     | Search chunks semantically.                          |
+| `make text_search QUESTION='...'`       | Search chunks with PostgreSQL full-text search.      |
+| `make ask QUESTION='...'`               | Generate an answer from retrieved context.           |
+| `make ask QUESTION='...' VERBOSE=1`     | Print the complete serialized RAG trace.             |
+| `make app`                              | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
 [agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python
 workflows.
+
+## Evaluation
+
+The project evaluates the current corpus and RAG pipeline with a 105-case golden
+dataset: 100 answerable questions and 5 unsupported questions. Each evaluation loads the
+bundled corpus into an isolated `evaluation` schema.
+
+| Evaluation | Run                    | Purpose                                                                          |
+| ---------- | ---------------------- | -------------------------------------------------------------------------------- |
+| Search     | `make evaluate-search` | Compare the current vector, full-text, and hybrid retrieval quality.             |
+| RAG        | `make evaluate-rag`    | Measure retrieval, citation, refusal, and latency metrics without the LLM judge. |
+| Judge      | `make evaluate-judge`  | Add LLM-judge answer-correctness scoring; this makes additional model calls.     |
+
+The corresponding notebooks retain the latest executed reports and conclusions:
+
+- [Search evaluation](evaluation/notebooks/search_evaluation.ipynb)
+- [RAG evaluation](evaluation/notebooks/rag_evaluation.ipynb)
+- [Judge evaluation](evaluation/notebooks/llm_judge_evaluation.ipynb)
+
+The latest retrieval comparison used the bundled corpus, `k=5`, and the configured
+`BAAI/bge-small-en-v1.5` embedding model. Hybrid search matched vector search's 98% hit
+rate and recall, while improving MRR slightly (0.9275 versus 0.9175); its mean search
+latency was 41 ms versus 34 ms. Full-text search was faster (8 ms) but achieved only 25%
+hit rate and recall. Hybrid search is therefore the application's default retrieval
+mode.
+
+The latest hybrid RAG run over all 105 cases achieved 99.0% source precision and recall,
+89.2% section precision, 96.2% section recall, and 96.2% citation validity, with no
+pipeline errors. The five unsupported cases exposed a remaining refusal gap: the model
+refused none of them, producing 95.2% refusal accuracy overall. The optional
+`gpt-4.1-mini` judge rated 97.1% of the 105 answers correct. These are current baseline
+results; prompt/model comparisons and broader robustness evaluations are deferred to
+follow-up work.
 
 ## Roadmap
 
 The complete plan, including milestones and deferred work, is maintained in
 [roadmap.md](roadmap.md).
 
-### Current release — v0.2.0: RAG MVP
+### Current release — v0.3.0: Evaluated RAG baseline
 
-This release delivers the first end-to-end RAG experience for the Brittany guide:
+This release delivers an evaluated RAG baseline for the Brittany guide:
 
 - Grounded answers generated from retrieved context
-- Retrieved source references with deduplicated page numbers
+- Retrieved source references with deduplicated, ordered page numbers
+- Hybrid retrieval selected from vector, full-text, and hybrid measurements
+- Runnable search, RAG, and optional judge evaluation notebooks with saved baseline
+  results
 - A basic Gradio chat interface
 
-### Next release — v0.3.0: Evaluation
+### Next release — v0.4.0: Monitoring
 
-The next goal is to validate and measure answer quality: build a reviewed evaluation
-dataset, compare retrieval and prompt configurations, and introduce verified citations
-based on LLM-returned chunk identifiers.
+The next goal is to collect feedback and make application behaviour observable. Broader
+evaluation experiments, such as prompt/model comparisons and dataset versioning, remain
+follow-up work rather than release blockers.
 
 ### Capstone success criteria
 

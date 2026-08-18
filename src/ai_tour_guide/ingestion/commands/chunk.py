@@ -39,8 +39,8 @@ def chunk_command(
 ) -> None:
     """Read PARSED_DOCUMENT JSON and write CHUNKED_DOCUMENT JSON."""
     try:
-        settings = IngestionSettings(
-            **{
+        settings = IngestionSettings().model_copy(
+            update={
                 key: value
                 for key, value in {
                     'target_chars': target_chars,
@@ -49,7 +49,7 @@ def chunk_command(
                     'section_chunk_max_depth': section_chunk_max_depth,
                 }.items()
                 if value is not None
-            }
+            },
         )
         result = chunk_document_stage(
             PARSED_DOCUMENT_JSON.read(input_path),

@@ -65,7 +65,7 @@ services:
         "run",
         "python",
         "-m",
-        "ai_tour_guide.knowledge_base.init_db",
+        "ai_tour_guide.knowledge_base.database.init",
       ]
 
     depends_on:

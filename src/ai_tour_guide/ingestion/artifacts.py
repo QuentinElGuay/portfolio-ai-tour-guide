@@ -296,7 +296,7 @@ class ChunkedDocumentArtifact:
                 for chunk in chunks
             ),
             chunking=ChunkingConfig.from_dict(
-                _require_mapping(data.get('chunking'), field_name='chunking')
+                dict(_require_mapping(data.get('chunking'), field_name='chunking'))
             ),
         )
 
@@ -357,9 +357,11 @@ class EmbeddedDocumentArtifact:
             ),
             chunks=tuple(embedded_chunks),
             chunking=ChunkingConfig.from_dict(
-                _require_mapping(
-                    data.get('chunking'),
-                    field_name='chunking',
+                dict(
+                    _require_mapping(
+                        data.get('chunking'),
+                        field_name='chunking',
+                    )
                 )
             ),
             embedding=_embedding_metadata_from_dict(

@@ -1,48 +1,85 @@
 from __future__ import annotations
 
 import os
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Protocol
 
 import httpx
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.agent.responses import LLM_CONFIGURATION_REQUIRED_ANSWER
+from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
+
+SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
 
 
 def create_backend() -> ChatBackend:
-    """Create the HTTP backend configured for the running chat service."""
     api_url = os.getenv('CHAT_API_URL')
-
     if api_url:
         return HttpChatBackend(api_url=api_url)
-
-    raise RuntimeError(
-        'CHAT_API_URL is required to run the chat service. '
-        'Inject DemoBackend when developing the interface.'
-    )
+    return DemoBackend()
 
 
-class ChatBackend(Protocol):
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
-        """Return an assistant response for the complete conversation."""
+class ChatBackend(ABC):
+    """Backend contract with shared validation for API-shaped responses."""
+
+    @abstractmethod
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+        """Return a validated answer payload."""
+
+    @staticmethod
+    def validate_response(payload: object) -> dict[str, object]:
+        if not isinstance(payload, dict):
+            raise TypeError('response must be an object')
+        if payload.get('schema_version') != SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION:
+            raise ValueError('unsupported schema version')
+
+        answer = payload.get('answer')
+        sources = payload.get('sources')
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError('answer must be a non-empty string')
+        if not isinstance(sources, list):
+            raise TypeError('sources must be a list')
+        return payload
 
 
-class DemoBackend:
-    """Development backend used only when no backend is injected."""
+class DemoBackend(ChatBackend):
+    """Development fallback with the same payload contract as the API."""
 
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
-        return LLM_CONFIGURATION_REQUIRED_ANSWER
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+        return self.validate_response(
+            {
+                'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
+                'answer': NO_BACKEND_AVAILABLE_ANSWER,
+                'sources': [],
+            }
+        )
 
 
-class HttpChatBackend:
-    """Adapter from the chat interface to the agent HTTP API."""
-
+class HttpChatBackend(ChatBackend):
     def __init__(self, api_url: str, timeout_seconds: float = 60.0) -> None:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
 
-    async def generate_reply(self, messages: Sequence[Message]) -> str:
+    async def check_ready(self) -> None:
+        """Verify that the API and its configured knowledge base are ready."""
+        health_url = f'{self.api_url.rsplit("/", 1)[0]}/health'
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(health_url)
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = ''
+            try:
+                payload = exc.response.json()
+                detail = payload.get('detail', '') if isinstance(payload, dict) else ''
+            except ValueError:
+                pass
+            message = f' Chat API health check failed: {detail}' if detail else ''
+            raise RuntimeError(f'The chat API is not ready.{message}') from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError('Unable to reach the chat API health check.') from exc
+
+    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
         question = next(
             (
                 message['content']
@@ -53,86 +90,23 @@ class HttpChatBackend:
         )
         if not question.strip():
             raise RuntimeError('The conversation does not contain a user question.')
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.api_url,
-                    json={'question': question},
-                )
+                response = await client.post(self.api_url, json={'question': question})
                 response.raise_for_status()
         except httpx.ConnectError as exc:
-            raise RuntimeError(
-                'Unable to connect to the chat API. '
-                'Make sure the backend is running and CHAT_API_URL is correct.'
-            ) from exc
+            raise RuntimeError('Unable to connect to the chat API.') from exc
         except httpx.HTTPStatusError as exc:
-            detail = exc.response.text[:500]
             raise RuntimeError(
-                f'The chat API returned HTTP {exc.response.status_code}: {detail}'
+                f'The chat API returned HTTP {exc.response.status_code}.'
             ) from exc
         except httpx.HTTPError as exc:
             raise RuntimeError(f'Chat API request failed: {exc}') from exc
-
         try:
-            payload = response.json()
-            answer = payload['answer']
-            sources = payload.get('sources', [])
-        except (ValueError, KeyError, TypeError) as exc:
+            payload = self.validate_response(response.json())
+        except (ValueError, TypeError) as exc:
             raise RuntimeError(
                 "Invalid API response. Expected {'answer': '...', 'sources': [...]}."
             ) from exc
 
-        if not isinstance(answer, str) or not answer.strip():
-            raise RuntimeError('The chat API returned an empty response.')
-        if not isinstance(sources, list):
-            raise RuntimeError(  # noqa: TRY004
-                'The chat API returned invalid sources.'
-            )
-
-        return _format_answer(answer, sources)
-
-
-def _format_answer(answer: str, sources: list[object]) -> str:
-    source_pages: dict[str, set[int]] = {}
-    sources_without_pages: list[str] = []
-
-    for source in sources:
-        if not isinstance(source, dict) or not isinstance(source.get('title'), str):
-            raise RuntimeError(  # noqa: TRY004
-                'The chat API returned an invalid source.'
-            )
-
-        title = source['title']
-        page_start = source.get('page_start')
-        page_end = source.get('page_end')
-        if isinstance(page_start, int) and isinstance(page_end, int):
-            pages = source_pages.setdefault(title, set())
-            pages.update(range(page_start, page_end + 1))
-        elif isinstance(page_start, int):
-            source_pages.setdefault(title, set()).add(page_start)
-        elif title not in source_pages and title not in sources_without_pages:
-            sources_without_pages.append(title)
-
-    formatted_sources = [
-        f'{title} ({_format_pages(sorted(pages))})'
-        for title, pages in source_pages.items()
-    ]
-    formatted_sources.extend(sources_without_pages)
-
-    if not formatted_sources:
-        return answer
-
-    return f'{answer}\n\n**Sources**\n\n' + '\n'.join(formatted_sources)
-
-
-# TODO: page formatting should be shared with ai_tour_guide.agent.cli.ask_command
-# See src/ai_tour_guide/agent/source_formatting.py
-def _format_pages(pages: list[int]) -> str:
-    page_numbers = [str(page) for page in pages]
-    if len(page_numbers) == 1:
-        return f'page {page_numbers[0]}'
-    if len(page_numbers) == 2:
-        return f'pages {page_numbers[0]} and {page_numbers[1]}'
-
-    return f'pages {", ".join(page_numbers[:-1])} and {page_numbers[-1]}'
+        return payload
