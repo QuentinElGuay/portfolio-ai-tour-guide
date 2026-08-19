@@ -131,12 +131,14 @@ cp .env.template .env
 Set an OpenAI API key in `.env` to generate answers:
 
 ```dotenv
-AGENT_OPENAI_API_KEY=your-api-key
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
 `make evaluate` and `make evaluate-judge` can optionally use a separate judge
 configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MODEL`.
-When these are absent, it reuses `AGENT_OPENAI_API_KEY` and `AGENT_OPENAI_MODEL`.
+When these are absent, it reuses `AGENT_LLM_API_KEY` and `AGENT_LLM_MODEL`.
 
 > [!NOTE]
 > OpenAI is the only currently supported LLM provider at the moment but more might be
@@ -157,7 +159,7 @@ Open `http://localhost:7860` to use the chat. The agent API is available at
 The first ingestion or image build can download the configured embedding model. To
 recreate the local database, use `make reset-db`, then run `make ingest` to populate the
 public schema. A reset intentionally leaves the database empty until ingestion
-completes. Use `DB_SCHEMA` to target another schema in the same PostgreSQL database, for
+completes. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
 example when isolating future evaluation data from local development data.
 
 > [!WARNING]
@@ -167,23 +169,23 @@ example when isolating future evaluation data from local development data.
 
 Run `make help` for every available shortcut.
 
-| Command                                 | Description                                          |
-| --------------------------------------- | ---------------------------------------------------- |
-| `make init-db`                          | Start PostgreSQL and initialise the pgvector schema. |
-| `make ingest`                           | Ingest documents defined in `source_files.json`.     |
-| `make export-corpus`                    | Overwrite the current knowledge-base corpus export.  |
-| `make load-corpus DB_SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
-| `make evaluate`                         | Run search, RAG, and judge evaluation.               |
-| `make evaluate-search`                  | Run offline search metrics only.                     |
-| `make evaluate-rag`                     | Run RAG metrics without answer judging.              |
-| `make evaluate-judge`                   | Generate and judge RAG answers only.                 |
-| `make evaluate-all`                     | Alias for `make evaluate`.                           |
-| `make vector_search QUESTION='...'`     | Search chunks semantically.                          |
-| `make text_search QUESTION='...'`       | Search chunks with PostgreSQL full-text search.      |
-| `make ask QUESTION='...'`               | Generate an answer from retrieved context.           |
-| `make ask QUESTION='...' VERBOSE=1`     | Print the complete serialized RAG trace.             |
-| `make cli-chat`                         | Start the interactive terminal chat.                 |
-| `make app`                              | Start the agent API and Gradio chat interface.       |
+| Command                              | Description                                          |
+| ------------------------------------ | ---------------------------------------------------- |
+| `make init-db`                       | Start PostgreSQL and initialise the pgvector schema. |
+| `make ingest`                        | Ingest documents defined in `source_files.json`.     |
+| `make export-corpus`                 | Overwrite the current knowledge-base corpus export.  |
+| `make load-corpus SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
+| `make evaluate`                      | Run search, RAG, and judge evaluation.               |
+| `make evaluate-search`               | Run offline search metrics only.                     |
+| `make evaluate-rag`                  | Run RAG metrics without answer judging.              |
+| `make evaluate-judge`                | Generate and judge RAG answers only.                 |
+| `make evaluate-all`                  | Alias for `make evaluate`.                           |
+| `make vector_search QUESTION='...'`  | Search chunks semantically.                          |
+| `make text_search QUESTION='...'`    | Search chunks with PostgreSQL full-text search.      |
+| `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
+| `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
+| `make cli-chat`                      | Start the interactive terminal chat.                 |
+| `make app`                           | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
 [agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python

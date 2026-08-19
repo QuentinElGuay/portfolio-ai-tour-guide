@@ -2,31 +2,22 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from pydantic import SecretStr
 
 from ai_tour_guide.agent.chat.models import Message, Role
-from ai_tour_guide.agent.llm.client import OpenAIClient
-from ai_tour_guide.agent.llm.factory import create_default_llm_client
-from ai_tour_guide.agent.llm.settings import LLMSettings, OpenAISettings
+from ai_tour_guide.agent.llm.clients import OpenAIClient
+from ai_tour_guide.agent.llm.factory import create_llm_client
+from ai_tour_guide.agent.llm.settings import AgentsSettings
 
 
-def test_llm_settings_reads_unprefixed_values_from_environment(monkeypatch) -> None:
-    monkeypatch.setenv('API_KEY', 'test-token')
-    monkeypatch.setenv('MODEL', 'test-model')
-
-    settings = LLMSettings()
-
-    assert settings.api_key.get_secret_value() == 'test-token'
-    assert settings.model == 'test-model'
-
-
-def test_openai_settings_reads_the_agent_api_key_from_environment(
+def test_agent_settings_reads_generic_values_from_environment(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv('AGENT_OPENAI_API_KEY', 'test-token')
-    monkeypatch.setenv('AGENT_OPENAI_MODEL', 'test-model')
+    monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
-    settings = OpenAISettings()
+    settings = AgentsSettings()
 
     assert settings.api_key.get_secret_value() == 'test-token'
     assert settings.model == 'test-model'
@@ -38,7 +29,7 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     )
     client = MagicMock()
     client.responses.create = AsyncMock(return_value=response)
-    settings = OpenAISettings(
+    settings = AgentsSettings(
         api_key=SecretStr('test-token'),
         model='test-model',
     )
@@ -64,17 +55,20 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
 
 
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
-    monkeypatch.setenv('AGENT_OPENAI_API_KEY', 'test-token')
-    monkeypatch.setenv('AGENT_OPENAI_MODEL', 'test-model')
+    monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
-    client = create_default_llm_client()
+    client = create_llm_client(AgentsSettings())
 
     assert isinstance(client, OpenAIClient)
     assert client.model == 'test-model'
 
 
-def test_default_llm_client_is_unavailable_when_api_key_is_empty(monkeypatch) -> None:
-    monkeypatch.setenv('AGENT_OPENAI_API_KEY', '')
-    monkeypatch.setenv('AGENT_OPENAI_MODEL', 'test-model')
+def test_llm_client_requires_api_key() -> None:
+    settings = AgentsSettings(
+        api_key=SecretStr(' '),
+        model='test-model',
+    )
 
-    assert create_default_llm_client() is None
+    with pytest.raises(ValueError, match='API key must be provided'):
+        create_llm_client(settings)

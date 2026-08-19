@@ -8,7 +8,7 @@ from sqlalchemy import insert, select
 from sqlalchemy.engine import Engine
 
 from .connection import database_engine
-from .tables import rag_feedback, rag_results
+from .tables import rag_ratings, rag_results
 
 
 def _mapping(value: object) -> Mapping[str, Any]:
@@ -27,6 +27,11 @@ def _optional_number(value: object) -> float | None:
     )
 
 
+def _optional_rounded_integer(value: object) -> int | None:
+    number = _optional_number(value)
+    return round(number) if number is not None else None
+
+
 def _optional_integer(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -35,15 +40,8 @@ def _items(value: object) -> list[object]:
     return value if isinstance(value, list) else []
 
 
-def _outcome(error: Mapping[str, Any], contexts: list[object]) -> str:
-    stage = _optional_string(error.get('stage'))
-    if stage in {'retrieval', 'generation'}:
-        return f'{stage}_error'
-    if error:
-        return 'failed'
-    if not contexts:
-        return 'insufficient_context'
-    return 'success'
+def _success(error: Mapping[str, Any], contexts: list[object]) -> bool:
+    return not error and bool(contexts)
 
 
 def _rag_result_values(rag_result: Mapping[str, Any]) -> dict[str, object]:
@@ -75,17 +73,19 @@ def _rag_result_values(rag_result: Mapping[str, Any]) -> dict[str, object]:
         'answer': answer,
         'search_mode': search_mode,
         'retrieval_k': retrieval_k,
-        'outcome': _outcome(error, contexts),
+        'success': _success(error, contexts),
         'error_stage': _optional_string(error.get('stage')),
         'error_type': _optional_string(error.get('type')),
         'error_message': _optional_string(error.get('message')),
-        'retrieval_latency_ms': _optional_number(
+        'retrieval_latency_ms': _optional_rounded_integer(
             rag_result.get('retrieval_latency_ms')
         ),
-        'generation_latency_ms': _optional_number(
+        'generation_latency_ms': _optional_rounded_integer(
             rag_result.get('generation_latency_ms')
         ),
-        'total_latency_ms': _optional_number(rag_result.get('total_latency_ms')),
+        'total_latency_ms': _optional_rounded_integer(
+            rag_result.get('total_latency_ms')
+        ),
         'retrieved_context_count': len(contexts),
         'search_result_count': len(_items(rag_result.get('search_results'))),
         'source_count': len(_items(rag_result.get('sources'))),
@@ -133,7 +133,7 @@ def store_feedback(
         if result_exists is None:
             return False
         connection.execute(
-            insert(rag_feedback).values(
+            insert(rag_ratings).values(
                 request_id=request_id,
                 helpful=helpful,
                 comment=comment,

@@ -1,14 +1,31 @@
 """Direct OpenAI client implementing the agent chat backend protocol."""
 
 from collections.abc import Sequence
+from typing import Protocol
 
 from openai import APIError, AsyncOpenAI
 
 from ai_tour_guide.agent.chat.models import Message, Role
-from ai_tour_guide.agent.llm.interfaces import GenerationError
 from ai_tour_guide.agent.llm.rate_limit import AsyncRateLimiter
-from ai_tour_guide.agent.llm.settings import OpenAISettings
+from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
+
+
+class GenerationError(RuntimeError):
+    """An expected provider or structured-output failure."""
+
+
+class LLMClient(Protocol):
+    """Generate a reply from a complete conversation."""
+
+    async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
+        """Return a structured answer for ``messages``."""
+        ...
+
+
+def create_openai_client(settings: AgentsSettings) -> AsyncOpenAI:
+    """Create the shared low-level OpenAI client from agent settings."""
+    return AsyncOpenAI(api_key=settings.api_key.get_secret_value())
 
 
 class OpenAIClient:
@@ -16,16 +33,13 @@ class OpenAIClient:
 
     def __init__(
         self,
-        settings: OpenAISettings | None = None,
+        settings: AgentsSettings,
         *,
         client: AsyncOpenAI | None = None,
     ) -> None:
-        selected_settings = settings or OpenAISettings()
-        self.model = selected_settings.model
-        self._rate_limiter = AsyncRateLimiter(selected_settings.requests_per_second)
-        self._client = client or AsyncOpenAI(
-            api_key=selected_settings.api_key.get_secret_value(),
-        )
+        self.model = settings.model
+        self._rate_limiter = AsyncRateLimiter(settings.requests_per_second)
+        self._client = client or create_openai_client(settings)
 
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
         """Generate one assistant response for the supplied messages."""
@@ -145,4 +159,10 @@ def _parse_answer(payload: object) -> tuple[str, tuple[LLMCitation, ...]]:
     return answer, tuple(parsed_citations)
 
 
-__all__ = ['OpenAIClient']
+__all__ = [
+    'GenerationError',
+    'LLMClient',
+    'LLMProvider',
+    'OpenAIClient',
+    'create_openai_client',
+]

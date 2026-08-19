@@ -77,7 +77,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
     client = MagicMock()
     client.answer_question = AsyncMock(return_value=GeneratedAnswer('Answer.'))
 
-    result = asyncio.run(answer_question_async('Question', client=client))
+    result = asyncio.run(answer_question_async('Question', llm_client=client))
 
     retrieve_context.assert_called_once()
     assert retrieve_context.call_args.kwargs['search_mode'].value == 'hybrid'
@@ -109,7 +109,7 @@ def test_answer_question_handles_empty_retrieval(retrieve_context: MagicMock) ->
     client = MagicMock()
     client.answer_question = AsyncMock()
 
-    result = asyncio.run(answer_question_async('Question', client=client))
+    result = asyncio.run(answer_question_async('Question', llm_client=client))
 
     assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
     assert result.contexts == ()
@@ -118,15 +118,15 @@ def test_answer_question_handles_empty_retrieval(retrieve_context: MagicMock) ->
     retrieve_context.assert_called_once()
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.create_default_llm_client', return_value=None)
+@patch('ai_tour_guide.agent.rag.pipeline.create_llm_client', return_value=None)
 def test_answer_question_requires_llm_configuration(
-    create_default_llm_client: MagicMock,
+    create_llm_client: MagicMock,
 ) -> None:
     """Verify that question answering fails gracefully when no LLM client is configured."""
     with pytest.raises(RuntimeError, match='No LLM client is configured'):
-        asyncio.run(answer_question_async('Question'))
+        answer_question('Question')
 
-    create_default_llm_client.assert_called_once_with()
+    create_llm_client.assert_called_once()
 
 
 def test_build_context_preserves_source_identity_and_pages() -> None:

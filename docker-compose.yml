@@ -137,8 +137,9 @@ services:
 
     environment:
       <<: *app-environment
-      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
-      AGENT_OPENAI_MODEL: "${AGENT_OPENAI_MODEL:-gpt-4.1-mini}"
+      AGENT_LLM_PROVIDER: "${AGENT_LLM_PROVIDER:-openai}"
+      AGENT_LLM_API_KEY: "${AGENT_LLM_API_KEY:-}"
+      AGENT_LLM_MODEL: "${AGENT_LLM_MODEL:-gpt-4.1-mini}"
 
     ports:
       - "${AGENT_PORT:-8000}:8000"

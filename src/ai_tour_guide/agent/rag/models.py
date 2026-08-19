@@ -194,9 +194,9 @@ class RAGResult:
     invalid_citations: tuple[InvalidCitation, ...] = ()
     citation_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
     error: RAGError | None = None
-    retrieval_latency_ms: float | None = None
-    generation_latency_ms: float | None = None
-    total_latency_ms: float | None = None
+    retrieval_latency_ms: int | None = None
+    generation_latency_ms: int | None = None
+    total_latency_ms: int | None = None
     request_id: UUID = field(default_factory=uuid4)
     retrieval_metadata: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
@@ -223,6 +223,14 @@ class RAGResult:
             self, 'retrieval_metadata', _freeze_mapping(self.retrieval_metadata)
         )
         object.__setattr__(self, 'llm_metadata', _freeze_mapping(self.llm_metadata))
+        for field_name in (
+            'retrieval_latency_ms',
+            'generation_latency_ms',
+            'total_latency_ms',
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, round(value))
 
     @property
     def answer(self) -> str:
