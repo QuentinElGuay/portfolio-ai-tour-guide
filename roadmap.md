@@ -106,17 +106,17 @@ ______________________________________________________________________
 - [x] A stored result can be inspected with its answer, execution status, and associated
   ratings.
 
-### [P1] Add privacy-conscious operational visibility
+### [P1] Summarize RAG quality and operational signals
 
-- [ ] Record structured application request, retrieval, model, latency, and error events
-  without unnecessary personal data.
-- [ ] Add ingestion-run status, duration, and failure observability.
-- [ ] Define retention and access rules for operational data.
+- [ ] Aggregate persisted RAG outcomes, ratings, latency, errors, and model usage into a
+  concise report or view.
+- [ ] Make the main quality and operational signals easy to inspect during a demo.
 
 **Acceptance criteria**
 
-- [ ] Operators can investigate failures and quality trends from queryable records.
-- [ ] Monitoring distinguishes successful, insufficient-context, and failed work.
+- [ ] A reviewer can inspect answer quality, failure rates, and latency from persisted
+  application data.
+- [ ] The report distinguishes successful, insufficient-context, and failed work.
 
 ### [P2] Provide a monitoring view
 
@@ -179,6 +179,10 @@ These improvements are useful but are not priorities for the final submission.
   constraints.
 - [ ] Pin the embedding model artifact and add reproducibility and retrieval smoke
   coverage.
+- [ ] Add ingestion-run status, duration, counts, and failure details if operational
+  monitoring becomes necessary.
+- [ ] Add detailed structured logs and traces only if future debugging needs justify
+  them.
 
 ### [P2] Retrieval and answer improvements
 
