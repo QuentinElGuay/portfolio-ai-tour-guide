@@ -39,14 +39,16 @@ make init-db
 make ingest
 ```
 
-For the RAG application, `.env` must define `AGENT_OPENAI_API_KEY`; it also needs the
+For the RAG application, `.env` must define `AGENT_LLM_API_KEY`; it also needs the
 database and embedding settings used for retrieval. The template provides a default
-`AGENT_OPENAI_MODEL`.
+`AGENT_LLM_PROVIDER` and `AGENT_LLM_MODEL`.
 
 Add your API key:
 
 ```dotenv
-AGENT_OPENAI_API_KEY=your-api-key
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
 Start the agent API and Gradio chat together:
@@ -78,7 +80,7 @@ make ask QUESTION='What are the best places to visit in Brittany?' K=5
 make ask QUESTION='What are the best places to visit in Brittany?' K=5 VERBOSE=1
 ```
 
-Run directly with Python after configuring `DB_*`, `EMBEDDING_*`, and `AGENT_OPENAI_*`:
+Run directly with Python after configuring `DB_*`, `EMBEDDING_*`, and `AGENT_LLM_*`:
 
 ```bash
 uv run portfolio-ai-tour-guide-agent search --mode vector --k 5 'Where is Dinan?'
@@ -143,20 +145,21 @@ make ingest
 
 ## Configuration
 
-| Variable               | Purpose                                | Template value      |
-| ---------------------- | -------------------------------------- | ------------------- |
-| `AGENT_OPENAI_API_KEY` | OpenAI API key for answer generation   | Empty               |
-| `AGENT_OPENAI_MODEL`   | OpenAI model for answer generation     | `gpt-4.1-mini`      |
-| `AGENT_PORT`           | Host port for the agent API            | `8000`              |
-| `DB_*`                 | Database connection used for retrieval | See `.env.template` |
-| `EMBEDDING_*`          | Query embedding configuration          | See `.env.template` |
+| Variable             | Purpose                                | Template value      |
+| -------------------- | -------------------------------------- | ------------------- |
+| `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `openai`            |
+| `AGENT_LLM_API_KEY`  | LLM API key for answer generation      | Empty               |
+| `AGENT_LLM_MODEL`    | LLM model for answer generation        | `gpt-4.1-mini`      |
+| `AGENT_PORT`         | Host port for the agent API            | `8000`              |
+| `DB_*`               | Database connection used for retrieval | See `.env.template` |
+| `EMBEDDING_*`        | Query embedding configuration          | See `.env.template` |
 
 `DB_SCHEMA` selects the PostgreSQL schema used for retrieval. It defaults to `public`;
 use the same value for schema initialization, ingestion, and the agent so RAG reads the
 knowledge base you populated.
 
-`AGENT_OPENAI_MODEL` is required by the settings class; `.env.template` provides a
-default. OpenAI is the only provider currently supported by the default client.
+`AGENT_LLM_MODEL` is required by the settings class; `.env.template` provides a default.
+OpenAI is the only provider currently supported by the default client.
 
 For the chat service's `CHAT_*` settings and development-only `DemoBackend`, see the
 [chat guide](chat/README.md).

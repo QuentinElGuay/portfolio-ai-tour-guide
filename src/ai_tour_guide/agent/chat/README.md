@@ -15,7 +15,7 @@ Return to the [project overview](../../../../README.md) or the
 
 ## Run with Docker
 
-After initializing and ingesting the database, set `AGENT_OPENAI_API_KEY` in `.env` and
+After initializing and ingesting the database, set `AGENT_LLM_API_KEY` in `.env` and
 run:
 
 ```bash

@@ -35,8 +35,8 @@ def _case() -> GoldenCase:
 
 
 def test_judge_settings_prefer_dedicated_values(monkeypatch) -> None:
-    monkeypatch.setenv('AGENT_OPENAI_API_KEY', 'agent-key')
-    monkeypatch.setenv('AGENT_OPENAI_MODEL', 'agent-model')
+    monkeypatch.setenv('AGENT_LLM_API_KEY', 'agent-key')
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'agent-model')
     monkeypatch.setenv('EVALUATION_OPENAI_JUDGE_API_KEY', 'judge-key')
     monkeypatch.setenv('EVALUATION_OPENAI_JUDGE_MODEL', 'judge-model')
 

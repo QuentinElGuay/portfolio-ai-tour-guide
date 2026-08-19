@@ -3,12 +3,17 @@
 import asyncio
 import logging
 from time import perf_counter
+from uuid import UUID, uuid4
 
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from ai_tour_guide.agent.llm.factory import create_default_llm_client
-from ai_tour_guide.agent.llm.interfaces import GenerationError, LLMClient
+from ai_tour_guide.agent.llm.clients import (
+    GenerationError,
+    LLMClient,
+)
+from ai_tour_guide.agent.llm.factory import create_llm_client
+from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGError, RAGResult
 from ai_tour_guide.agent.rag.prompting import build_messages
 from ai_tour_guide.agent.rag.sources import validate_citations
@@ -38,17 +43,15 @@ async def answer_question_async(
     *,
     mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
-    client: LLMClient | None = None,
+    llm_client: LLMClient,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
+    request_id: UUID | None = None,
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
+    selected_request_id = request_id or uuid4()
     selected_mode = SearchMode(mode)
-
-    selected_client = client or create_default_llm_client()
-    if selected_client is None:
-        raise RuntimeError('No LLM client is configured.')
 
     retrieval_started = perf_counter()
 
@@ -65,6 +68,7 @@ async def answer_question_async(
 
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=(),
@@ -79,6 +83,7 @@ async def answer_question_async(
     if not contexts:
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=(),
@@ -93,12 +98,13 @@ async def answer_question_async(
     generation_started = perf_counter()
 
     try:
-        generated = await selected_client.answer_question(messages)
+        generated = await llm_client.answer_question(messages)
     except GenerationError as exc:
         generation_latency = (perf_counter() - generation_started) * 1000
 
         return RAGResult(
             question=question,
+            request_id=selected_request_id,
             mode=selected_mode,
             k=k,
             messages=messages,
@@ -125,6 +131,7 @@ async def answer_question_async(
 
     return RAGResult(
         question=question,
+        request_id=selected_request_id,
         mode=selected_mode,
         k=k,
         messages=messages,
@@ -149,19 +156,26 @@ def answer_question(
     *,
     mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
-    client: LLMClient | None = None,
+    settings: AgentsSettings | None = None,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
 ) -> RAGResult:
     """Synchronously answer a question for CLI and synchronous callers."""
+    selected_settings = settings or AgentsSettings()
+    selected_client = create_llm_client(selected_settings)
+
+    if selected_client is None:
+        raise RuntimeError('No LLM client is configured.')
+    request_id = uuid4()
     return asyncio.run(
         answer_question_async(
             question,
             mode=mode,
             k=k,
-            client=client,
+            llm_client=selected_client,
             engine=engine,
             strategy=strategy,
+            request_id=request_id,
         )
     )
 

@@ -13,41 +13,36 @@ from openai.types.responses import (
     ResponseTextConfigParam,
 )
 from pydantic import AliasChoices, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ai_tour_guide.agent.llm.interfaces import GenerationError
+from ai_tour_guide.agent.llm.clients import GenerationError, create_openai_client
 from ai_tour_guide.agent.llm.rate_limit import (
-    DEFAULT_REQUESTS_PER_SECOND,
     AsyncRateLimiter,
 )
+from ai_tour_guide.agent.llm.settings import AgentsSettings
 from evaluation.dataset import GoldenCase
 
 
-class JudgeSettings(BaseSettings):
+class JudgesSettings(AgentsSettings):
     """Settings for the optional, costlier LLM answer judge.
 
     Dedicated evaluation variables take precedence, while the agent credentials
     provide a convenient local fallback.
     """
 
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_file_encoding='utf-8',
-        extra='ignore',
-        populate_by_name=True,
-    )
-    requests_per_second: float = Field(default=DEFAULT_REQUESTS_PER_SECOND, gt=0)
-
     api_key: SecretStr = Field(
         validation_alias=AliasChoices(
-            'EVALUATION_OPENAI_JUDGE_API_KEY', 'AGENT_OPENAI_API_KEY'
+            'EVALUATION_OPENAI_JUDGE_API_KEY', 'AGENT_LLM_API_KEY'
         )
     )
+
     model: str = Field(
         validation_alias=AliasChoices(
-            'EVALUATION_OPENAI_JUDGE_MODEL', 'AGENT_OPENAI_MODEL'
+            'EVALUATION_OPENAI_JUDGE_MODEL', 'AGENT_LLM_MODEL'
         )
     )
+
+
+JudgeSettings = JudgesSettings
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,15 +63,15 @@ class OpenAIAnswerJudge:
 
     def __init__(
         self,
-        settings: JudgeSettings | None = None,
+        settings: JudgesSettings | None = None,
         *,
         client: AsyncOpenAI | None = None,
     ) -> None:
-        selected_settings = settings or JudgeSettings()
+        selected_settings = settings or JudgesSettings()
         self.model = selected_settings.model
         self._rate_limiter = AsyncRateLimiter(selected_settings.requests_per_second)
-        self._client = client or AsyncOpenAI(
-            api_key=selected_settings.api_key.get_secret_value(),
+        self._client = client or create_openai_client_from_judge_settings(
+            selected_settings
         )
 
     async def judge(self, case: GoldenCase, answer: str) -> JudgeVerdict:
@@ -151,6 +146,18 @@ _VERDICT_FORMAT: ResponseFormatTextJSONSchemaConfigParam = {
 _VERDICT_TEXT_CONFIG: ResponseTextConfigParam = {'format': _VERDICT_FORMAT}
 
 
+def create_openai_client_from_judge_settings(settings: JudgesSettings) -> AsyncOpenAI:
+    """Adapt evaluation settings to the shared OpenAI client constructor."""
+    return create_openai_client(
+        AgentsSettings(
+            api_key=settings.api_key,
+            model=settings.model,
+            llm_provider=settings.llm_provider,
+            requests_per_second=settings.requests_per_second,
+        )
+    )
+
+
 def _judge_input(case: GoldenCase, answer: str) -> str:
     return json.dumps(
         {
@@ -175,4 +182,10 @@ def _parse_verdict(payload: object) -> tuple[bool, str]:
     return correct, reason
 
 
-__all__ = ['JudgeSettings', 'JudgeVerdict', 'OpenAIAnswerJudge']
+__all__ = [
+    'JudgeSettings',
+    'JudgeVerdict',
+    'JudgesSettings',
+    'OpenAIAnswerJudge',
+    'create_openai_client_from_judge_settings',
+]

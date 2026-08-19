@@ -1,6 +1,7 @@
 """Tests for immutable search-domain contracts."""
 
 from math import inf, nan
+from typing import Any
 
 import pytest
 
@@ -58,7 +59,7 @@ def test_search_mode_lists_vector_text_and_hybrid() -> None:
     ],
 )
 def test_hybrid_settings_reject_invalid_values(
-    kwargs: dict[str, float | int],
+    kwargs: dict[str, Any],
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):

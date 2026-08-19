@@ -1,6 +1,8 @@
 """HTTP API exposing the tour-guide RAG pipeline."""
 
+import logging
 from datetime import date
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
@@ -8,11 +10,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.agent.rag.pipeline import answer_question
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
+from ai_tour_guide.knowledge_base.database.feedback import (
+    store_feedback,
+    store_rag_result,
+)
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 ASK_RESPONSE_SCHEMA_VERSION = 1
+logger = logging.getLogger(__name__)
 
 
 class AskRequest(BaseModel):
@@ -58,8 +65,30 @@ class AskResponse(BaseModel):
     """Grounded answer and the sources used to produce it."""
 
     schema_version: int = ASK_RESPONSE_SCHEMA_VERSION
+    request_id: UUID
     answer: str
     sources: list[SourceResponse]
+
+
+class FeedbackRequest(BaseModel):
+    """Anonymous rating for a generated RAG answer."""
+
+    request_id: UUID
+    helpful: bool
+    comment: str | None = None
+
+    @field_validator('comment')
+    @classmethod
+    def normalize_comment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class FeedbackResponse(BaseModel):
+    """Confirmation that feedback was associated with a RAG result."""
+
+    request_id: UUID
 
 
 app = FastAPI(title='AI Tour Guide Agent')
@@ -72,6 +101,10 @@ def _ensure_knowledge_base_ready() -> None:
         with engine.connect() as connection:
             document_id = connection.scalar(select(DocumentRow.document_id).limit(1))
     except SQLAlchemyError as exc:
+        logger.warning(
+            'Knowledge-base health check failed: PostgreSQL is unavailable. '
+            'Check the database service and run `make init-db`.',
+        )
         raise HTTPException(
             status_code=503,
             detail='The knowledge base is unavailable. Check the database service.',
@@ -80,11 +113,15 @@ def _ensure_knowledge_base_ready() -> None:
         engine.dispose()
 
     if document_id is None:
+        logger.warning(
+            'Knowledge-base health check failed: the public schema contains no '
+            'documents. Run `make ingest` or `make load-corpus DB_SCHEMA=public`.'
+        )
         raise HTTPException(
             status_code=503,
             detail=(
-                'The knowledge base is empty. Run `make load-corpus DB_SCHEMA=public` '
-                'before starting the application.'
+                'The knowledge base is empty. Run `make ingest` or '
+                '`make load-corpus DB_SCHEMA=public` before starting the application.'
             ),
         )
 
@@ -97,8 +134,38 @@ def health() -> dict[str, str]:
 
 
 @app.post('/ask', response_model=AskResponse)
-async def ask(request: AskRequest) -> AskResponse:
+def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result: RAGResult = await answer_question_async(request.question)
+    result: RAGResult = answer_question(request.question)
+    try:
+        store_rag_result(result.request_id, result.to_dict())
+    except SQLAlchemyError as exc:
+        logger.exception('Unable to store RAG result: request_id=%s', result.request_id)
+        raise HTTPException(
+            status_code=503,
+            detail='Unable to store the generated answer for feedback.',
+        ) from exc
     sources = [SourceResponse.from_reference(source) for source in result.sources]
-    return AskResponse(answer=result.answer, sources=sources)
+    return AskResponse(
+        request_id=result.request_id, answer=result.answer, sources=sources
+    )
+
+
+@app.post('/feedback', response_model=FeedbackResponse)
+def feedback(request: FeedbackRequest) -> FeedbackResponse:
+    """Store a rating for a previously generated RAG answer."""
+    try:
+        stored = store_feedback(
+            request.request_id,
+            request.helpful,
+            request.comment,
+        )
+    except SQLAlchemyError as exc:
+        logger.exception('Unable to store feedback: request_id=%s', request.request_id)
+        raise HTTPException(
+            status_code=503,
+            detail='Unable to store feedback.',
+        ) from exc
+    if not stored:
+        raise HTTPException(status_code=404, detail='Unknown RAG result request ID.')
+    return FeedbackResponse(request_id=request.request_id)

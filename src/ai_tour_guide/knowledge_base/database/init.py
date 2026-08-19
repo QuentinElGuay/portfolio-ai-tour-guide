@@ -29,10 +29,13 @@ def initialize_database(
             text('CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public')
         )
         connection.execute(CreateSchema(schema_name, if_not_exists=True))
-        metadata.create_all(bind=connection, checkfirst=True)
+        schema_connection = connection.execution_options(
+            schema_translate_map={None: schema_name}
+        )
+        metadata.create_all(bind=schema_connection, checkfirst=True)
         for table in metadata.tables.values():
             for index in table.indexes:
-                index.create(bind=connection, checkfirst=True)
+                index.create(bind=schema_connection, checkfirst=True)
 
 
 def main() -> None:

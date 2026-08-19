@@ -30,6 +30,10 @@ def corpus_knowledge_base() -> Callable[[int], AbstractContextManager[None]]:
             with corpus_knowledge_base(1):
                 ...
     """
+
     # TODO: Add a hard guard for an isolated test database before enabling this
     # fixture in CI or local test runs.
-    return lambda: corpus_context()
+    def context_factory(_: int) -> AbstractContextManager[None]:
+        return corpus_context()
+
+    return context_factory

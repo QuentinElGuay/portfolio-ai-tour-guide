@@ -1,5 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 from click.testing import CliRunner
 
@@ -49,9 +50,10 @@ def test_search_command_prints_chunks(retrieve_context: MagicMock) -> None:
     )
 
 
+@patch('ai_tour_guide.agent.cli.store_rag_result')
 @patch('ai_tour_guide.agent.cli.answer_question')
 def test_ask_command_prints_answer_and_compact_sources(
-    answer_question: MagicMock,
+    answer_question: MagicMock, store_rag_result: MagicMock
 ) -> None:
     """Verify that the ask command displays the answer followed by compact source references."""
     answer_question.return_value = _result()
@@ -61,6 +63,7 @@ def test_ask_command_prints_answer_and_compact_sources(
     assert invocation.exit_code == 0
     assert json.loads(invocation.output) == {
         'schema_version': 1,
+        'request_id': str(answer_question.return_value.request_id),
         'answer': 'The coast is beautiful.',
         'sources': [
             {
@@ -75,11 +78,96 @@ def test_ask_command_prints_answer_and_compact_sources(
         ],
     }
     answer_question.assert_called_once_with('What?', mode=DEFAULT_SEARCH_MODE, k=5)
+    store_rag_result.assert_called_once_with(
+        answer_question.return_value.request_id, answer_question.return_value.to_dict()
+    )
 
 
+@patch('ai_tour_guide.agent.cli.store_feedback', return_value=True)
+def test_feedback_command_stores_helpful_feedback(store_feedback: MagicMock) -> None:
+    request_id = UUID('11111111-1111-1111-1111-111111111111')
+
+    invocation = CliRunner().invoke(
+        main,
+        [
+            'feedback',
+            str(request_id),
+            '--helpful',
+            '--comment',
+            'Clear answer.',
+        ],
+    )
+
+    assert invocation.exit_code == 0
+    assert f'Feedback stored for request {request_id}.' in invocation.output
+    store_feedback.assert_called_once_with(request_id, True, 'Clear answer.')
+
+
+@patch('ai_tour_guide.agent.cli.store_feedback', return_value=False)
+def test_feedback_command_rejects_unknown_request(store_feedback: MagicMock) -> None:
+    request_id = UUID('22222222-2222-2222-2222-222222222222')
+
+    invocation = CliRunner().invoke(
+        main, ['feedback', str(request_id), '--not-helpful']
+    )
+
+    assert invocation.exit_code != 0
+    assert 'Unknown RAG result request ID.' in invocation.output
+    store_feedback.assert_called_once_with(request_id, False, None)
+
+
+@patch('ai_tour_guide.agent.cli.store_feedback')
+@patch('ai_tour_guide.agent.cli.store_rag_result')
+@patch('ai_tour_guide.agent.cli.answer_question')
+def test_chat_command_stores_answer_and_positive_feedback(
+    answer_question: MagicMock,
+    store_rag_result: MagicMock,
+    store_feedback: MagicMock,
+) -> None:
+    answer_question.return_value = _result()
+
+    invocation = CliRunner().invoke(
+        main,
+        ['chat'],
+        input='What?\npositive\n/exit\n',
+    )
+
+    assert invocation.exit_code == 0
+    assert 'Guide: The coast is beautiful.' in invocation.output
+    store_rag_result.assert_called_once_with(
+        answer_question.return_value.request_id,
+        answer_question.return_value.to_dict(),
+    )
+    store_feedback.assert_called_once_with(
+        answer_question.return_value.request_id, True
+    )
+
+
+@patch('ai_tour_guide.agent.cli.store_feedback')
+@patch('ai_tour_guide.agent.cli.store_rag_result')
+@patch('ai_tour_guide.agent.cli.answer_question')
+def test_chat_command_can_skip_feedback(
+    answer_question: MagicMock,
+    store_rag_result: MagicMock,
+    store_feedback: MagicMock,
+) -> None:
+    answer_question.return_value = _result()
+
+    invocation = CliRunner().invoke(
+        main,
+        ['chat'],
+        input='What?\nskip\n/exit\n',
+    )
+
+    assert invocation.exit_code == 0
+    store_rag_result.assert_called_once()
+    store_feedback.assert_not_called()
+
+
+@patch('ai_tour_guide.agent.cli.store_rag_result')
 @patch('ai_tour_guide.agent.cli.answer_question')
 def test_ask_command_deduplicates_source_references(
-    answer_question: MagicMock,
+    answer_question: MagicMock, store_rag_result: MagicMock
 ) -> None:
     """Verify that the ask command does not display duplicate references to the same source pages."""
     answer_question.return_value = RAGResult(
@@ -106,9 +194,10 @@ def test_ask_command_deduplicates_source_references(
     assert sources[0]['pages'] == [4, 12]
 
 
+@patch('ai_tour_guide.agent.cli.store_rag_result')
 @patch('ai_tour_guide.agent.cli.answer_question')
 def test_ask_command_orders_pages(
-    answer_question: MagicMock,
+    answer_question: MagicMock, store_rag_result: MagicMock
 ) -> None:
     """Verify that source page references are displayed in ascending page order."""
     answer_question.return_value = RAGResult(
@@ -130,8 +219,11 @@ def test_ask_command_orders_pages(
     assert json.loads(invocation.output)['sources'][0]['pages'] == [4, 12]
 
 
+@patch('ai_tour_guide.agent.cli.store_rag_result')
 @patch('ai_tour_guide.agent.cli.answer_question')
-def test_ask_command_prints_normalized_sources(answer_question: MagicMock) -> None:
+def test_ask_command_prints_normalized_sources(
+    answer_question: MagicMock, store_rag_result: MagicMock
+) -> None:
     answer_question.return_value = _result()
 
     invocation = CliRunner().invoke(main, ['ask', 'What?'])
@@ -149,8 +241,11 @@ def test_ask_command_prints_normalized_sources(answer_question: MagicMock) -> No
     }
 
 
+@patch('ai_tour_guide.agent.cli.store_rag_result')
 @patch('ai_tour_guide.agent.cli.answer_question')
-def test_ask_command_verbose_prints_full_rag_result(answer_question: MagicMock) -> None:
+def test_ask_command_verbose_prints_full_rag_result(
+    answer_question: MagicMock, store_rag_result: MagicMock
+) -> None:
     answer_question.return_value = _result()
     result = CliRunner().invoke(main, ['ask', 'What?', '--verbose'])
     assert result.exit_code == 0

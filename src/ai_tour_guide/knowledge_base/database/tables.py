@@ -21,7 +21,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 
@@ -227,6 +227,86 @@ document_chunks = Table(
     ),
 )
 
+rag_results = Table(
+    'rag_results',
+    metadata,
+    Column('question', Text, nullable=False),
+    Column('success', Boolean, nullable=False),
+    Column('answer', Text, nullable=False),
+    Column('error_stage', Text),
+    Column('error_type', Text),
+    Column('error_message', Text),
+    Column('search_mode', Text, nullable=False),
+    Column('retrieval_k', Integer, nullable=False),
+    Column('search_result_count', Integer, nullable=False),
+    Column('retrieved_context_count', Integer, nullable=False),
+    Column('source_count', Integer, nullable=False),
+    Column('citation_count', Integer, nullable=False),
+    Column('invalid_citation_count', Integer, nullable=False),
+    Column('retrieval_latency_ms', Integer),
+    Column('llm_provider', Text),
+    Column('llm_model', Text),
+    Column('input_tokens', BigInteger),
+    Column('output_tokens', BigInteger),
+    Column('total_tokens', BigInteger),
+    Column('generation_latency_ms', Integer),
+    Column('total_latency_ms', Integer),
+    Column('request_id', UUID(as_uuid=True), primary_key=True),
+    Column('rag_result_schema_version', Integer, nullable=False),
+    Column('rag_trace', JSONB, nullable=False),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint('retrieval_k > 0', name='ck_rag_results_retrieval_k_positive'),
+    CheckConstraint(
+        "search_mode IN ('vector', 'text', 'hybrid')",
+        name='ck_rag_results_search_mode',
+    ),
+    CheckConstraint(
+        'retrieved_context_count >= 0 AND search_result_count >= 0 '
+        'AND source_count >= 0 AND citation_count >= 0 '
+        'AND invalid_citation_count >= 0',
+        name='ck_rag_results_counts_non_negative',
+    ),
+    CheckConstraint(
+        'input_tokens IS NULL OR input_tokens >= 0',
+        name='ck_rag_results_input_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'output_tokens IS NULL OR output_tokens >= 0',
+        name='ck_rag_results_output_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'total_tokens IS NULL OR total_tokens >= 0',
+        name='ck_rag_results_total_tokens_non_negative',
+    ),
+)
+
+rag_ratings = Table(
+    'rag_ratings',
+    metadata,
+    Column('feedback_id', BigInteger, Identity(), primary_key=True),
+    Column(
+        'request_id',
+        UUID(as_uuid=True),
+        ForeignKey('rag_results.request_id', ondelete='CASCADE'),
+        nullable=False,
+    ),
+    Column('helpful', Boolean, nullable=False),
+    Column('comment', Text),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint(
+        "comment IS NULL OR btrim(comment) <> ''",
+        name='ck_rag_feedback_comment_not_empty',
+    ),
+    CheckConstraint(
+        'comment IS NULL OR helpful IS NOT NULL',
+        name='ck_rag_feedback_comment_requires_rating',
+    ),
+)
+
 Index('ix_documents_embedding_model_id', documents.c.embedding_model_id)
 Index('ix_documents_source_checksum', documents.c.source_checksum)
 Index(
@@ -258,5 +338,8 @@ Index(
     postgresql_using='hnsw',
     postgresql_ops={'embedding': 'vector_ip_ops'},
 )
+Index('ix_rag_results_search_mode', rag_results.c.search_mode)
+Index('ix_rag_results_success', rag_results.c.success)
+Index('ix_rag_ratings_request_id', rag_ratings.c.request_id)
 
 __all__ = ['document_chunks', 'documents', 'embedding_models', 'metadata']

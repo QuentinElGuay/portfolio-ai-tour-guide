@@ -6,6 +6,7 @@ from datetime import date, datetime
 from enum import Enum, StrEnum
 from types import MappingProxyType
 from typing import Any
+from uuid import UUID, uuid4
 
 from ai_tour_guide.agent.chat.models import Message
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
@@ -193,9 +194,10 @@ class RAGResult:
     invalid_citations: tuple[InvalidCitation, ...] = ()
     citation_section_paths: tuple[tuple[tuple[str, ...], ...], ...] = ()
     error: RAGError | None = None
-    retrieval_latency_ms: float | None = None
-    generation_latency_ms: float | None = None
-    total_latency_ms: float | None = None
+    retrieval_latency_ms: int | None = None
+    generation_latency_ms: int | None = None
+    total_latency_ms: int | None = None
+    request_id: UUID = field(default_factory=uuid4)
     retrieval_metadata: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -221,6 +223,14 @@ class RAGResult:
             self, 'retrieval_metadata', _freeze_mapping(self.retrieval_metadata)
         )
         object.__setattr__(self, 'llm_metadata', _freeze_mapping(self.llm_metadata))
+        for field_name in (
+            'retrieval_latency_ms',
+            'generation_latency_ms',
+            'total_latency_ms',
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, round(value))
 
     @property
     def answer(self) -> str:
@@ -229,6 +239,7 @@ class RAGResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             'schema_version': RAG_RESULT_SCHEMA_VERSION,
+            'request_id': str(self.request_id),
             'question': self.question,
             'mode': self.mode.value,
             'k': self.k,

@@ -12,6 +12,24 @@ x-app-environment: &app-environment
   EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:-true}"
 
 services:
+  ai-tour-guide-base:
+    image: ai-tour-guide-base:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/base.Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+
+    profiles:
+      - tools
+      - ingestion
+      - agent
+      - app
+
+    scale: 0
+
   database:
     image: pgvector/pgvector:pg17
 
@@ -49,8 +67,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - tools
@@ -61,8 +79,6 @@ services:
 
     command:
       [
-        "uv",
-        "run",
         "python",
         "-m",
         "ai_tour_guide.knowledge_base.database.init",
@@ -84,8 +100,8 @@ services:
     build:
       context: .
       dockerfile: docker/ingestion.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - ingestion
@@ -112,8 +128,8 @@ services:
     build:
       context: .
       dockerfile: docker/agent.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
       - agent
@@ -121,8 +137,9 @@ services:
 
     environment:
       <<: *app-environment
-      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
-      AGENT_OPENAI_MODEL: "${AGENT_OPENAI_MODEL:-gpt-4.1-mini}"
+      AGENT_LLM_PROVIDER: "${AGENT_LLM_PROVIDER:-openai}"
+      AGENT_LLM_API_KEY: "${AGENT_LLM_API_KEY:-}"
+      AGENT_LLM_MODEL: "${AGENT_LLM_MODEL:-gpt-4.1-mini}"
 
     ports:
       - "${AGENT_PORT:-8000}:8000"
@@ -151,13 +168,7 @@ services:
 
   chat:
     image: ai-tour-guide-agent:local
-    pull_policy: build
-
-    build:
-      context: .
-      dockerfile: docker/agent.Dockerfile
-      args:
-        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+    pull_policy: never
 
     profiles:
       - app
