@@ -19,7 +19,7 @@ ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: help init-db reset-db reset-schema init-dashboard ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -27,6 +27,7 @@ help: ## Show the available commands.
 	@echo "  make reset-db                        Delete and recreate the database"
 	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
 	@echo "  make reset-schema SCHEMA=evaluation  Delete and recreate one schema"
+	@echo "  make init-dashboard                  Start and initialize Metabase"
 	@echo "  make ingest                          Ingest source_files.json"
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
@@ -57,7 +58,7 @@ init-db: validate-db-schema ## Start PostgreSQL and initialize its schema.
 
 reset-db: validate-db-schema ## Delete the PostgreSQL volume and initialize a fresh database.
 	@echo "Deleting the PostgreSQL volume and all stored application data..."
-	$(COMPOSE) down --volumes
+	$(COMPOSE) --profile dashboard down --volumes --remove-orphans
 	$(COMPOSE) --profile tools run --rm init-db \
 		python -m ai_tour_guide.knowledge_base.database.init \
 		--schema "$(SCHEMA)"
@@ -71,6 +72,9 @@ reset-schema: validate-db-schema ## Delete and recreate only the selected schema
 		--dbname "$$POSTGRES_DB" \
 		--command 'DROP SCHEMA "$(SCHEMA)" CASCADE'
 	$(MAKE) init-db SCHEMA="$(SCHEMA)"
+
+init-dashboard: ## Start Metabase and initialize its first admin user.
+	$(COMPOSE) --profile dashboard run --rm dashboard-init
 
 ingest: ## Ingest the documents described by SOURCE_FILES.
 	@test -f "$(SOURCE_FILES)" || (echo "Input file not found: $(SOURCE_FILES)" >&2; exit 1)

@@ -152,6 +152,17 @@ make ingest
 make app
 ```
 
+To initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
+`METABASE_ADMIN_PASSWORD` in `.env`, then run:
+
+```bash
+make init-dashboard
+```
+
+This starts Metabase, creates the initial admin user if necessary, and registers the
+project PostgreSQL database as a Metabase data source. The command is safe to rerun.
+Metabase is available at `http://localhost:3000`.
+
 Open `http://localhost:7860` to use the chat. The agent API is available at
 `http://localhost:8000`; its interactive API documentation is at
 `http://localhost:8000/docs`.
@@ -185,6 +196,7 @@ Run `make help` for every available shortcut.
 | `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
 | `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
 | `make cli-chat`                      | Start the interactive terminal chat.                 |
+| `make init-dashboard`                | Start and initialize the Metabase dashboard.         |
 | `make app`                           | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
