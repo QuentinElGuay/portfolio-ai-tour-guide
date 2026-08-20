@@ -65,13 +65,13 @@ reset-db: validate-db-schema ## Delete the PostgreSQL volume and initialize a fr
 		--schema "$(SCHEMA)"
 
 reset-schema: validate-db-schema ## Delete and recreate only the selected schema.
-	@test "$(origin SCHEMA)" = command line || \
+	@test "$(origin SCHEMA)" = "command line" || \
 		(echo "SCHEMA must be provided explicitly, for example: make reset-schema SCHEMA=evaluation" >&2; exit 1)
 	$(COMPOSE) up -d --wait database
-	$(COMPOSE) exec -T database psql \
-		--username "$$POSTGRES_USER" \
+	$(COMPOSE) exec -T database sh -c \
+		'psql --username "$$POSTGRES_USER" \
 		--dbname "$$POSTGRES_DB" \
-		--command 'DROP SCHEMA "$(SCHEMA)" CASCADE'
+		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
 	$(MAKE) init-db SCHEMA="$(SCHEMA)"
 
 init-dashboard: ## Start Metabase and initialize its first admin user.

@@ -2,8 +2,8 @@
 
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from ai_tour_guide.knowledge_base.database.feedback import _rag_result_values
-from ai_tour_guide.knowledge_base.database.tables import (
+from ai_tour_guide.agent.rag.persistence import _rag_result_values
+from ai_tour_guide.knowledge_base.database.tables.public import (
     metadata,
     rag_ratings,
     rag_results,
