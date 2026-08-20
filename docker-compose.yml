@@ -193,6 +193,113 @@ services:
     networks:
       - ai-tour-guide
 
+  dashboard:
+    image: metabase/metabase:latest
+
+    profiles:
+      - dashboard
+
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: "${METABASE_DB_NAME:-metabase}"
+      MB_DB_PORT: "5432"
+      MB_DB_USER: "${DB_USER:?DB_USER is required}"
+      MB_DB_PASS: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      MB_DB_HOST: database
+
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+
+    depends_on:
+      metabase-database:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+    restart: unless-stopped
+
+    networks:
+      - ai-tour-guide
+
+  metabase-database:
+    image: postgres:17-alpine
+
+    profiles:
+      - dashboard
+
+    environment:
+      PGHOST: database
+      PGPORT: "5432"
+      PGDATABASE: "${DB_NAME:?DB_NAME is required}"
+      PGUSER: "${DB_USER:?DB_USER is required}"
+      PGPASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      METABASE_DB_NAME: "${METABASE_DB_NAME:-metabase}"
+
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        case "$${METABASE_DB_NAME}" in
+          ''|*[!a-z0-9_]*|[0-9]*)
+            echo "METABASE_DB_NAME must be a lowercase PostgreSQL identifier" >&2
+            exit 1
+            ;;
+        esac
+        if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$${METABASE_DB_NAME}'" | grep -q 1; then
+          createdb "$${METABASE_DB_NAME}"
+        fi
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    restart: "no"
+
+    networks:
+      - ai-tour-guide
+
+  dashboard-init:
+    image: alpine:3.22
+
+    profiles:
+      - dashboard
+
+    environment:
+      METABASE_URL: http://dashboard:3000
+      METABASE_ADMIN_EMAIL: "${METABASE_ADMIN_EMAIL:?METABASE_ADMIN_EMAIL is required}"
+      METABASE_ADMIN_PASSWORD: "${METABASE_ADMIN_PASSWORD:?METABASE_ADMIN_PASSWORD is required}"
+      METABASE_DATABASE_NAME: "${METABASE_DATABASE_NAME:-AI Tour Guide}"
+      METABASE_DATABASE_HOST: database
+      METABASE_HEALTH_TIMEOUT_SECONDS: "${METABASE_HEALTH_TIMEOUT_SECONDS:-300}"
+      METABASE_DB_NAME: "${METABASE_DB_NAME:-metabase}"
+      DB_NAME: "${DB_NAME:?DB_NAME is required}"
+      DB_USER: "${DB_USER:?DB_USER is required}"
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      DB_PORT: "5432"
+
+    volumes:
+      - ./scripts/bootstrap_metabase.sh:/scripts/bootstrap_metabase.sh:ro
+
+    command:
+      - /bin/sh
+      - -c
+      - apk add --no-cache bash curl jq >/dev/null && /bin/bash /scripts/bootstrap_metabase.sh
+
+    depends_on:
+      dashboard:
+        condition: service_started
+
+    restart: "no"
+
+    networks:
+      - ai-tour-guide
+
 volumes:
   postgres_data:
 

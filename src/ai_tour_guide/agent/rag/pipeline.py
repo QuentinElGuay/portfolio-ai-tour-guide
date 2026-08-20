@@ -38,6 +38,11 @@ def _error(stage: str, exc: Exception) -> RAGError:
     return RAGError(stage=stage, type=type(exc).__name__, message=str(exc))
 
 
+def _elapsed_ms(started: float) -> int:
+    """Return elapsed time in milliseconds using the RAG result's integer type."""
+    return round((perf_counter() - started) * 1000)
+
+
 async def answer_question_async(
     question: str,
     *,
@@ -64,7 +69,7 @@ async def answer_question_async(
             strategy=strategy,
         )
     except (OSError, SQLAlchemyError) as exc:
-        retrieval_latency = (perf_counter() - retrieval_started) * 1000
+        retrieval_latency = _elapsed_ms(retrieval_started)
 
         return RAGResult(
             question=question,
@@ -75,10 +80,10 @@ async def answer_question_async(
             generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
             error=_error('retrieval', exc),
             retrieval_latency_ms=retrieval_latency,
-            total_latency_ms=(perf_counter() - started) * 1000,
+            total_latency_ms=_elapsed_ms(started),
         )
 
-    retrieval_latency = (perf_counter() - retrieval_started) * 1000
+    retrieval_latency = _elapsed_ms(retrieval_started)
 
     if not contexts:
         return RAGResult(
@@ -90,7 +95,7 @@ async def answer_question_async(
             generated=GeneratedAnswer(INSUFFICIENT_CONTEXT_ANSWER),
             contexts=(),
             retrieval_latency_ms=retrieval_latency,
-            total_latency_ms=(perf_counter() - started) * 1000,
+            total_latency_ms=_elapsed_ms(started),
         )
 
     messages = build_messages(question, contexts)
@@ -100,7 +105,7 @@ async def answer_question_async(
     try:
         generated = await llm_client.answer_question(messages)
     except GenerationError as exc:
-        generation_latency = (perf_counter() - generation_started) * 1000
+        generation_latency = _elapsed_ms(generation_started)
 
         return RAGResult(
             question=question,
@@ -113,10 +118,10 @@ async def answer_question_async(
             error=_error('generation', exc),
             retrieval_latency_ms=retrieval_latency,
             generation_latency_ms=generation_latency,
-            total_latency_ms=(perf_counter() - started) * 1000,
+            total_latency_ms=_elapsed_ms(started),
         )
 
-    generation_latency = (perf_counter() - generation_started) * 1000
+    generation_latency = _elapsed_ms(generation_started)
 
     validation = validate_citations(
         generated.citations,
@@ -142,7 +147,7 @@ async def answer_question_async(
         citation_section_paths=validation.matched_section_paths,
         retrieval_latency_ms=retrieval_latency,
         generation_latency_ms=generation_latency,
-        total_latency_ms=(perf_counter() - started) * 1000,
+        total_latency_ms=_elapsed_ms(started),
         retrieval_metadata={
             'mode': selected_mode.value,
         },
