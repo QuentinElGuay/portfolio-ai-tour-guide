@@ -10,12 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
-from ai_tour_guide.agent.rag.pipeline import answer_question
-from ai_tour_guide.knowledge_base.database.connection import create_database_engine
-from ai_tour_guide.knowledge_base.database.feedback import (
+from ai_tour_guide.agent.rag.persistence import (
     store_feedback,
     store_rag_result,
 )
+from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 ASK_RESPONSE_SCHEMA_VERSION = 1

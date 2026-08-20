@@ -6,7 +6,8 @@ from sqlalchemy.schema import CreateSchema
 
 from .connection import database_engine
 from .settings import DatabaseSettings
-from .tables import metadata
+from .tables.evaluation import metadata as evaluation_metadata
+from .tables.public import metadata as public_metadata
 
 SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation')
 
@@ -32,10 +33,12 @@ def initialize_database(
         schema_connection = connection.execution_options(
             schema_translate_map={None: schema_name}
         )
-        metadata.create_all(bind=schema_connection, checkfirst=True)
-        for table in metadata.tables.values():
+        public_metadata.create_all(bind=schema_connection, checkfirst=True)
+        for table in public_metadata.tables.values():
             for index in table.indexes:
                 index.create(bind=schema_connection, checkfirst=True)
+        if schema_name == 'evaluation':
+            evaluation_metadata.create_all(bind=schema_connection, checkfirst=True)
 
 
 def main() -> None:

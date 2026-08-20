@@ -6,12 +6,12 @@ import click
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.api import ASK_RESPONSE_SCHEMA_VERSION
-from ai_tour_guide.agent.rag.pipeline import answer_question
-from ai_tour_guide.agent.source_formatting import format_page_range
-from ai_tour_guide.knowledge_base.database.feedback import (
+from ai_tour_guide.agent.rag.persistence import (
     store_feedback,
     store_rag_result,
 )
+from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.source_formatting import format_page_range
 from ai_tour_guide.knowledge_base.retrieval import retrieve_context
 from ai_tour_guide.knowledge_base.search import (
     DEFAULT_SEARCH_MODE,

@@ -7,8 +7,11 @@ from uuid import UUID
 from sqlalchemy import insert, select
 from sqlalchemy.engine import Engine
 
-from .connection import database_engine
-from .tables import rag_ratings, rag_results
+from ai_tour_guide.knowledge_base.database.connection import database_engine
+from ai_tour_guide.knowledge_base.database.tables.public import (
+    rag_ratings,
+    rag_results,
+)
 
 
 def _mapping(value: object) -> Mapping[str, Any]:
