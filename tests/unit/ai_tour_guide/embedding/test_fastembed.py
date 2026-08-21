@@ -7,6 +7,7 @@ from ai_tour_guide.embedding.fastembed import FastEmbedder
 
 
 def test_fastembedder_passes_the_configured_cache_directory() -> None:
+    """Verify that fastembedder passes the configured cache directory."""
     text_embedding = MagicMock()
 
     with patch.dict(
@@ -25,6 +26,7 @@ def test_fastembedder_passes_the_configured_cache_directory() -> None:
 
 
 def test_fastembedder_uses_fastembed_default_cache_without_configuration() -> None:
+    """Verify that fastembedder uses fastembed default cache without configuration."""
     text_embedding = MagicMock()
 
     with patch.dict(

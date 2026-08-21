@@ -1,17 +1,34 @@
-"""Skeleton tests for scoped corpus lifecycle."""
+"""Tests for scoped corpus lifecycle management."""
+
+from pathlib import Path
+from unittest.mock import patch
+
+from ai_tour_guide.knowledge_base.corpus.context import corpus_context
 
 
-def test_corpus_context_loads_before_yield_and_clears_after() -> None:
-    """Enter/exit ``corpus_context(root=..., schema_name=...)``.
+@patch('ai_tour_guide.knowledge_base.corpus.context.clear_knowledge_base')
+@patch('ai_tour_guide.knowledge_base.corpus.context.load_corpus')
+def test_corpus_context_loads_before_yield_and_clears_after(
+    load_corpus, clear_knowledge_base
+) -> None:
+    """Verify that a scoped corpus is loaded before work and cleared afterward."""
+    root = Path('fixture-corpus')
 
-    Required mocks: ``load_corpus`` and ``clear_knowledge_base`` plus an observable action inside the context.
-    Expected verification: load occurs before body execution and clear occurs afterward when clear_after=True.
-    """
+    with corpus_context(root=root, schema_name='evaluation'):
+        load_corpus.assert_called_once_with(root=root, schema_name='evaluation')
+        clear_knowledge_base.assert_not_called()
+
+    clear_knowledge_base.assert_called_once_with(schema_name='evaluation')
 
 
-def test_corpus_context_can_preserve_loaded_rows() -> None:
-    """Use ``corpus_context(..., clear_after=False)``.
+@patch('ai_tour_guide.knowledge_base.corpus.context.clear_knowledge_base')
+@patch('ai_tour_guide.knowledge_base.corpus.context.load_corpus')
+def test_corpus_context_can_preserve_loaded_rows(
+    load_corpus, clear_knowledge_base
+) -> None:
+    """Verify that callers can retain loaded corpus rows after a scoped operation."""
+    with corpus_context(clear_after=False):
+        pass
 
-    Required mocks: load and clear helpers. Expected verification: corpus is loaded but clear helper is not
-    invoked when leaving the context.
-    """
+    load_corpus.assert_called_once()
+    clear_knowledge_base.assert_not_called()

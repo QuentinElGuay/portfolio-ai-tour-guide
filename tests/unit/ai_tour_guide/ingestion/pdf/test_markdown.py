@@ -68,6 +68,7 @@ def _parsed_pdf() -> ParsedPdf:
 
 
 def test_render_markdown_uses_paragraph_text() -> None:
+    """Verify that render markdown uses paragraph text."""
     markdown = render_markdown(_parsed_pdf())
 
     assert markdown == (
@@ -79,6 +80,7 @@ def test_render_markdown_uses_paragraph_text() -> None:
 
 
 def test_write_markdown_creates_parent_directories(tmp_path: Path) -> None:
+    """Verify that write markdown creates parent directories."""
     destination = write_markdown(
         _parsed_pdf(),
         tmp_path / 'nested' / 'guide.md',
@@ -89,6 +91,7 @@ def test_write_markdown_creates_parent_directories(tmp_path: Path) -> None:
 
 
 def test_render_markdown_handles_untitled_content() -> None:
+    """Verify that render markdown handles untitled content."""
     parsed = ParsedPdf(
         metadata=_metadata(source_page_count=1, page_count=1),
         sections=(

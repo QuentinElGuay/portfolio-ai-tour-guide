@@ -22,6 +22,7 @@ from ai_tour_guide.knowledge_base.search import SearchMode
 
 @patch('ai_tour_guide.agent.api._ensure_knowledge_base_ready')
 def test_health_reports_ok(_ensure_knowledge_base_ready: MagicMock) -> None:
+    """Verify that health reports ok."""
     _ensure_knowledge_base_ready.return_value = None
     assert health() == {'status': 'ok'}
 
@@ -31,6 +32,7 @@ def test_health_logs_how_to_populate_an_empty_knowledge_base(
     create_database_engine: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Verify that health logs how to populate an empty knowledge base."""
     engine = create_database_engine.return_value
     engine.connect.return_value.__enter__.return_value.scalar.return_value = None
 
@@ -51,6 +53,7 @@ def test_health_logs_when_postgresql_is_unavailable(
     create_database_engine: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Verify that health logs when postgresql is unavailable."""
     engine = create_database_engine.return_value
     engine.connect.side_effect = SQLAlchemyError('connection refused')
 
@@ -122,6 +125,7 @@ def test_ask_rejects_an_empty_question() -> None:
 
 @patch('ai_tour_guide.agent.api.store_feedback', return_value=True)
 def test_feedback_stores_a_rating(store_feedback: MagicMock) -> None:
+    """Verify that feedback stores a rating."""
     request_id = UUID('12345678-1234-5678-1234-567812345678')
 
     response = feedback(
@@ -138,6 +142,7 @@ def test_feedback_stores_a_rating(store_feedback: MagicMock) -> None:
 
 @patch('ai_tour_guide.agent.api.store_feedback', return_value=False)
 def test_feedback_rejects_unknown_rag_result(store_feedback: MagicMock) -> None:
+    """Verify that feedback rejects unknown rag result."""
     with pytest.raises(HTTPException, match='Unknown RAG result') as exc_info:
         feedback(
             FeedbackRequest(

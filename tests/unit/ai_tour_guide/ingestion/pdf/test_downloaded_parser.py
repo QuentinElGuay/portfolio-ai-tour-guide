@@ -10,6 +10,7 @@ from ai_tour_guide.ingestion.pdf.parser import (
 
 
 def test_parse_downloaded_pdf_uses_the_existing_file(tmp_path: Path) -> None:
+    """Verify that parse downloaded pdf uses the existing file."""
     pdf_path = tmp_path / 'guide.pdf'
     with pymupdf.open() as pdf:
         page = pdf.new_page()
@@ -31,6 +32,7 @@ def test_parse_downloaded_pdf_uses_the_existing_file(tmp_path: Path) -> None:
 
 
 def test_parse_pdf_bytes_uses_no_intermediary_file(tmp_path: Path) -> None:
+    """Verify that parse pdf bytes uses no intermediary file."""
     pdf_path = tmp_path / 'source.pdf'
     with pymupdf.open() as pdf:
         page = pdf.new_page()

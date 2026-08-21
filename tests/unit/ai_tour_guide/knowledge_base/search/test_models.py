@@ -39,6 +39,7 @@ def _chunk(document: DocumentRow) -> DocumentChunkRow:
 
 
 def test_search_mode_lists_vector_text_and_hybrid() -> None:
+    """Verify that search mode lists vector text and hybrid."""
     assert tuple(SearchMode) == (
         SearchMode.VECTOR,
         SearchMode.TEXT,
@@ -62,11 +63,13 @@ def test_hybrid_settings_reject_invalid_values(
     kwargs: dict[str, Any],
     message: str,
 ) -> None:
+    """Verify that hybrid settings reject invalid values."""
     with pytest.raises(ValueError, match=message):
         HybridSearchSettings(**kwargs)
 
 
 def test_search_result_keeps_chunk_and_search_metadata_and_exposes_document() -> None:
+    """Verify that search result keeps chunk and search metadata and exposes document."""
     document = _document()
     chunk = _chunk(document)
     metadata = SearchMetadata(

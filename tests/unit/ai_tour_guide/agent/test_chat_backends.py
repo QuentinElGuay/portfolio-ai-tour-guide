@@ -7,17 +7,20 @@ from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 
 def test_demo_backend_returns_structured_fallback() -> None:
+    """Verify that demo backend returns structured fallback."""
     result = asyncio.run(DemoBackend().ask([]))
     assert result['answer'] == NO_BACKEND_AVAILABLE_ANSWER
     assert result['sources'] == []
 
 
 def test_demo_backend_feedback_is_a_noop() -> None:
+    """Verify that demo backend feedback is a noop."""
     asyncio.run(DemoBackend().submit_feedback('TODO: request_id:1', True))
 
 
 @patch('ai_tour_guide.agent.chat.backends.httpx.AsyncClient')
 def test_http_backend_returns_validated_api_payload(async_client: MagicMock) -> None:
+    """Verify that http backend returns validated api payload."""
     response = MagicMock()
     response.json.return_value = {
         'schema_version': 1,
@@ -36,6 +39,7 @@ def test_http_backend_returns_validated_api_payload(async_client: MagicMock) -> 
 
 @patch('ai_tour_guide.agent.chat.backends.httpx.AsyncClient')
 def test_http_backend_submits_feedback(async_client: MagicMock) -> None:
+    """Verify that http backend submits feedback."""
     response = MagicMock()
     client = AsyncMock()
     client.post.return_value = response
