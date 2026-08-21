@@ -48,7 +48,8 @@ class IngestionDocument:
     """
 
     title: str
-    source_url: str
+    source_url: str = ''
+    source_path: Path | None = None
     collection: str | None = None
     excluded_leading_pages: int = 3
     excluded_trailing_pages: int = 2
@@ -66,9 +67,25 @@ class IngestionDocument:
 
         normalize_filename_stem(self.title)
 
-        parsed_url = urlparse(self.source_url)
-        if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
-            raise ValueError('source_url must be a valid HTTP or HTTPS URL')
+        if not self.source_url and self.source_path is None:
+            raise ValueError('source_url or source_path must be provided')
+
+        if not isinstance(self.source_url, str):
+            raise TypeError('source_url must be a string')
+        source_url = self.source_url.strip()
+        if source_url:
+            parsed_url = urlparse(source_url)
+            if parsed_url.scheme not in {'http', 'https'} or not parsed_url.netloc:
+                raise ValueError('source_url must be a valid HTTP or HTTPS URL')
+            object.__setattr__(self, 'source_url', source_url)
+
+        if self.source_path is not None:
+            if not isinstance(self.source_path, Path):
+                raise TypeError('source_path must be a pathlib.Path or None')
+            source_path = self.source_path.expanduser().resolve()
+            object.__setattr__(self, 'source_path', source_path)
+            if not source_url:
+                object.__setattr__(self, 'source_url', source_path.as_uri())
 
         if self.collection is not None:
             if not isinstance(self.collection, str):
@@ -104,6 +121,12 @@ class IngestionDocument:
             raise ValueError('Unknown document field(s): ' + ', '.join(unknown_fields))
 
         normalized = dict(values)
+
+        source_path = normalized.get('source_path')
+        if source_path is not None:
+            if not isinstance(source_path, str) or not source_path.strip():
+                raise ValueError('source_path must be a non-empty string')
+            normalized['source_path'] = Path(source_path)
 
         publication_date = normalized.get('publication_date')
         if publication_date is not None:
@@ -334,9 +357,11 @@ def parse_pdf(
     """
     _validate_ingestion_document(document)
 
+    if document.source_path is not None:
+        return parse_downloaded_pdf(document.source_path, document=document)
+
     destination = _build_pdf_destination(
-        document,
-        download_directory=download_directory,
+        document, download_directory=download_directory
     )
     downloaded_path = download_pdf(
         document.source_url,

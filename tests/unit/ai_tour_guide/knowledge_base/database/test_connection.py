@@ -1,18 +1,37 @@
-"""Skeleton tests for SQLAlchemy engine creation."""
+"""Tests for SQLAlchemy engine creation and schema selection."""
+
+from unittest.mock import MagicMock, patch
+
+from ai_tour_guide.knowledge_base.database.connection import database_engine
 
 
-def test_create_database_engine_builds_expected_postgres_url() -> None:
-    """Call ``create_database_engine(settings)`` with an explicit ``DatabaseSettings`` fixture.
+@patch('ai_tour_guide.knowledge_base.database.connection.create_database_engine')
+@patch('ai_tour_guide.knowledge_base.database.connection.DatabaseSettings')
+def test_database_engine_uses_environment_selected_schema_by_default(
+    database_settings: MagicMock,
+    create_database_engine: MagicMock,
+) -> None:
+    settings = database_settings.return_value
+    engine = create_database_engine.return_value
 
-    Required mocks: patch ``database.connection.create_engine`` so no real connection is created.
-    Expected verification: URL uses psycopg, configured credentials/host/port/database, pool_pre_ping,
-    and a search_path option containing the selected schema followed by public.
-    """
+    with database_engine() as selected_engine:
+        assert selected_engine is engine
+
+    database_settings.assert_called_once_with()
+    create_database_engine.assert_called_once_with(settings)
+    engine.dispose.assert_called_once_with()
 
 
-def test_create_database_engine_uses_default_settings_when_omitted() -> None:
-    """Call ``create_database_engine()`` without arguments.
+@patch('ai_tour_guide.knowledge_base.database.connection.create_database_engine')
+@patch('ai_tour_guide.knowledge_base.database.connection.DatabaseSettings')
+def test_database_engine_uses_an_explicit_schema_override(
+    database_settings: MagicMock,
+    create_database_engine: MagicMock,
+) -> None:
+    settings = database_settings.return_value
 
-    Required mocks: patch ``DatabaseSettings`` and ``create_engine`` in ``database.connection``.
-    Expected verification: the settings object is instantiated once and its values drive engine creation.
-    """
+    with database_engine(schema_name='smoke'):
+        pass
+
+    database_settings.assert_called_once_with(schema_name='smoke')
+    create_database_engine.assert_called_once_with(settings)

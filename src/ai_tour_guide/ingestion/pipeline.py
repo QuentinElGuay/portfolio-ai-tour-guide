@@ -18,7 +18,10 @@ from ai_tour_guide.ingestion.chunking import chunk_document
 from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.embedding import embed_chunks
 from ai_tour_guide.ingestion.io import write_bytes_atomic
-from ai_tour_guide.ingestion.pdf.downloader import download_pdf_bytes
+from ai_tour_guide.ingestion.pdf.downloader import (
+    download_pdf_bytes,
+    read_pdf_file_bytes,
+)
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument, parse_pdf_bytes
 from ai_tour_guide.ingestion.pdf.serializers import (
     ParsedPdfMarkdownSerializer,
@@ -39,10 +42,14 @@ def download_pdf_stage(
     client: httpx.Client | None = None,
 ) -> DownloadedPdf:
     """Download one PDF and return its content and stable checksum."""
-    content = download_pdf_bytes(
-        document.source_url,
-        timeout_seconds=timeout_seconds,
-        client=client,
+    content = (
+        read_pdf_file_bytes(document.source_path)
+        if document.source_path is not None
+        else download_pdf_bytes(
+            document.source_url,
+            timeout_seconds=timeout_seconds,
+            client=client,
+        )
     )
     return DownloadedPdf(
         document=document,

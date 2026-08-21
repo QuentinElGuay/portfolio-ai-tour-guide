@@ -33,6 +33,20 @@ def test_collection_is_optional_in_the_documents_input() -> None:
     assert documents[0].collection is None
 
 
+def test_local_source_path_is_loaded_and_becomes_a_file_source_url(tmp_path) -> None:
+    source_path = tmp_path / 'brittany.pdf'
+    documents = load_documents(
+        StringIO(
+            json.dumps(
+                {'title': 'A guide to Brittany', 'source_path': str(source_path)}
+            )
+        )
+    )
+
+    assert documents[0].source_path == source_path.resolve()
+    assert documents[0].source_url == source_path.resolve().as_uri()
+
+
 @pytest.mark.parametrize('collection', ['', '   ', 123])
 def test_collection_rejects_empty_and_non_string_values(
     collection: str | int,
