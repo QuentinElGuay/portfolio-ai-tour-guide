@@ -1,26 +1,48 @@
-"""Skeleton tests for Core table definitions."""
+"""Tests for Core table definitions."""
+
+from ai_tour_guide.knowledge_base.database.tables import (
+    document_chunks,
+    documents,
+    embedding_models,
+    metadata,
+)
 
 
 def test_tables_share_one_metadata_registry() -> None:
-    """Inspect ``embedding_models``, ``documents`` and ``document_chunks`` from ``database.tables``.
-
-    Required inputs: none beyond importing the module with a deterministic embedding dimension setting.
-    Expected verification: all tables belong to the exported ``metadata`` object.
-    """
+    """Verify that all persistence tables use the exported Core metadata."""
+    assert {
+        embedding_models.metadata,
+        documents.metadata,
+        document_chunks.metadata,
+    } == {metadata}
 
 
 def test_document_chunks_contains_section_and_search_columns() -> None:
-    """Inspect ``document_chunks.c`` without connecting to PostgreSQL.
-
-    Required inputs: imported Core table.
-    Expected verification: section_id, section_chunk_index, section_path, embedding and computed
-    search_vector columns exist with the constraints/indexes required by sibling, vector and text search.
-    """
+    """Verify that chunks retain sibling, provenance, vector, and text-search data."""
+    assert {
+        'section_id',
+        'section_chunk_index',
+        'section_path',
+        'embedding',
+        'embedding_input_sha256',
+        'search_vector',
+    } <= set(document_chunks.c.keys())
+    constraints = {constraint.name for constraint in document_chunks.constraints}
+    assert 'ck_document_chunks_page_range' in constraints
+    assert 'ck_document_chunks_embedding_input_sha256_required' in constraints
 
 
 def test_vector_indexes_cover_all_supported_distance_metrics() -> None:
-    """Inspect indexes declared on ``document_chunks``.
-
-    Required inputs: imported table metadata only.
-    Expected verification: HNSW indexes exist for cosine, L2 and inner-product operator classes.
-    """
+    """Verify that HNSW indexes support cosine, L2, and inner-product queries."""
+    vector_indexes = {
+        index.name: index.dialect_options['postgresql'].get('ops')
+        for index in document_chunks.indexes
+        if index.name and 'embedding_' in index.name
+    }
+    assert vector_indexes == {
+        'ix_document_chunks_embedding_cosine_hnsw': {'embedding': 'vector_cosine_ops'},
+        'ix_document_chunks_embedding_l2_hnsw': {'embedding': 'vector_l2_ops'},
+        'ix_document_chunks_embedding_inner_product_hnsw': {
+            'embedding': 'vector_ip_ops'
+        },
+    }

@@ -7,6 +7,10 @@ from datetime import date
 
 import pytest
 
+# Running ``pytest tests/smoke`` directly must be as isolated as ``make smoke-test``.
+# An explicitly supplied DB_SCHEMA still takes precedence for controlled CI environments.
+os.environ.setdefault('DB_SCHEMA', 'smoke')
+
 from ai_tour_guide.embedding import FastEmbedder
 from ai_tour_guide.embedding.settings import EmbeddingSettings
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
