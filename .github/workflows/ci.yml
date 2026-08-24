@@ -24,6 +24,7 @@ env:
   EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
   EMBEDDING_NORMALIZE: "true"
   AGENT_LLM_API_KEY: test-token
+  AGENT_LLM_MODEL: test-model
 
 jobs:
   quality:
