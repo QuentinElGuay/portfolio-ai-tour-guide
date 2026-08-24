@@ -1,7 +1,7 @@
 """Tests for database settings validation."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from ai_tour_guide.knowledge_base.database.settings import DatabaseSettings
 
@@ -29,5 +29,8 @@ def test_database_settings_rejects_invalid_schema_identifier() -> None:
     """Verify that unsafe schema names are rejected before connection creation."""
     with pytest.raises(ValidationError, match='schema_name'):
         DatabaseSettings(
-            user='guide', password='secret', name='tour-guide', schema_name='bad-name'
+            user='guide',
+            password=SecretStr('secret'),
+            name='tour-guide',
+            schema_name='bad-name',
         )

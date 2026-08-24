@@ -1,0 +1,65 @@
+name: Publish images
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
+
+jobs:
+  publish:
+    name: Build and publish release images
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish images
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image_prefix="ghcr.io/${image_owner}/ai-tour-guide"
+          version="${GITHUB_REF_NAME}"
+          revision="sha-${GITHUB_SHA}"
+
+          docker buildx build --push \
+            --file docker/base.Dockerfile \
+            --build-arg "EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}" \
+            --tag "${image_prefix}-base:${version}" \
+            --tag "${image_prefix}-base:${revision}" \
+            .
+
+          for service in agent ingestion; do
+            docker buildx build --push \
+              --file "docker/${service}.Dockerfile" \
+              --build-context "ai-tour-guide-base=docker-image://${image_prefix}-base:${revision}" \
+              --tag "${image_prefix}-${service}:${version}" \
+              --tag "${image_prefix}-${service}:${revision}" \
+              .
+          done
+
+          docker buildx build --push \
+            --file docker/metabase-database.Dockerfile \
+            --tag "${image_prefix}-metabase-database:${version}" \
+            --tag "${image_prefix}-metabase-database:${revision}" \
+            .

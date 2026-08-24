@@ -234,7 +234,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             ],
             cache_examples=False,
         )
-        chatbot.like(
+        # Gradio exposes this runtime event, but its published type information omits it.
+        chatbot.like(  # pyright: ignore[reportAttributeAccessIssue]
             on_like,
             inputs=[request_ids, chatbot, feedback_values],
             outputs=[chatbot, feedback_values],

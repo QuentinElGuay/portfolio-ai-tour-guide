@@ -1,11 +1,13 @@
 """Tests for concrete retrieval strategy orchestration."""
 
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 
 from ai_tour_guide.embedding import EmbeddingMetadata
+from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow
 from ai_tour_guide.knowledge_base.search.models import ScoreKind, SearchMode
 from ai_tour_guide.knowledge_base.search.queries import ScoredDocumentChunk
 from ai_tour_guide.knowledge_base.search.strategies import (
@@ -19,7 +21,9 @@ from ai_tour_guide.knowledge_base.search.strategies import (
 
 
 def _scored(chunk_id: str, score: float) -> ScoredDocumentChunk:
-    return ScoredDocumentChunk(chunk=SimpleNamespace(chunk_id=chunk_id), score=score)
+    return ScoredDocumentChunk(
+        chunk=cast(DocumentChunkRow, SimpleNamespace(chunk_id=chunk_id)), score=score
+    )
 
 
 @patch('ai_tour_guide.knowledge_base.search.strategies.search_text')

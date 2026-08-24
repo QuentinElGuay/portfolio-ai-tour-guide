@@ -10,6 +10,6 @@ fixtures/corpus/
     └── document_chunks.jsonl
 ```
 
-Create these files with `scripts/export_corpus.py`. They are intentionally not
-populated with example rows because their identifiers, vectors, and metadata must
-come from a real database export.
+Create these files with `scripts/export_corpus.py`. They are intentionally not populated
+with example rows because their identifiers, vectors, and metadata must come from a real
+database export.
