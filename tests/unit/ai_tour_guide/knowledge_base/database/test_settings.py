@@ -1,17 +1,33 @@
-"""Skeleton tests for database settings."""
+"""Tests for database settings validation."""
+
+import pytest
+from pydantic import ValidationError
+
+from ai_tour_guide.knowledge_base.database.settings import DatabaseSettings
 
 
-def test_database_settings_loads_db_environment_variables() -> None:
-    """Call ``DatabaseSettings()`` with ``DB_*`` environment variables supplied via ``monkeypatch``.
+def test_database_settings_loads_db_environment_variables(monkeypatch) -> None:
+    """Verify that database settings read and type-check DB environment values."""
+    monkeypatch.setenv('DB_USER', 'guide')
+    monkeypatch.setenv('DB_PASSWORD', 'secret')
+    monkeypatch.setenv('DB_NAME', 'tour-guide')
+    monkeypatch.setenv('DB_HOST', 'database')
+    monkeypatch.setenv('DB_PORT', '5433')
+    monkeypatch.setenv('DB_SCHEMA', 'evaluation')
 
-    Required inputs: DB_USER, DB_WORD and DB_NAME; optionally host, port and schema.
-    Expected verification: parsed fields match the environment and the word remains a SecretStr.
-    """
+    settings = DatabaseSettings()
+
+    assert settings.user == 'guide'
+    assert settings.password.get_secret_value() == 'secret'
+    assert settings.host == 'database'
+    assert settings.port == 5433
+    assert settings.name == 'tour-guide'
+    assert settings.schema_name == 'evaluation'
 
 
 def test_database_settings_rejects_invalid_schema_identifier() -> None:
-    """Call ``DatabaseSettings`` with a schema containing unsafe/invalid identifier characters.
-
-    Required inputs: otherwise-valid database settings and one invalid schema value.
-    Expected verification: Pydantic validation rejects the schema before any database call occurs.
-    """
+    """Verify that unsafe schema names are rejected before connection creation."""
+    with pytest.raises(ValidationError, match='schema_name'):
+        DatabaseSettings(
+            user='guide', password='secret', name='tour-guide', schema_name='bad-name'
+        )

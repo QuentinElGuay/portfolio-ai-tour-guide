@@ -26,15 +26,16 @@ ______________________________________________________________________
 
 ## ✅ Milestone 1 — Project Foundation
 
-**Delivered:** project documentation, configuration, dependency management, logging, and
-test structure.
+**Delivered:** project documentation, configuration, dependency management, logging, a
+separated runtime/development/test dependency model, and unit-test structure.
 
 ______________________________________________________________________
 
 ## ✅ Milestone 2 — Document Ingestion
 
-**Delivered:** page-aware PDF extraction, structured artifacts, section-aware chunking,
-embeddings, transactional persistence, and independent ingestion commands.
+**Delivered:** page-aware PDF extraction from remote URLs or local files, structured
+artifacts, section-aware chunking, embeddings, transactional persistence, and
+independent ingestion commands.
 
 ______________________________________________________________________
 
@@ -57,7 +58,8 @@ ______________________________________________________________________
 ## ✅ Milestone 4 — RAG Application
 
 **Delivered:** configurable LLM generation, structured and validated citations, clear
-failure handling, HTTP and CLI access, and a Gradio chat interface.
+failure handling, HTTP and CLI access, a Gradio chat interface, and a deterministic
+fixture LLM for end-to-end tests.
 
 ______________________________________________________________________
 
@@ -72,8 +74,9 @@ ______________________________________________________________________
 
 ## ✅ Milestone 5 — Retrieval and RAG Evaluation
 
-**Delivered:** a 105-case golden dataset, retrieval comparison and hybrid selection,
-reproducible search/RAG/judge workflows, and isolated evaluation results and ratings.
+**Delivered:** a 105-case golden dataset, an annotator that can edit and create cases,
+retrieval comparison and hybrid selection, reproducible search/RAG/judge workflows, and
+isolated evaluation results and ratings.
 
 ______________________________________________________________________
 
@@ -108,8 +111,10 @@ ______________________________________________________________________
 
 ### [P1] Summarize RAG quality and operational signals
 
+- [x] Provision Metabase with the public and evaluation schemas as queryable data
+  sources.
 - [ ] Aggregate persisted RAG outcomes, ratings, latency, errors, and model usage into a
-  concise report or view.
+  curated report or view.
 - [ ] Make the main quality and operational signals easy to inspect during a demo.
 
 **Acceptance criteria**
@@ -120,7 +125,7 @@ ______________________________________________________________________
 
 ### [P2] Provide a monitoring view
 
-- [ ] Add a lightweight dashboard for request volume, ratings, latency,
+- [ ] Configure a lightweight Metabase dashboard for request volume, ratings, latency,
   insufficient-context outcomes, errors, and frequently retrieved destinations.
 
 **Acceptance criteria**
@@ -137,15 +142,22 @@ ______________________________________________________________________
 - [x] Provide Dockerfiles, Docker Compose services, persistent database storage, and
   startup health checks.
 - [x] Document setup, configuration, ingestion, usage, and limitations.
-- [ ] Add public screenshots and final evaluation evidence to the project documentation.
+- [x] Provide a deterministic smoke-test command that ingests an original local PDF into
+  an isolated schema and checks health, grounded answers, citations, and refusals
+  through the API.
+- [x] Publish the latest evaluation evidence and reports in the documentation.
+- [ ] Add public application screenshots to the project documentation.
 
 **Acceptance criteria**
 
 - [x] A new user can run the application through Docker Compose.
 - [x] Services start in the required order and data persists across restarts.
+- [x] The complete ingestion and RAG path can be validated without an external LLM.
 
 ### [P1] Add delivery automation and demo material
 
+- [x] Expand unit coverage for LLM output validation, fixture behavior, database engine
+  ownership/schema selection, retrieval strategies, and golden-dataset annotation.
 - [ ] Run the relevant test suite on pull requests.
 - [ ] Record a concise demo showing ingestion, a grounded answer, an unsupported
   question, and sources.
@@ -161,8 +173,8 @@ ______________________________________________________________________
 
 **Status:** ⏳ Planned
 
-The final submission requires the remaining delivery work: CI, final documentation
-evidence, and a concise demo.
+The final submission requires delivery automation, public screenshots, and a concise
+demo. Evaluation evidence and a deterministic smoke test are already available.
 
 ______________________________________________________________________
 
@@ -170,15 +182,19 @@ ______________________________________________________________________
 
 These improvements are useful but are not priorities for the final submission.
 
-### [P1] Ingestion and retrieval hardening
+### [P1] Test, ingestion, and retrieval hardening
 
 - [ ] Add focused chunking tests for boundaries, traceability, reproducibility,
   oversized paragraphs, and hard limits.
-- [ ] Record and verify full parser and chunking provenance for each imported document.
+- [ ] Record and verify full parser-version provenance for each imported document.
+  Source checksums, chunking configuration, embedding metadata, and debug artifacts are
+  already persisted or emitted.
 - [ ] Add PostgreSQL integration coverage for aggregate insertion, rollback, and
-  constraints.
-- [ ] Pin the embedding model artifact and add reproducibility and retrieval smoke
-  coverage.
+  constraints; the current database fixtures are intentionally disabled until they guard
+  an isolated schema.
+- [x] Add deterministic ingestion and retrieval smoke coverage with a fixture LLM and an
+  isolated schema.
+- [ ] Pin the embedding model artifact and verify reproducibility against it.
 - [ ] Add ingestion-run status, duration, counts, and failure details if operational
   monitoring becomes necessary.
 - [ ] Add detailed structured logs and traces only if future debugging needs justify

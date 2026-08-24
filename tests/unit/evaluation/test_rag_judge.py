@@ -35,6 +35,7 @@ def _case() -> GoldenCase:
 
 
 def test_judge_settings_prefer_dedicated_values(monkeypatch) -> None:
+    """Verify that judge settings prefer dedicated values."""
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'agent-key')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'agent-model')
     monkeypatch.setenv('EVALUATION_OPENAI_JUDGE_API_KEY', 'judge-key')
@@ -47,6 +48,7 @@ def test_judge_settings_prefer_dedicated_values(monkeypatch) -> None:
 
 
 def test_judge_sends_reference_answer_and_returns_structured_verdict() -> None:
+    """Verify that judge sends reference answer and returns structured verdict."""
     response = SimpleNamespace(
         output_text='{"correct": true, "reason": "The temperatures match."}'
     )
@@ -76,6 +78,7 @@ def test_judge_sends_reference_answer_and_returns_structured_verdict() -> None:
 
 
 def test_summarize_judgements_reports_correctness_and_latency() -> None:
+    """Verify that summarize judgements reports correctness and latency."""
     correct = JudgeVerdict(correct=True, reason='reason', latency_ms=20.0)
     incorrect = JudgeVerdict(correct=False, reason='reason', latency_ms=40.0)
 

@@ -24,6 +24,7 @@ def _like_data(index: object, liked: object) -> gr.LikeData:
 
 
 def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
+    """Verify that create app configures chatbot feedback and like event."""
     app = create_app(DemoBackend())
 
     chatbot = next(
@@ -51,12 +52,14 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
 
 
 def test_placeholder_request_ids_are_unique_per_assistant_message() -> None:
+    """Verify that placeholder request ids are unique per assistant message."""
     assert placeholder_request_id(1) == 'TODO: request_id:1'
     assert placeholder_request_id(2) == 'TODO: request_id:2'
     assert placeholder_request_id(1) != placeholder_request_id(2)
 
 
 def test_update_feedback_values_preserves_previous_ratings() -> None:
+    """Verify that update feedback values preserves previous ratings."""
     history: list[ChatHistoryItem] = [
         {'role': 'user', 'content': 'First question'},
         {'role': 'assistant', 'content': 'First answer'},
@@ -71,6 +74,7 @@ def test_update_feedback_values_preserves_previous_ratings() -> None:
 
 
 def test_submit_feedback_forwards_like_and_dislike_events() -> None:
+    """Verify that submit feedback forwards like and dislike events."""
     backend = MagicMock()
     backend.submit_feedback = AsyncMock()
     request_ids = {1: 'TODO: request_id:1', 3: 'TODO: request_id:3'}
@@ -91,6 +95,7 @@ def test_submit_feedback_forwards_like_and_dislike_events() -> None:
 
 
 def test_submit_feedback_ignores_invalid_events() -> None:
+    """Verify that submit feedback ignores invalid events."""
     backend = MagicMock()
     backend.submit_feedback = AsyncMock()
     request_ids = {1: 'TODO: request_id:1'}

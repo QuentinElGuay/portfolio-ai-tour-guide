@@ -7,7 +7,7 @@ import pytest
 from pydantic import SecretStr
 
 from ai_tour_guide.agent.chat.models import Message, Role
-from ai_tour_guide.agent.llm.clients import GenerationError, OpenAIClient
+from ai_tour_guide.agent.llm.clients import GenerationError, OpenAIClient, _parse_answer
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
 from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
@@ -17,6 +17,7 @@ from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 def test_agent_settings_reads_generic_values_from_environment(
     monkeypatch,
 ) -> None:
+    """Verify that agent settings reads generic values from environment."""
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
@@ -27,6 +28,7 @@ def test_agent_settings_reads_generic_values_from_environment(
 
 
 def test_openai_client_sends_messages_and_returns_structured_output() -> None:
+    """Verify that openai client sends messages and returns structured output."""
     response = SimpleNamespace(
         output_text='{"answer": "A grounded answer.", "citations": []}'
     )
@@ -58,6 +60,7 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
 
 
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
+    """Verify that default llm client is openai when openai is configured."""
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
@@ -68,6 +71,7 @@ def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> 
 
 
 def test_llm_client_requires_api_key() -> None:
+    """Verify that llm client requires api key."""
     settings = AgentsSettings(
         api_key=SecretStr(' '),
         model='test-model',
@@ -80,6 +84,7 @@ def test_llm_client_requires_api_key() -> None:
 def test_fixture_client_returns_a_golden_answer_with_context_derived_citation(
     tmp_path,
 ) -> None:
+    """Verify that fixture answers cite the matching context's first page."""
     dataset_path = tmp_path / 'golden.jsonl'
     dataset_path.write_text(
         json.dumps(
@@ -121,6 +126,7 @@ def test_fixture_client_returns_a_golden_answer_with_context_derived_citation(
 
 
 def test_fixture_client_refuses_an_unsupported_golden_question(tmp_path) -> None:
+    """Verify that unsupported fixture questions return the fallback response."""
     dataset_path = tmp_path / 'golden.jsonl'
     dataset_path.write_text(
         json.dumps(
@@ -149,6 +155,7 @@ def test_fixture_client_refuses_an_unsupported_golden_question(tmp_path) -> None
 
 
 def test_fixture_client_fails_when_expected_evidence_is_not_retrieved(tmp_path) -> None:
+    """Verify that fixture answers require their expected source section."""
     dataset_path = tmp_path / 'golden.jsonl'
     dataset_path.write_text(
         json.dumps(
@@ -180,6 +187,7 @@ def test_fixture_client_fails_when_expected_evidence_is_not_retrieved(tmp_path) 
 
 
 def test_fixture_provider_does_not_require_an_api_key(tmp_path) -> None:
+    """Verify that the deterministic fixture provider can run without an API key."""
     dataset_path = tmp_path / 'golden.jsonl'
     dataset_path.write_text('', encoding='utf-8')
 
@@ -192,3 +200,51 @@ def test_fixture_provider_does_not_require_an_api_key(tmp_path) -> None:
     )
 
     assert isinstance(client, FixtureLLMClient)
+
+
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {},
+        {'answer': '', 'citations': []},
+        {'answer': 'Answer', 'citations': {}},
+        {
+            'answer': 'Answer',
+            'citations': [
+                {
+                    'source_url': '',
+                    'version': None,
+                    'page_start': None,
+                    'page_end': None,
+                }
+            ],
+        },
+        {
+            'answer': 'Answer',
+            'citations': [
+                {
+                    'source_url': 'https://example.test',
+                    'version': None,
+                    'page_start': True,
+                    'page_end': None,
+                }
+            ],
+        },
+    ],
+)
+def test_parse_answer_rejects_invalid_structured_provider_payloads(
+    payload: object,
+) -> None:
+    """Verify that malformed provider payloads cannot enter the citation pipeline."""
+    with pytest.raises((TypeError, ValueError, KeyError)):
+        _parse_answer(payload)
+
+
+def test_openai_client_wraps_an_empty_structured_response() -> None:
+    """Verify that empty provider output becomes a recoverable generation error."""
+    client = MagicMock()
+    client.responses.create = AsyncMock(return_value=SimpleNamespace(output_text='  '))
+    settings = AgentsSettings(api_key=SecretStr('token'), model='model')
+
+    with pytest.raises(GenerationError, match='empty response'):
+        asyncio.run(OpenAIClient(settings, client=client).answer_question([]))

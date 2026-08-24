@@ -85,6 +85,7 @@ def test_ask_command_prints_answer_and_compact_sources(
 
 @patch('ai_tour_guide.agent.cli.store_feedback', return_value=True)
 def test_feedback_command_stores_helpful_feedback(store_feedback: MagicMock) -> None:
+    """Verify that feedback command stores helpful feedback."""
     request_id = UUID('11111111-1111-1111-1111-111111111111')
 
     invocation = CliRunner().invoke(
@@ -105,6 +106,7 @@ def test_feedback_command_stores_helpful_feedback(store_feedback: MagicMock) -> 
 
 @patch('ai_tour_guide.agent.cli.store_feedback', return_value=False)
 def test_feedback_command_rejects_unknown_request(store_feedback: MagicMock) -> None:
+    """Verify that feedback command rejects unknown request."""
     request_id = UUID('22222222-2222-2222-2222-222222222222')
 
     invocation = CliRunner().invoke(
@@ -124,6 +126,7 @@ def test_chat_command_stores_answer_and_positive_feedback(
     store_rag_result: MagicMock,
     store_feedback: MagicMock,
 ) -> None:
+    """Verify that chat command stores answer and positive feedback."""
     answer_question.return_value = _result()
 
     invocation = CliRunner().invoke(
@@ -151,6 +154,7 @@ def test_chat_command_can_skip_feedback(
     store_rag_result: MagicMock,
     store_feedback: MagicMock,
 ) -> None:
+    """Verify that chat command can skip feedback."""
     answer_question.return_value = _result()
 
     invocation = CliRunner().invoke(
@@ -224,6 +228,7 @@ def test_ask_command_orders_pages(
 def test_ask_command_prints_normalized_sources(
     answer_question: MagicMock, store_rag_result: MagicMock
 ) -> None:
+    """Verify that ask command prints normalized sources."""
     answer_question.return_value = _result()
 
     invocation = CliRunner().invoke(main, ['ask', 'What?'])
@@ -246,6 +251,7 @@ def test_ask_command_prints_normalized_sources(
 def test_ask_command_verbose_prints_full_rag_result(
     answer_question: MagicMock, store_rag_result: MagicMock
 ) -> None:
+    """Verify that ask command verbose prints full rag result."""
     answer_question.return_value = _result()
     result = CliRunner().invoke(main, ['ask', 'What?', '--verbose'])
     assert result.exit_code == 0

@@ -11,6 +11,7 @@ from ai_tour_guide.knowledge_base.database.tables import (
 
 
 def test_rag_results_store_one_result_snapshot_per_request() -> None:
+    """Verify that rag results store one result snapshot per request."""
     assert rag_results.name == 'rag_results'
     assert rag_results.metadata is metadata
     assert rag_results.c.request_id.primary_key
@@ -41,6 +42,7 @@ def test_rag_results_store_one_result_snapshot_per_request() -> None:
 
 
 def test_rag_rating_references_a_rag_result() -> None:
+    """Verify that rag rating references a rag result."""
     assert rag_ratings.name == 'rag_ratings'
     assert rag_ratings.metadata is metadata
     assert rag_ratings.c.feedback_id.primary_key
@@ -53,6 +55,7 @@ def test_rag_rating_references_a_rag_result() -> None:
 
 
 def test_rag_result_and_feedback_constraints() -> None:
+    """Verify that rag result and feedback constraints."""
     result_constraints = {constraint.name for constraint in rag_results.constraints}
     feedback_constraints = {constraint.name for constraint in rag_ratings.constraints}
 
@@ -75,6 +78,7 @@ def test_rag_result_and_feedback_constraints() -> None:
 
 
 def test_rag_result_values_promote_queryable_result_fields() -> None:
+    """Verify that rag result values promote queryable result fields."""
     values = _rag_result_values(
         {
             'schema_version': 1,

@@ -27,6 +27,7 @@ def test_parse_pdf_metadata_datetime_normalizes_to_utc(
     value: str,
     expected: datetime,
 ) -> None:
+    """Verify that parse pdf metadata datetime normalizes to utc."""
     assert _parse_pdf_metadata_datetime(value) == expected
 
 
@@ -44,10 +45,12 @@ def test_parse_pdf_metadata_datetime_normalizes_to_utc(
 def test_parse_pdf_metadata_datetime_rejects_unreliable_values(
     value: str | None,
 ) -> None:
+    """Verify that parse pdf metadata datetime rejects unreliable values."""
     assert _parse_pdf_metadata_datetime(value) is None
 
 
 def test_document_metadata_rejects_naive_timestamps() -> None:
+    """Verify that document metadata rejects naive timestamps."""
     with pytest.raises(
         ValueError,
         match='creation_date must include timezone information',

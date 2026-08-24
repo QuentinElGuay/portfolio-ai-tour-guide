@@ -14,6 +14,7 @@ from ai_tour_guide.ingestion.settings import IngestionSettings
 
 
 def test_cli_exposes_each_stage_and_the_pipeline() -> None:
+    """Verify that cli exposes each stage and the pipeline."""
     result = CliRunner().invoke(main, ['--help'])
 
     assert result.exit_code == 0
@@ -23,6 +24,7 @@ def test_cli_exposes_each_stage_and_the_pipeline() -> None:
 
 
 def test_individual_document_command_rejects_an_array(tmp_path: Path) -> None:
+    """Verify that individual document command rejects an array."""
     input_path = tmp_path / 'documents.json'
     input_path.write_text(
         json.dumps(
@@ -56,6 +58,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
     *,
     debug: bool,
 ) -> None:
+    """Verify that document pipeline retains artifacts only in debug mode."""
     document = IngestionDocument(
         title='Test guide',
         source_url='https://example.test/guide.pdf',

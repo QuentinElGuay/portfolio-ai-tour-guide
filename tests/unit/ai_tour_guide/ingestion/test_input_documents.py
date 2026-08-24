@@ -7,6 +7,7 @@ from ai_tour_guide.ingestion.cli import load_documents
 
 
 def test_collection_is_loaded_from_the_documents_input() -> None:
+    """Verify that collection is loaded from the documents input."""
     documents = load_documents(
         StringIO(
             '{'
@@ -21,6 +22,7 @@ def test_collection_is_loaded_from_the_documents_input() -> None:
 
 
 def test_collection_is_optional_in_the_documents_input() -> None:
+    """Verify that collection is optional in the documents input."""
     documents = load_documents(
         StringIO(
             '{'
@@ -51,6 +53,7 @@ def test_local_source_path_is_loaded_and_becomes_a_file_source_url(tmp_path) -> 
 def test_collection_rejects_empty_and_non_string_values(
     collection: str | int,
 ) -> None:
+    """Verify that collection rejects empty and non string values."""
     source = StringIO(
         json.dumps(
             {

@@ -39,6 +39,7 @@ class _FakeEmbedder:
 
 
 def test_typed_stages_compose_without_intermediate_files() -> None:
+    """Verify that typed stages compose without intermediate files."""
     with pymupdf.open() as pdf:
         page = pdf.new_page()
         page.insert_text((72, 72), 'Visit Saint-Malo.')
