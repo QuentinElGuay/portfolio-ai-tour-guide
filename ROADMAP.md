@@ -96,7 +96,7 @@ to persisted RAG results.
 
 ______________________________________________________________________
 
-## 🔄 Milestone 7 — Monitoring
+## ✅ Milestone 7 — Monitoring
 
 ### [P0] Establish queryable RAG execution records
 
@@ -135,6 +135,16 @@ ______________________________________________________________________
 
 - [x] The dashboards present the most useful quality, feedback, reliability, and cost
   trends from persisted data.
+
+______________________________________________________________________
+
+## 📦 Release v0.4.0 — Monitoring
+
+**Status:** 📦 Shipped
+
+Delivered persisted operational RAG records, user feedback monitoring, offline
+evaluation reporting, production quality and cost dashboards, schema-separated LLM usage
+tracking, model pricing validation, and Metabase backup/restore support.
 
 ______________________________________________________________________
 
