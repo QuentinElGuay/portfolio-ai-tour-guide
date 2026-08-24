@@ -156,14 +156,14 @@ To initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
 `METABASE_ADMIN_PASSWORD` in `.env`, then run:
 
 ```bash
-make init-dashboard
+make dashboard-init
 ```
 
 To version the current Metabase configuration, questions, and dashboards for the Docker
 setup, run:
 
 ```bash
-make export-metabase
+make dashboard-export
 ```
 
 This writes `fixtures/metabase/metabase.sql`. The dashboard database image bundles and
@@ -174,14 +174,14 @@ committing it.
 To restore the bundled backup manually, use:
 
 ```bash
-make restore-metabase
+make dashboard-restore
 ```
 
 This refuses to overwrite a non-empty Metabase database. To explicitly replace the
 current Metabase configuration and dashboards, use:
 
 ```bash
-make restore-metabase FORCE=1
+make dashboard-restore FORCE=1
 ```
 
 Only the separate `metabase` database is replaced; the application database and its
@@ -227,8 +227,8 @@ Run `make help` for every available shortcut.
 | `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
 | `make cli-chat`                      | Start the interactive terminal chat.                 |
 | `make dashboard`                     | Start PostgreSQL and the Metabase dashboard.         |
-| `make init-dashboard`                | Start and initialize the Metabase dashboard.         |
-| `make export-metabase`               | Export Metabase configuration and dashboards.        |
+| `make dashboard-init`                | Start and initialize the Metabase dashboard.         |
+| `make dashboard-export`              | Export Metabase configuration and dashboards.        |
 | `make app`                           | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and

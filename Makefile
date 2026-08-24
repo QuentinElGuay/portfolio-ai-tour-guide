@@ -13,7 +13,7 @@ JUDGE_PROVIDER ?= openai
 ANNOTATOR_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
 EVALUATION ?= all
-METABASE_BACKUP ?= fixtures/metabase/metabase.sql
+DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
 METABASE_DB_NAME ?= metabase
 FORCE ?= 0
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
@@ -22,7 +22,7 @@ ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema dashboard init-dashboard export-metabase restore-metabase ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: help init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -31,10 +31,10 @@ help: ## Show the available commands.
 	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
 	@echo "  make reset-schema SCHEMA=evaluation  Delete and recreate one schema"
 	@echo "  make dashboard                       Start PostgreSQL and Metabase"
-	@echo "  make init-dashboard                  Start and initialize Metabase"
-	@echo "  make export-metabase                 Export the Metabase application database"
-	@echo "  make restore-metabase                Restore Metabase if its database is empty"
-	@echo "  make restore-metabase FORCE=1        Overwrite and restore Metabase"
+	@echo "  make dashboard-init                  Start and initialize Metabase"
+	@echo "  make dashboard-export                Export the dashboard application database"
+	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
+	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
 	@echo "  make ingest                          Ingest source_files.json"
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
@@ -81,22 +81,22 @@ reset-schema: validate-db-schema ## Delete and recreate only the selected schema
 dashboard: ## Start PostgreSQL and the Metabase dashboard.
 	$(COMPOSE) --profile dashboard up --build -d --wait database dashboard
 
-init-dashboard: ## Start Metabase and initialize its first admin user.
+dashboard-init: ## Start Metabase and initialize its first admin user.
 	$(COMPOSE) --profile dashboard run --rm dashboard-init
 
-export-metabase: dashboard init-dashboard ## Export the Metabase application database into the repository.
+dashboard-export: dashboard dashboard-init ## Export the dashboard application database into the repository.
 	$(COMPOSE) --profile dashboard up -d --wait database dashboard
-	@mkdir -p "$(dir $(METABASE_BACKUP))"
+	@mkdir -p "$(dir $(DASHBOARD_BACKUP))"
 	@$(COMPOSE) exec -T database \
 		sh -c 'pg_dump --username "$${POSTGRES_USER}" \
 		--clean --if-exists --no-owner --no-privileges \
 		--dbname="$(METABASE_DB_NAME)"' \
-		> "$(METABASE_BACKUP).tmp"
-	@mv "$(METABASE_BACKUP).tmp" "$(METABASE_BACKUP)"
+		> "$(DASHBOARD_BACKUP).tmp"
+	@mv "$(DASHBOARD_BACKUP).tmp" "$(DASHBOARD_BACKUP)"
 	$(COMPOSE) --profile dashboard build metabase-database
-	@echo "Exported Metabase configuration to $(METABASE_BACKUP)"
+	@echo "Exported dashboard configuration to $(DASHBOARD_BACKUP)"
 
-restore-metabase: validate-metabase-backup ## Restore the bundled Metabase application database.
+dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard application database.
 	$(COMPOSE) --profile dashboard up -d --wait database
 	@if [ "$(FORCE)" = "1" ]; then \
 		$(COMPOSE) --profile dashboard stop dashboard >/dev/null 2>&1 || true; \
@@ -127,9 +127,9 @@ ingest: ## Ingest the documents described by SOURCE_FILES.
 validate-db-schema:
 	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 
-validate-metabase-backup:
-	@test -s "$(METABASE_BACKUP)" || \
-		(echo "Metabase backup not found: $(METABASE_BACKUP). Run 'make export-metabase' first." >&2; exit 1)
+validate-dashboard-backup:
+	@test -s "$(DASHBOARD_BACKUP)" || \
+		(echo "Dashboard backup not found: $(DASHBOARD_BACKUP). Run 'make dashboard-export' first." >&2; exit 1)
 	@case "$(METABASE_DB_NAME)" in *[!a-z0-9_]*|[0-9]*|'') echo "METABASE_DB_NAME must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 	@case "$(FORCE)" in 0|1) ;; *) echo "FORCE must be 0 or 1" >&2; exit 1;; esac
 

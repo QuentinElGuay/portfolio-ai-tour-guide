@@ -1,6 +1,6 @@
 # Metabase application backup
 
-Run `make export-metabase` to create `metabase.sql` in this directory.
+Run `make dashboard-export` to create `metabase.sql` in this directory.
 
 The `metabase-database` image bundles that file and restores it when the Metabase
 application database is created for the first time. Existing application databases are
