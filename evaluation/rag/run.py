@@ -12,10 +12,7 @@ from ai_tour_guide.agent.llm.clients import LLMProvider
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import RAGResult
-from ai_tour_guide.agent.rag.persistence import (
-    store_feedback,
-    store_rag_result,
-)
+from ai_tour_guide.agent.rag.persistence import store_rag_result
 from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
@@ -26,6 +23,10 @@ from evaluation.dataset import DEFAULT_DATASET_ROOT, GoldenCase, load_golden_dat
 from evaluation.rag.factory import JudgeFactory
 from evaluation.rag.judge import JudgesSettings
 from evaluation.rag.metrics import score_case, summarize, summarize_judgements
+from evaluation.rag.persistence import (
+    store_rag_evaluation,
+    store_rag_judgements,
+)
 
 DEFAULT_K = 5
 
@@ -108,9 +109,21 @@ async def run_rag_async(
     report = _base_report(
         dataset_root=dataset_root, corpus_root=corpus_root, mode=mode, k=k
     )
-    report['metrics'] = summarize(
-        score_case(case, result) for case, result in zip(cases, results)
-    )
+    case_metrics = [score_case(case, result) for case, result in zip(cases, results)]
+    with database_engine(schema_name='evaluation') as engine:
+        run_id = store_rag_evaluation(
+            dataset_path=dataset_root,
+            corpus_path=corpus_root,
+            mode=SearchMode(mode).value,
+            k=k,
+            cases=cases,
+            results=results,
+            metrics=case_metrics,
+            configuration={'evaluation': 'rag'},
+            engine=engine,
+        )
+    report['run_id'] = str(run_id)
+    report['metrics'] = summarize(case_metrics)
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
@@ -122,7 +135,7 @@ async def run_judge_async(
     mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = DEFAULT_K,
 ) -> None:
-    """Run RAG generation and mandatory semantic answer judging."""
+    """Run RAG generation and persist separate semantic judge results."""
     cases, results = await _generate_results(
         corpus_root=corpus_root, dataset_root=dataset_root, mode=mode, k=k
     )
@@ -130,21 +143,35 @@ async def run_judge_async(
     verdicts = await asyncio.gather(
         *(judge.judge(case, result.answer) for case, result in zip(cases, results))
     )
+    case_metrics = [score_case(case, result) for case, result in zip(cases, results)]
     with database_engine(schema_name='evaluation') as engine:
-        for result, verdict in zip(results, verdicts):
-            stored = store_feedback(
-                result.request_id,
-                verdict.correct,
-                verdict.reason,
-                engine=engine,
-            )
-            if not stored:
-                raise RuntimeError(
-                    f'RAG result was not found for request {result.request_id}.'
-                )
+        rag_run_id = store_rag_evaluation(
+            dataset_path=dataset_root,
+            corpus_path=corpus_root,
+            mode=SearchMode(mode).value,
+            k=k,
+            cases=cases,
+            results=results,
+            metrics=case_metrics,
+            configuration={'evaluation': 'rag', 'judge_provider': llm_provider.value},
+            engine=engine,
+        )
+        judge_run_id = store_rag_judgements(
+            rag_run_id=rag_run_id,
+            provider=llm_provider.value,
+            model=judge.model,
+            cases=cases,
+            results=results,
+            judgements=verdicts,
+            configuration={'evaluation': 'judge'},
+            engine=engine,
+        )
     report = _base_report(
         dataset_root=dataset_root, corpus_root=corpus_root, mode=mode, k=k
     )
+    report['run_id'] = str(rag_run_id)
+    report['rag_run_id'] = str(rag_run_id)
+    report['judge_run_id'] = str(judge_run_id)
     report['judge'] = {
         'model': judge.model,
         'metrics': summarize_judgements(verdicts),

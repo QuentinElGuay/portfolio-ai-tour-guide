@@ -8,6 +8,7 @@ from .connection import database_engine
 from .settings import DatabaseSettings
 from .tables.evaluation import metadata as evaluation_metadata
 from .tables.public import metadata as public_metadata
+from .views import create_evaluation_views
 
 SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation', 'smoke')
 
@@ -39,6 +40,7 @@ def initialize_database(
                 index.create(bind=schema_connection, checkfirst=True)
         if schema_name == 'evaluation':
             evaluation_metadata.create_all(bind=schema_connection, checkfirst=True)
+            create_evaluation_views(connection, schema_name=schema_name)
 
 
 def main() -> None:

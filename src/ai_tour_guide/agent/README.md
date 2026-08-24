@@ -143,6 +143,8 @@ make reset-db
 make ingest
 ```
 
+`make reset-db` resets only the selected application schema and preserves Metabase.
+
 ## Configuration
 
 | Variable             | Purpose                                | Template value      |

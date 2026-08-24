@@ -11,6 +11,10 @@ from ai_tour_guide.knowledge_base.database.tables.evaluation import (
 
 def test_search_evaluation_tables_use_dedicated_metadata() -> None:
     assert metadata.tables.keys() == {
+        'rag_evaluation_runs',
+        'rag_evaluation_results',
+        'rag_judge_runs',
+        'rag_judge_results',
         'search_evaluation_runs',
         'search_evaluation_results',
     }
