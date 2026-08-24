@@ -4,6 +4,7 @@ import argparse
 import json
 from collections.abc import Iterable
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any, TypedDict
@@ -33,6 +34,9 @@ from evaluation.search.metrics import (
     hit_rate_at_k,
     recall_at_k,
     reciprocal_rank,
+)
+from evaluation.search.persistence import (
+    store_search_evaluation,
 )
 
 DEFAULT_K = 5
@@ -147,6 +151,7 @@ def run(
         if case.expected.answerable
     ]
     selected_modes = tuple(SearchMode(mode) for mode in modes)
+    started_at = datetime.now(UTC)
 
     with (
         corpus_context(root=corpus_root, schema_name='evaluation'),
@@ -160,6 +165,7 @@ def run(
             'cases': len(cases),
             'modes': {},
         }
+        results_by_mode: dict[str, list[CaseMetrics]] = {}
         with Session(engine) as session:
             session.connection()
             if session.scalar(select(DocumentRow.document_id).limit(1)) is None:
@@ -169,14 +175,11 @@ def run(
                 )
             for mode in selected_modes:
                 strategy = create_search_strategy(mode)
-                case_results = [
-                    _case_metrics(session, strategy, case, k=k)
-                    for case in tqdm(
-                        cases,
-                        desc=f'Search ({mode.value})',
-                        unit='case',
-                    )
-                ]
+                case_results = []
+                for case in tqdm(cases, desc=f'Search ({mode.value})', unit='case'):
+                    metrics = _case_metrics(session, strategy, case, k=k)
+                    case_results.append(metrics)
+                results_by_mode[mode.value] = case_results
                 report['modes'][mode.value] = {
                     'configuration': _strategy_configuration(strategy),
                     'chunk_ranking': {
@@ -194,6 +197,36 @@ def run(
                         case['search_latency_ms'] for case in case_results
                     ),
                 }
+        run_id = store_search_evaluation(
+            dataset_path=dataset_root,
+            corpus_path=corpus_root,
+            k=k,
+            configuration={
+                'modes': {
+                    mode: report['modes'][mode]['configuration']
+                    for mode in results_by_mode
+                }
+            },
+            results={
+                mode: [
+                    {
+                        **metrics,
+                        'results': [
+                            {
+                                **result,
+                                'section_path': list(result['section_path']),
+                            }
+                            for result in metrics['results']
+                        ],
+                    }
+                    for metrics in mode_results
+                ]
+                for mode, mode_results in results_by_mode.items()
+            },
+            engine=engine,
+            started_at=started_at,
+        )
+        report['run_id'] = str(run_id)
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 

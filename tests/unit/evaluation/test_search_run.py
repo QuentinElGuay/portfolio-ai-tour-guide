@@ -45,6 +45,7 @@ def _result(
 
 
 def test_raw_evidence_preserves_duplicate_sections_and_ranking_order() -> None:
+    """Verify that raw evidence preserves duplicate sections and ranking order."""
     results = [
         _result(
             chunk_id='first',

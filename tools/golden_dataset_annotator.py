@@ -1,4 +1,4 @@
-"""Interactively annotate reference answers and source pages in a golden dataset."""
+"""Interactively annotate reference answers and source sections in a golden dataset."""
 
 import argparse
 import json
@@ -8,18 +8,20 @@ from typing import Any
 
 import questionary
 
+from ai_tour_guide.knowledge_base import slugify_section_path
+
 DEFAULT_INPUT = Path('evaluation/datasets/golden_dataset.jsonl')
 
 
-def parse_pages(value: str) -> list[int]:
-    """Parse a comma-separated list of one-indexed source pages."""
-    try:
-        pages = sorted({int(page.strip()) for page in value.split(',') if page.strip()})
-    except ValueError as exc:
-        raise ValueError('Pages must be comma-separated positive integers.') from exc
-    if not pages or any(page <= 0 for page in pages):
-        raise ValueError('Enter at least one positive page number.')
-    return pages
+def parse_section_path(value: str) -> list[str]:
+    """Parse a ``>``-separated source section path into stable slugs."""
+    parts = [part.strip() for part in value.split('>')]
+    if not parts or any(not part for part in parts):
+        raise ValueError('Section path must contain non-empty headings separated by >.')
+    section_path = list(slugify_section_path(parts))
+    if not all(section_path):
+        raise ValueError('Section path must contain at least one letter or number.')
+    return section_path
 
 
 def load_rows(path: Path) -> list[dict[str, Any]]:
@@ -57,9 +59,18 @@ def find_row(rows: list[dict[str, Any]], case_id: int) -> int:
 def find_next_unanswered(
     rows: list[dict[str, Any]], *, start_index: int = 0
 ) -> int | None:
-    """Return the next row marked as requiring annotation, if any."""
+    """Return the next answerable row missing an answer or source section."""
     for index in range(start_index, len(rows)):
-        if rows[index].get('_todo') is True:
+        expected = rows[index]['expected']
+        source = expected.get('relevant_source')
+        if rows[index].get('_todo') is True or (
+            expected.get('answerable') is True
+            and (
+                not expected.get('reference_answer')
+                or not isinstance(source, dict)
+                or not source.get('section_path')
+            )
+        ):
             return index
     return None
 
@@ -82,22 +93,75 @@ def next_index(rows: list[dict[str, Any]], *, index: int, resume: bool) -> int |
     return index + 1 if index + 1 < len(rows) else None
 
 
-def update_row(row: dict[str, Any], *, answer: str, pages: list[int]) -> None:
-    """Update a row's reference answer and pages for its first source."""
+def update_row(row: dict[str, Any], *, answer: str, section_path: list[str]) -> None:
+    """Update a row's reference answer and stable source section path."""
     expected = row['expected']
-    sources = expected['relevant_sources']
-    if not sources:
+    source = expected.get('relevant_source')
+    if expected.get('answerable') is not True or not isinstance(source, dict):
         raise ValueError('The question has no relevant source to annotate.')
     expected['reference_answer'] = answer
-    sources[0]['pages'] = pages
+    source['section_path'] = section_path
     row.pop('_todo', None)
 
 
-def _pages_text(row: dict[str, Any]) -> str:
-    sources = row['expected']['relevant_sources']
-    if not sources:
+def create_row(
+    rows: Iterable[dict[str, Any]],
+    *,
+    category: str,
+    question: str,
+    answerable: bool,
+    reference_answer: str | None = None,
+    source_url: str | None = None,
+    version: str | None = None,
+    section_path: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create one schema-valid golden-dataset row with the next available ID."""
+    normalized_category = category.strip()
+    normalized_question = question.strip()
+    if not normalized_category or not normalized_question:
+        raise ValueError('Category and question cannot be empty.')
+
+    existing_ids = [row.get('id') for row in rows]
+    if any(
+        not isinstance(case_id, int) or isinstance(case_id, bool)
+        for case_id in existing_ids
+    ):
+        raise ValueError('Existing dataset rows must have integer IDs.')
+    row: dict[str, Any] = {
+        'id': max(existing_ids, default=0) + 1,
+        'category': normalized_category,
+        'question': normalized_question,
+        'expected': {
+            'answerable': answerable,
+            'reference_answer': None,
+        },
+    }
+    if not answerable:
+        return row
+
+    if not reference_answer or not reference_answer.strip():
+        raise ValueError('Answerable questions require a reference answer.')
+    if not source_url or not source_url.strip():
+        raise ValueError('Answerable questions require a source URL.')
+    if not section_path:
+        raise ValueError('Answerable questions require a source section path.')
+    row['expected'] = {
+        'answerable': True,
+        'reference_answer': reference_answer.strip(),
+        'relevant_source': {
+            'source_url': source_url.strip(),
+            'version': version.strip() if version and version.strip() else None,
+            'section_path': section_path,
+        },
+    }
+    return row
+
+
+def _section_path_text(row: dict[str, Any]) -> str:
+    source = row['expected'].get('relevant_source')
+    if not isinstance(source, dict):
         return ''
-    return ', '.join(str(page) for page in sources[0]['pages'])
+    return ' > '.join(source.get('section_path', []))
 
 
 def _show_question(row: dict[str, Any], *, position: int, total: int) -> None:
@@ -105,7 +169,39 @@ def _show_question(row: dict[str, Any], *, position: int, total: int) -> None:
     print(f'Category: {row["category"]}')
     print(row['question'])
     print(f'Current answer: {row["expected"]["reference_answer"] or "(missing)"}')
-    print(f'Current pages: {_pages_text(row) or "(missing)"}')
+    print(f'Current source section: {_section_path_text(row) or "(missing)"}')
+
+
+def _new_question(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Prompt for a complete new golden case, returning ``None`` when cancelled."""
+    category = questionary.text('Category:').ask()
+    question = questionary.text('Question:').ask()
+    answerable = questionary.confirm(
+        'Is this question answerable from the corpus?'
+    ).ask()
+    if category is None or question is None or answerable is None:
+        return None
+    if not answerable:
+        return create_row(rows, category=category, question=question, answerable=False)
+
+    answer = questionary.text('Reference answer:').ask()
+    source_url = questionary.text('Source URL:').ask()
+    version = questionary.text('Source version (optional):').ask()
+    section_path = questionary.text(
+        'Source section path (use > between headings):'
+    ).ask()
+    if None in (answer, source_url, version, section_path):
+        return None
+    return create_row(
+        rows,
+        category=category,
+        question=question,
+        answerable=True,
+        reference_answer=answer,
+        source_url=source_url,
+        version=version,
+        section_path=parse_section_path(section_path),
+    )
 
 
 def annotate(
@@ -127,7 +223,8 @@ def annotate(
         action = questionary.select(
             'Choose an action:',
             choices=[
-                'Edit answer and pages',
+                'Edit answer and source section',
+                'Create new question',
                 'Next question',
                 'Next unanswered question',
                 'Jump to question ID',
@@ -139,6 +236,19 @@ def annotate(
             write_rows(dataset_path, rows)
             print(f'Saved dataset to {dataset_path}.')
             return
+        if action == 'Create new question':
+            try:
+                row = _new_question(rows)
+            except ValueError as exc:
+                print(exc)
+                continue
+            if row is None:
+                continue
+            rows.append(row)
+            index = len(rows) - 1
+            write_rows(dataset_path, rows)
+            print(f'Created question {row["id"]} in {dataset_path}.')
+            continue
         if action == 'Next question':
             next_question = next_index(rows, index=index, resume=False)
             if next_question is None:
@@ -164,14 +274,21 @@ def annotate(
         answer = questionary.text(
             'Reference answer:', default=row['expected']['reference_answer'] or ''
         ).ask()
-        pages_text = questionary.text('Source page(s):', default=_pages_text(row)).ask()
-        if answer is None or pages_text is None:
+        section_path_text = questionary.text(
+            'Source section path (use > between headings):',
+            default=_section_path_text(row),
+        ).ask()
+        if answer is None or section_path_text is None:
             continue
         if not answer.strip():
             print('Reference answer cannot be empty.')
             continue
         try:
-            update_row(row, answer=answer.strip(), pages=parse_pages(pages_text))
+            update_row(
+                row,
+                answer=answer.strip(),
+                section_path=parse_section_path(section_path_text),
+            )
         except ValueError as exc:
             print(exc)
             continue
@@ -188,7 +305,7 @@ def annotate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Fill in reference answers and source pages in a golden dataset.'
+        description='Fill in reference answers and source sections in a golden dataset.'
     )
     parser.add_argument('--input', type=Path, default=DEFAULT_INPUT)
     parser.add_argument('--start-id', type=int, help='Start at this question ID.')

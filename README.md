@@ -100,7 +100,7 @@ Unsupported questions include:
   configuration.
 - [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
   integration.
-- [Roadmap](roadmap.md): delivered work and planned validation, evaluation, and
+- [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
 ## Data source
@@ -156,8 +156,36 @@ To initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
 `METABASE_ADMIN_PASSWORD` in `.env`, then run:
 
 ```bash
-make init-dashboard
+make dashboard-init
 ```
+
+To version the current Metabase configuration, questions, and dashboards for the Docker
+setup, run:
+
+```bash
+make dashboard-export
+```
+
+This writes `fixtures/metabase/metabase.sql`. The dashboard database image bundles and
+restores that backup when creating a new Metabase application database. Existing
+application databases are not overwritten. Review the dump for sensitive values before
+committing it.
+
+To restore the bundled backup manually, use:
+
+```bash
+make dashboard-restore
+```
+
+This refuses to overwrite a non-empty Metabase database. To explicitly replace the
+current Metabase configuration and dashboards, use:
+
+```bash
+make dashboard-restore FORCE=1
+```
+
+Only the separate `metabase` database is replaced; the application database and its
+schemas are preserved.
 
 This starts Metabase, creates the initial admin user if necessary, and registers the
 project PostgreSQL database as a Metabase data source. The command is safe to rerun.
@@ -168,13 +196,15 @@ Open `http://localhost:7860` to use the chat. The agent API is available at
 `http://localhost:8000/docs`.
 
 The first ingestion or image build can download the configured embedding model. To
-recreate the local database, use `make reset-db`, then run `make ingest` to populate the
-public schema. A reset intentionally leaves the database empty until ingestion
-completes. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
+recreate the application knowledge base, use `make reset-db`, then run `make ingest` to
+populate the selected schema. The reset preserves the separate Metabase application
+database. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
 example when isolating future evaluation data from local development data.
 
 > [!WARNING]
-> `make reset-db` permanently deletes the project's PostgreSQL volume.
+> `make reset-db` removes all data in the selected application schema. To intentionally
+> remove the entire PostgreSQL volume, including Metabase and its dashboards, run
+> `docker compose --profile dashboard down --volumes --remove-orphans` explicitly.
 
 ## Common commands
 
@@ -196,7 +226,9 @@ Run `make help` for every available shortcut.
 | `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
 | `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
 | `make cli-chat`                      | Start the interactive terminal chat.                 |
-| `make init-dashboard`                | Start and initialize the Metabase dashboard.         |
+| `make dashboard`                     | Start PostgreSQL and the Metabase dashboard.         |
+| `make dashboard-init`                | Start and initialize the Metabase dashboard.         |
+| `make dashboard-export`              | Export Metabase configuration and dashboards.        |
 | `make app`                           | Start the agent API and Gradio chat interface.       |
 
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
@@ -239,7 +271,7 @@ follow-up work.
 ## Roadmap
 
 The complete plan, including milestones and deferred work, is maintained in
-[roadmap.md](roadmap.md).
+[ROADMAP.md](ROADMAP.md).
 
 ### Current release — v0.3.0: Evaluated RAG baseline
 

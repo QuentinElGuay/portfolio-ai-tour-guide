@@ -15,6 +15,7 @@ from sqlalchemy import (
     Index,
     Integer,
     MetaData,
+    Numeric,
     Table,
     Text,
     UniqueConstraint,
@@ -27,6 +28,103 @@ from ai_tour_guide.embedding.settings import EmbeddingSettings
 
 EMBEDDING_DIMENSIONS = EmbeddingSettings().dimensions
 metadata = MetaData()
+
+llm_model_pricing = Table(
+    'llm_model_pricing',
+    metadata,
+    Column('pricing_id', BigInteger, Identity(), primary_key=True),
+    Column('provider', Text, nullable=False),
+    Column('model', Text, nullable=False),
+    Column('input_cost_per_token', Numeric(20, 12), nullable=False),
+    Column('cached_input_cost_per_token', Numeric(20, 12), nullable=False),
+    Column('output_cost_per_token', Numeric(20, 12), nullable=False),
+    Column('currency', Text, nullable=False, server_default=text("'USD'")),
+    Column(
+        'effective_from',
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    UniqueConstraint(
+        'provider',
+        'model',
+        'effective_from',
+        name='uq_llm_model_pricing_version',
+    ),
+    CheckConstraint(
+        'input_cost_per_token >= 0',
+        name='ck_llm_model_pricing_input_cost_non_negative',
+    ),
+    CheckConstraint(
+        'cached_input_cost_per_token >= 0',
+        name='ck_llm_model_pricing_cached_input_cost_non_negative',
+    ),
+    CheckConstraint(
+        'output_cost_per_token >= 0',
+        name='ck_llm_model_pricing_output_cost_non_negative',
+    ),
+    CheckConstraint(
+        "btrim(provider) <> '' AND btrim(model) <> ''",
+        name='ck_llm_model_pricing_identity_not_empty',
+    ),
+)
+
+llm_usage_events = Table(
+    'llm_usage_events',
+    metadata,
+    Column('usage_event_id', BigInteger, Identity(), primary_key=True),
+    Column('request_id', UUID(as_uuid=True)),
+    Column('rag_run_id', UUID(as_uuid=True)),
+    Column('judge_run_id', UUID(as_uuid=True)),
+    Column('call_type', Text, nullable=False),
+    Column('provider', Text, nullable=False),
+    Column('model', Text, nullable=False),
+    Column('input_tokens', BigInteger),
+    Column('cached_input_tokens', BigInteger),
+    Column('output_tokens', BigInteger),
+    Column('total_tokens', BigInteger),
+    Column('pricing_id', BigInteger, ForeignKey('llm_model_pricing.pricing_id')),
+    Column('input_cost', Numeric(20, 12)),
+    Column('output_cost', Numeric(20, 12)),
+    Column('total_cost', Numeric(20, 12)),
+    Column('currency', Text),
+    Column('metadata', JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint(
+        "call_type IN ('answer', 'judge', 'embedding', 'other')",
+        name='ck_llm_usage_events_call_type',
+    ),
+    CheckConstraint(
+        'input_tokens IS NULL OR input_tokens >= 0',
+        name='ck_llm_usage_events_input_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'cached_input_tokens IS NULL OR cached_input_tokens >= 0',
+        name='ck_llm_usage_events_cached_input_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'output_tokens IS NULL OR output_tokens >= 0',
+        name='ck_llm_usage_events_output_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'total_tokens IS NULL OR total_tokens >= 0',
+        name='ck_llm_usage_events_total_tokens_non_negative',
+    ),
+    CheckConstraint(
+        'input_cost IS NULL OR input_cost >= 0',
+        name='ck_llm_usage_events_input_cost_non_negative',
+    ),
+    CheckConstraint(
+        'output_cost IS NULL OR output_cost >= 0',
+        name='ck_llm_usage_events_output_cost_non_negative',
+    ),
+    CheckConstraint(
+        'total_cost IS NULL OR total_cost >= 0',
+        name='ck_llm_usage_events_total_cost_non_negative',
+    ),
+)
 
 embedding_models = Table(
     'embedding_models',
@@ -341,5 +439,14 @@ Index(
 Index('ix_rag_results_search_mode', rag_results.c.search_mode)
 Index('ix_rag_results_success', rag_results.c.success)
 Index('ix_rag_ratings_request_id', rag_ratings.c.request_id)
+Index('ix_llm_usage_events_rag_run_id', llm_usage_events.c.rag_run_id)
+Index('ix_llm_usage_events_judge_run_id', llm_usage_events.c.judge_run_id)
 
-__all__ = ['document_chunks', 'documents', 'embedding_models', 'metadata']
+__all__ = [
+    'document_chunks',
+    'documents',
+    'embedding_models',
+    'llm_model_pricing',
+    'llm_usage_events',
+    'metadata',
+]

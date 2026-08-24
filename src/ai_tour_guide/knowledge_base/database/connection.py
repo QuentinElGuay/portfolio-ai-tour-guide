@@ -32,13 +32,16 @@ def create_database_engine(settings: DatabaseSettings | None = None) -> Engine:
 
 @contextmanager
 def database_engine(
-    engine: Engine | None = None, *, schema_name: str = 'public'
+    engine: Engine | None = None, *, schema_name: str | None = None
 ) -> Iterator[Engine]:
     """Yield an engine and dispose it only when this context creates it."""
     owned_engine = engine is None
-    db_engine = engine or create_database_engine(
-        DatabaseSettings(schema_name=schema_name)
+    settings = (
+        DatabaseSettings()
+        if schema_name is None
+        else DatabaseSettings(schema_name=schema_name)
     )
+    db_engine = engine or create_database_engine(settings)
     try:
         yield db_engine
     finally:

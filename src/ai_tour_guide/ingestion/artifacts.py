@@ -44,6 +44,7 @@ def _ingestion_document_to_dict(document: IngestionDocument) -> dict[str, Any]:
     return {
         'title': document.title,
         'source_url': document.source_url,
+        'source_path': str(document.source_path) if document.source_path else None,
         'collection': document.collection,
         'excluded_leading_pages': document.excluded_leading_pages,
         'excluded_trailing_pages': document.excluded_trailing_pages,

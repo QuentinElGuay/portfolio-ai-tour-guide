@@ -1,7 +1,7 @@
 # Ingestion pipeline
 
 This package transforms tourism-guide PDFs into searchable document chunks stored in the
-knowledge base. The complete pipeline downloads a source, parses the PDF, chunks the
+knowledge base. The complete pipeline obtains a source PDF, parses it, chunks the
 content, creates embeddings, and loads the result into PostgreSQL in one transaction.
 
 Return to the [project overview](../../../README.md).
@@ -33,13 +33,16 @@ make ingest DEBUG=1
 
 `make init-db` creates the tables and enables pgvector. The ingestion rejects a source
 URL already present in the database rather than replacing its document and chunks. Use
-`make reset-db` only when you intentionally want a fresh development database.
+`make reset-db` when you intentionally want to clear the selected application schema;
+the separate Metabase database is preserved.
 
 ## Document definitions
 
 The `run` command accepts one JSON object or a non-empty array of objects. Each
-individual stage accepts exactly one object. A definition needs `title` and
-`source_url`:
+individual stage accepts exactly one object. A definition needs `title` and either
+`source_url` or `source_path`. `source_url` is the persistent source identity; when both
+are supplied, the pipeline reads the local file while retaining the URL for citations
+and document identity:
 
 ```json
 {
@@ -54,8 +57,21 @@ individual stage accepts exactly one object. A definition needs `title` and
 }
 ```
 
-All fields other than `title` and `source_url` are optional metadata or parsing options.
-Document titles in the same input must produce unique filenames. See
+An external orchestrator can download a document itself and pass its local path:
+
+```json
+{
+  "title": "Guide to the Region of Brittany",
+  "source_url": "https://example.com/brittany-guide.pdf",
+  "source_path": "/data/brittany-guide.pdf"
+}
+```
+
+When only `source_path` is supplied, its resolved `file://` URI becomes the source
+identity.
+
+All other fields are optional metadata or parsing options. Document titles in the same
+input must produce unique filenames. See
 [`source_files.json`](../../../source_files.json) for the repository's default input.
 
 ## Local Python workflow

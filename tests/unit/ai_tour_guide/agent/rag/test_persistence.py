@@ -1,9 +1,17 @@
 """Tests for RAG-result and user-feedback persistence schema."""
 
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from ai_tour_guide.knowledge_base.database.feedback import _rag_result_values
-from ai_tour_guide.knowledge_base.database.tables import (
+from ai_tour_guide.agent.rag.persistence import (
+    UnimplementedModelError,
+    _rag_result_values,
+    _usage_event_values,
+)
+from ai_tour_guide.knowledge_base.database.tables.public import (
     metadata,
     rag_ratings,
     rag_results,
@@ -11,6 +19,7 @@ from ai_tour_guide.knowledge_base.database.tables import (
 
 
 def test_rag_results_store_one_result_snapshot_per_request() -> None:
+    """Verify that rag results store one result snapshot per request."""
     assert rag_results.name == 'rag_results'
     assert rag_results.metadata is metadata
     assert rag_results.c.request_id.primary_key
@@ -41,6 +50,7 @@ def test_rag_results_store_one_result_snapshot_per_request() -> None:
 
 
 def test_rag_rating_references_a_rag_result() -> None:
+    """Verify that rag rating references a rag result."""
     assert rag_ratings.name == 'rag_ratings'
     assert rag_ratings.metadata is metadata
     assert rag_ratings.c.feedback_id.primary_key
@@ -53,6 +63,7 @@ def test_rag_rating_references_a_rag_result() -> None:
 
 
 def test_rag_result_and_feedback_constraints() -> None:
+    """Verify that rag result and feedback constraints."""
     result_constraints = {constraint.name for constraint in rag_results.constraints}
     feedback_constraints = {constraint.name for constraint in rag_ratings.constraints}
 
@@ -75,6 +86,7 @@ def test_rag_result_and_feedback_constraints() -> None:
 
 
 def test_rag_result_values_promote_queryable_result_fields() -> None:
+    """Verify that rag result values promote queryable result fields."""
     values = _rag_result_values(
         {
             'schema_version': 1,
@@ -113,3 +125,21 @@ def test_rag_result_values_promote_queryable_result_fields() -> None:
     rag_trace = values['rag_trace']
     assert isinstance(rag_trace, dict)
     assert 'raw_provider_response' not in rag_trace
+
+
+def test_usage_event_rejects_model_without_pricing() -> None:
+    """Fail fast instead of recording an unpriced billable LLM call."""
+    connection = MagicMock()
+    connection.execute.return_value.mappings.return_value.first.return_value = None
+
+    with pytest.raises(UnimplementedModelError, match='openai/unknown-model'):
+        _usage_event_values(
+            request_id=uuid4(),
+            rag_run_id=None,
+            judge_run_id=None,
+            call_type='answer',
+            provider='openai',
+            model='unknown-model',
+            usage={'input_tokens': 10, 'output_tokens': 5},
+            connection=connection,
+        )

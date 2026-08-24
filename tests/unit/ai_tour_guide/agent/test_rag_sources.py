@@ -53,6 +53,7 @@ def _context(*pages: int) -> RetrievedContext:
 
 
 def test_partial_range_keeps_known_pages_and_retains_original_invalid_claim() -> None:
+    """Verify that partial range keeps known pages and retains original invalid claim."""
     result = validate_citations(
         (LLMCitation('https://example.com/guide', '2026', 2, 4),),
         (_context(2, 4),),
@@ -63,6 +64,7 @@ def test_partial_range_keeps_known_pages_and_retains_original_invalid_claim() ->
 
 
 def test_unknown_document_is_invalid() -> None:
+    """Verify that unknown document is invalid."""
     result = validate_citations(
         (LLMCitation('https://other.test', None, 1, 1),),
         (_context(1),),

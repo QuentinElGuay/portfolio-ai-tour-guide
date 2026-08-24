@@ -1,14 +1,31 @@
 """Database/schema initialization using the Core metadata as the single DDL source."""
 
-from sqlalchemy import text
+from decimal import Decimal
+
+from sqlalchemy import insert, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.schema import CreateSchema
 
 from .connection import database_engine
 from .settings import DatabaseSettings
-from .tables import metadata
+from .tables.evaluation import metadata as evaluation_metadata
+from .tables.public import llm_model_pricing
+from .tables.public import metadata as public_metadata
+from .views import create_evaluation_views, create_operational_views
 
-SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation')
+SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation', 'smoke')
+
+# OpenAI published prices for gpt-4.1-mini, expressed per token. Keep prices in
+# the database so later pricing changes can be represented by a new effective
+# row rather than rewriting historical cost calculations.
+DEFAULT_LLM_MODEL_PRICING = {
+    ('openai', 'gpt-4.1-mini'): {
+        'input_cost_per_token': Decimal('0.0000004'),
+        'cached_input_cost_per_token': Decimal('0.0000001'),
+        'output_cost_per_token': Decimal('0.0000016'),
+        'currency': 'USD',
+    }
+}
 
 
 def initialize_database(
@@ -25,17 +42,110 @@ def initialize_database(
         database_engine(engine, schema_name=schema_name) as db_engine,
         db_engine.begin() as connection,
     ):
+        connection.execute(CreateSchema(schema_name, if_not_exists=True))
         connection.execute(
             text('CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public')
         )
-        connection.execute(CreateSchema(schema_name, if_not_exists=True))
         schema_connection = connection.execution_options(
             schema_translate_map={None: schema_name}
         )
-        metadata.create_all(bind=schema_connection, checkfirst=True)
-        for table in metadata.tables.values():
+        public_metadata.create_all(bind=schema_connection, checkfirst=True)
+        _migrate_llm_usage_events(connection)
+        for table in public_metadata.tables.values():
             for index in table.indexes:
                 index.create(bind=schema_connection, checkfirst=True)
+        _migrate_llm_model_pricing(connection)
+        _seed_default_llm_model_pricing(connection)
+        if schema_name == 'evaluation':
+            evaluation_metadata.create_all(bind=schema_connection, checkfirst=True)
+            create_evaluation_views(connection, schema_name=schema_name)
+        elif schema_name == 'public':
+            create_operational_views(connection, schema_name=schema_name)
+
+
+def _migrate_llm_model_pricing(connection) -> None:
+    """Add pricing columns introduced after the initial table release."""
+    connection.execute(
+        text(
+            """
+            ALTER TABLE llm_model_pricing
+            ADD COLUMN IF NOT EXISTS cached_input_cost_per_token NUMERIC(20, 12)
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE llm_model_pricing
+            SET cached_input_cost_per_token = CASE
+                WHEN provider = 'openai' AND model = 'gpt-4.1-mini'
+                    THEN 0.0000001
+                ELSE 0
+            END
+            WHERE cached_input_cost_per_token IS NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE llm_model_pricing
+            ALTER COLUMN cached_input_cost_per_token SET NOT NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'ck_llm_model_pricing_cached_input_cost_non_negative'
+                ) THEN
+                    ALTER TABLE llm_model_pricing
+                    ADD CONSTRAINT ck_llm_model_pricing_cached_input_cost_non_negative
+                    CHECK (cached_input_cost_per_token >= 0);
+                END IF;
+            END
+            $$
+            """
+        )
+    )
+
+
+def _migrate_llm_usage_events(connection) -> None:
+    """Add evaluation run references to existing usage-event tables."""
+    connection.execute(
+        text('ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS rag_run_id UUID')
+    )
+    connection.execute(
+        text('ALTER TABLE llm_usage_events ADD COLUMN IF NOT EXISTS judge_run_id UUID')
+    )
+
+
+def _seed_default_llm_model_pricing(connection) -> None:
+    """Insert known pricing defaults without overwriting existing prices."""
+    rows = [
+        {
+            'provider': provider,
+            'model': model,
+            **pricing,
+        }
+        for (provider, model), pricing in DEFAULT_LLM_MODEL_PRICING.items()
+    ]
+    for row in rows:
+        existing = connection.execute(
+            select(llm_model_pricing.c.pricing_id)
+            .where(
+                llm_model_pricing.c.provider == row['provider'],
+                llm_model_pricing.c.model == row['model'],
+            )
+            .limit(1)
+        ).first()
+        if existing is None:
+            connection.execute(insert(llm_model_pricing).values(row))
 
 
 def main() -> None:
@@ -55,4 +165,8 @@ if __name__ == '__main__':
     main()
 
 
-__all__ = ['SUPPORTED_SCHEMA_NAMES', 'initialize_database']
+__all__ = [
+    'DEFAULT_LLM_MODEL_PRICING',
+    'SUPPORTED_SCHEMA_NAMES',
+    'initialize_database',
+]

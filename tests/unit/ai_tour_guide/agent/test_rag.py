@@ -93,6 +93,7 @@ def test_answer_question_retrieves_context_and_returns_sources(
 def test_answer_question_assigns_and_propagates_request_id(
     answer_question_async_mock: AsyncMock,
 ) -> None:
+    """Verify that answer question assigns and propagates request id."""
     expected = MagicMock()
     answer_question_async_mock.return_value = expected
 

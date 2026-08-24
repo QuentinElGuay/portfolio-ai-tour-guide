@@ -4,6 +4,7 @@ from ai_tour_guide.ingestion.config import ChunkingConfig
 
 
 def test_section_id_uses_heading_levels_not_section_path_positions() -> None:
+    """Verify that section id uses heading levels not section path positions."""
     heading_path = (
         (1, 'The region and its departments'),
         (2, 'Departments of Brittany'),
@@ -26,6 +27,7 @@ def test_section_id_uses_heading_levels_not_section_path_positions() -> None:
 
 
 def test_section_id_defaults_cover_the_available_heading_depths() -> None:
+    """Verify that section id defaults cover the available heading depths."""
     section_id = compute_section_id(
         (
             (1, 'The region and its departments'),
@@ -41,6 +43,7 @@ def test_section_id_defaults_cover_the_available_heading_depths() -> None:
 
 
 def test_chunks_share_section_id_and_have_local_indexes() -> None:
+    """Verify that chunks share section id and have local indexes."""
     document = {
         'metadata': {'title': 'Guide to Brittany'},
         'sections': [
