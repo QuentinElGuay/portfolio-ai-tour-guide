@@ -10,14 +10,6 @@ from ai_tour_guide.knowledge_base.database.connection import (
 )
 from ai_tour_guide.knowledge_base.database.settings import DatabaseSettings
 
-@patch('ai_tour_guide.knowledge_base.database.connection.create_database_engine')
-@patch('ai_tour_guide.knowledge_base.database.connection.DatabaseSettings')
-def test_database_engine_uses_environment_selected_schema_by_default(
-    database_settings: MagicMock,
-    create_database_engine: MagicMock,
-) -> None:
-    settings = database_settings.return_value
-    engine = create_database_engine.return_value
 
 @patch('ai_tour_guide.knowledge_base.database.connection.create_engine')
 def test_create_database_engine_builds_expected_postgres_url(

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DB_HOST: localhost
+  DB_PORT: "5432"
+  DB_NAME: postgres
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  DB_SCHEMA: public
+  EMBEDDING_DIMENSIONS: "384"
+  EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
+  EMBEDDING_NORMALIZE: "true"
+  AGENT_LLM_API_KEY: test-token
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Verify the lockfile
+        run: uv lock --check
+
+      - name: Lint and format Python
+        run: |
+          uv run ruff check src tests evaluation tools scripts
+          uv run ruff format --check src tests evaluation tools scripts
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Check Markdown formatting
+        run: git ls-files -z '*.md' | xargs -0 uv run mdformat --check
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Run unit tests
+        env:
+          PYTHONPATH: .
+        run: uv run pytest tests/unit
+
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Configure Docker Compose
+        run: cp .env.template .env
+
+      - name: Run fixture-backed smoke tests
+        run: make smoke-test
+
+      - name: Stop the test database
+        if: always()
+        run: docker compose down --volumes --remove-orphans
