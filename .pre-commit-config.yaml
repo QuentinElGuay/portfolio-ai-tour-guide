@@ -13,6 +13,13 @@ repos:
         language: system
         types: [python]
 
+      - id: pyright
+        name: Pyright type check
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: mdformat
         name: mdformat
         entry: uv run mdformat

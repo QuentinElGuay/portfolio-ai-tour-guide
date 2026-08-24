@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Mapping
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -23,7 +24,7 @@ from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGResult, SourceRef
 from ai_tour_guide.knowledge_base.search import SearchMode
 
 
-def _post(path: str, payload: dict[str, object]) -> httpx.Response:
+def _post(path: str, payload: Mapping[str, object]) -> httpx.Response:
     """Send one request through the ASGI boundary without starting a server thread."""
 
     async def request() -> httpx.Response:

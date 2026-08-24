@@ -13,6 +13,7 @@ from ai_tour_guide.knowledge_base.database.tables.evaluation import (
     rag_judge_results,
     rag_judge_runs,
 )
+from ai_tour_guide.knowledge_base.search import SearchMode
 from evaluation.dataset import ExpectedOutcome, GoldenCase, SourceExpectation
 from evaluation.rag.judge import JudgeVerdict
 from evaluation.rag.metrics import RAGCaseMetrics
@@ -72,7 +73,7 @@ def test_rag_evaluation_row_keeps_expected_evidence_and_metrics() -> None:
     )
     result = RAGResult(
         question=case.question,
-        mode='hybrid',
+        mode=SearchMode.HYBRID,
         k=5,
         messages=(),
         generated=GeneratedAnswer('The coast is in Brittany.'),
