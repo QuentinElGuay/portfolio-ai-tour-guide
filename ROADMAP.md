@@ -98,43 +98,9 @@ ______________________________________________________________________
 
 ## ✅ Milestone 7 — Monitoring
 
-### [P0] Establish queryable RAG execution records
-
-- [x] Persist the question, answer, success state, error details, source counts, model
-  metadata, timings, and trace for each stored RAG result.
-- [x] Link answer ratings to their stored RAG results.
-
-**Acceptance criteria**
-
-- [x] A stored result can be inspected with its answer, execution status, and associated
-  ratings.
-
-### [P1] Summarize RAG quality and operational signals
-
-- [x] Provision Metabase with the public and evaluation schemas as queryable data
-  sources.
-- [x] Provide persisted Search, RAG, and Judge evaluation dashboards, including
-  historical quality and judge-latency views.
-- [x] Aggregate evaluation and operational model usage and cost into curated views,
-  including separate schema-scoped reporting for offline and production calls.
-- [x] Make the main quality and operational signals easy to inspect during a demo with
-  dedicated Quality and Costs dashboards.
-
-**Acceptance criteria**
-
-- [x] A reviewer can inspect answer quality, failure rates, and latency from persisted
-  application data.
-- [x] The dashboards distinguish successful, insufficient-context, and failed work.
-
-### [P2] Provide a monitoring view
-
-- [x] Configure Metabase dashboards for request volume, ratings, latency,
-  insufficient-context outcomes, errors, model usage, and operational costs.
-
-**Acceptance criteria**
-
-- [x] The dashboards present the most useful quality, feedback, reliability, and cost
-  trends from persisted data.
+**Delivered:** persisted operational RAG records and user feedback, schema-separated
+evaluation and production usage tracking, model pricing validation, curated cost views,
+and preconfigured Quality and Costs dashboards.
 
 ______________________________________________________________________
 
@@ -159,6 +125,8 @@ ______________________________________________________________________
   an isolated schema and checks health, grounded answers, citations, and refusals
   through the API.
 - [x] Publish the latest evaluation evidence and reports in the documentation.
+- [x] Publish versioned application images to GitHub Container Registry when a release
+  tag is pushed; deployment remains intentionally out of scope.
 - [ ] Add public application screenshots to the project documentation.
 
 **Acceptance criteria**
@@ -171,13 +139,16 @@ ______________________________________________________________________
 
 - [x] Expand unit coverage for LLM output validation, fixture behavior, database engine
   ownership/schema selection, retrieval strategies, and golden-dataset annotation.
-- [ ] Run the relevant test suite on pull requests.
+- [x] Run lockfile, lint, formatting, Markdown, type, unit, and fixture-backed smoke
+  checks on pull requests and pushes to the main branch.
+- [x] Publish immutable commit-SHA and release-tagged container images without deploying
+  them.
 - [ ] Record a concise demo showing ingestion, a grounded answer, an unsupported
   question, and sources.
 
 **Acceptance criteria**
 
-- [ ] A contributor can verify changes automatically before merge.
+- [x] A contributor can verify changes automatically before merge.
 - [ ] A reviewer can understand the project outcome from the README and demo.
 
 ______________________________________________________________________
@@ -186,8 +157,8 @@ ______________________________________________________________________
 
 **Status:** ⏳ Planned
 
-The final submission requires delivery automation, public screenshots, and a concise
-demo. Evaluation evidence and a deterministic smoke test are already available.
+The final submission requires public screenshots and a concise demo. Delivery
+automation, evaluation evidence, and a deterministic smoke test are already available.
 
 ______________________________________________________________________
 
