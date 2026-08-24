@@ -11,6 +11,7 @@ QUESTION ?=
 K ?= 5
 JUDGE_PROVIDER ?= openai
 ANNOTATOR_ARGS ?=
+SIMULATE_ARGS ?=
 CORPUS_ROOT ?= fixtures/corpus
 EVALUATION ?= all
 DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
@@ -24,7 +25,7 @@ DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: help init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all simulate-rag smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -52,6 +53,8 @@ help: ## Show the available commands.
 	@echo "  make evaluate-rag                    Run online RAG metrics without judging"
 	@echo "  make evaluate-judge                  Generate and judge RAG answers only"
 	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
+	@echo "  make simulate-rag                    Populate dashboards with synthetic RAG traffic"
+	@echo "  make simulate-rag SIMULATE_ARGS='--days 30 --requests-per-day 50'"
 	@echo "  make smoke-test                      Run deterministic end-to-end RAG smoke tests"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
@@ -189,6 +192,10 @@ evaluate-judge: EVALUATION=judge
 evaluate-judge: evaluate
 
 evaluate-all: evaluate
+
+simulate-rag: ## Populate operational dashboards with deterministic synthetic RAG traffic.
+	$(DATABASE_UP)
+	uv run python -m tools.simulate_rag_traffic $(SIMULATE_ARGS)
 
 smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke schema.
 	$(DATABASE_UP)

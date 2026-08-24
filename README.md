@@ -221,6 +221,7 @@ Run `make help` for every available shortcut.
 | `make evaluate-rag`                  | Run RAG metrics without answer judging.              |
 | `make evaluate-judge`                | Generate and judge RAG answers only.                 |
 | `make evaluate-all`                  | Alias for `make evaluate`.                           |
+| `make simulate-rag`                  | Populate dashboards with synthetic fixture traffic.  |
 | `make vector_search QUESTION='...'`  | Search chunks semantically.                          |
 | `make text_search QUESTION='...'`    | Search chunks with PostgreSQL full-text search.      |
 | `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |

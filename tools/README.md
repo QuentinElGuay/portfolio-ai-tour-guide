@@ -1,5 +1,33 @@
 # Developer tools
 
+## Simulate RAG traffic
+
+Populate the public operational dashboards with deterministic traffic generated from the
+golden dataset. This command always uses the local fixture LLM: it never calls OpenAI or
+any other paid provider, and it never incurs an API bill. The `--model` option only
+names the model used to calculate synthetic costs. By default, the tool also writes
+explicitly marked synthetic token and cost events:
+
+```bash
+make simulate-rag
+```
+
+Customize the time range and volume with:
+
+```bash
+make simulate-rag SIMULATE_ARGS='--days 30 --requests-per-day 50 --error-rate 0.08'
+```
+
+Use `--variance 0` for constant daily volume or increase it up to `1` for more
+variation. The default is `0.35`.
+
+To replace a previous simulation instead of appending to it, add `--clear-simulated`.
+
+`--no-simulated-usage` is optional. Use it only for a Quality-dashboard demo or a test
+that needs RAG results and feedback without populating the Costs dashboard. The default
+is recommended when demonstrating both dashboards. The generated rows are intended for
+local dashboard demonstrations and should not be used as production telemetry.
+
 ## Annotate the golden dataset
 
 Edit the golden dataset in place:
