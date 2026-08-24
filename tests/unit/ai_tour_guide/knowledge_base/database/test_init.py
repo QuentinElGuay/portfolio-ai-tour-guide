@@ -15,7 +15,12 @@ def test_initialize_database_creates_extension_schema_tables_and_indexes() -> No
     index = MagicMock()
     table = MagicMock(indexes={index})
 
-    with patch.object(init, 'metadata') as metadata:
+    with (
+        patch.object(init, 'public_metadata') as metadata,
+        patch.object(init, '_migrate_llm_model_pricing'),
+        patch.object(init, '_migrate_llm_usage_events'),
+        patch.object(init, '_seed_default_llm_model_pricing'),
+    ):
         metadata.tables = {'document_chunks': table}
         init.initialize_database('smoke', engine=engine)
 
@@ -44,8 +49,8 @@ def test_initialize_database_delegates_engine_ownership_to_database_context(
     connection.execution_options.return_value = MagicMock()
 
     with (
-        patch.object(init.metadata, 'create_all'),
-        patch.object(init.metadata, 'tables', {}),
+        patch.object(init.public_metadata, 'create_all'),
+        patch.object(init.public_metadata, 'tables', {}),
     ):
         init.initialize_database('evaluation', engine=engine)
 

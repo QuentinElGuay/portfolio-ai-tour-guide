@@ -17,7 +17,9 @@ DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
 METABASE_DB_NAME ?= metabase
 FORCE ?= 0
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
+COMPOSE_DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--verbose,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
+DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
@@ -31,6 +33,7 @@ help: ## Show the available commands.
 	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
 	@echo "  make reset-schema SCHEMA=evaluation  Delete and recreate one schema"
 	@echo "  make dashboard                       Start PostgreSQL and Metabase"
+	@echo "  make dashboard DEBUG=1               Start dashboard with Docker Compose diagnostics"
 	@echo "  make dashboard-init                  Start and initialize Metabase"
 	@echo "  make dashboard-export                Export the dashboard application database"
 	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
@@ -58,6 +61,7 @@ help: ## Show the available commands.
 	@echo "  make annotate-dataset                Fill answers and source pages interactively"
 	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
 	@echo "  make app                             Start the agent API and Gradio chat"
+	@echo "  DEBUG=1                              Enable verbose Docker Compose diagnostics"
 
 init-db: validate-db-schema ## Start PostgreSQL and initialize its schema.
 	$(COMPOSE) --profile tools run --build --rm init-db \
@@ -71,7 +75,7 @@ reset-db: validate-db-schema ## Reset the selected application schema without to
 reset-schema: validate-db-schema ## Delete and recreate only the selected schema.
 	@test "$(origin SCHEMA)" = "command line" || \
 		(echo "SCHEMA must be provided explicitly, for example: make reset-schema SCHEMA=evaluation" >&2; exit 1)
-	$(COMPOSE) up -d --wait database
+	$(DATABASE_UP)
 	$(COMPOSE) exec -T database sh -c \
 		'psql --username "$$POSTGRES_USER" \
 		--dbname "$$POSTGRES_DB" \
@@ -79,13 +83,13 @@ reset-schema: validate-db-schema ## Delete and recreate only the selected schema
 	$(MAKE) init-db SCHEMA="$(SCHEMA)"
 
 dashboard: ## Start PostgreSQL and the Metabase dashboard.
-	$(COMPOSE) --profile dashboard up --build -d --wait database dashboard
+	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up --build -d --wait database dashboard
 
 dashboard-init: ## Start Metabase and initialize its first admin user.
 	$(COMPOSE) --profile dashboard run --rm dashboard-init
 
 dashboard-export: dashboard dashboard-init ## Export the dashboard application database into the repository.
-	$(COMPOSE) --profile dashboard up -d --wait database dashboard
+	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up -d --wait database dashboard
 	@mkdir -p "$(dir $(DASHBOARD_BACKUP))"
 	@$(COMPOSE) exec -T database \
 		sh -c 'pg_dump --username "$${POSTGRES_USER}" \
@@ -97,7 +101,7 @@ dashboard-export: dashboard dashboard-init ## Export the dashboard application d
 	@echo "Exported dashboard configuration to $(DASHBOARD_BACKUP)"
 
 dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard application database.
-	$(COMPOSE) --profile dashboard up -d --wait database
+	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up -d --wait database
 	@if [ "$(FORCE)" = "1" ]; then \
 		$(COMPOSE) --profile dashboard stop dashboard >/dev/null 2>&1 || true; \
 		$(COMPOSE) exec -T database sh -c \
@@ -163,7 +167,7 @@ load-corpus: ## Replace the knowledge-base corpus in the selected SCHEMA.
 
 evaluate: ## Run all evaluation metrics.
 	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
-	$(COMPOSE) up -d --wait database
+	$(DATABASE_UP)
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" SCHEMA=evaluation
 	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = all ]; then \
 		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
@@ -187,7 +191,7 @@ evaluate-judge: evaluate
 evaluate-all: evaluate
 
 smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke schema.
-	$(COMPOSE) up -d --wait database
+	$(DATABASE_UP)
 	uv run python -m ai_tour_guide.knowledge_base.database.init --schema smoke
 	AGENT_LLM_PROVIDER=fixture \
 	AGENT_LLM_API_KEY= \

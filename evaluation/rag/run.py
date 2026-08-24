@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from tqdm import tqdm
@@ -37,6 +38,7 @@ async def _generate_results(
     dataset_root: Path,
     mode: SearchMode,
     k: int,
+    evaluation_run_id: UUID,
 ) -> tuple[list[GoldenCase], list[RAGResult]]:
     if k <= 0:
         raise ValueError('k must be greater than zero')
@@ -76,7 +78,12 @@ async def _generate_results(
         ) as progress:
             for completed in asyncio.as_completed(tasks):
                 index, result = await completed
-                store_rag_result(result.request_id, result.to_dict(), engine=engine)
+                store_rag_result(
+                    result.request_id,
+                    result.to_dict(),
+                    engine=engine,
+                    evaluation_run_id=evaluation_run_id,
+                )
                 results[index] = result
                 progress.update()
 
@@ -103,8 +110,13 @@ async def run_rag_async(
     k: int = DEFAULT_K,
 ) -> None:
     """Run deterministic RAG metrics without semantic answer judging."""
+    rag_run_id = uuid4()
     cases, results = await _generate_results(
-        corpus_root=corpus_root, dataset_root=dataset_root, mode=mode, k=k
+        corpus_root=corpus_root,
+        dataset_root=dataset_root,
+        mode=mode,
+        k=k,
+        evaluation_run_id=rag_run_id,
     )
     report = _base_report(
         dataset_root=dataset_root, corpus_root=corpus_root, mode=mode, k=k
@@ -121,6 +133,7 @@ async def run_rag_async(
             metrics=case_metrics,
             configuration={'evaluation': 'rag'},
             engine=engine,
+            run_id=rag_run_id,
         )
     report['run_id'] = str(run_id)
     report['metrics'] = summarize(case_metrics)
@@ -136,8 +149,13 @@ async def run_judge_async(
     k: int = DEFAULT_K,
 ) -> None:
     """Run RAG generation and persist separate semantic judge results."""
+    rag_run_id = uuid4()
     cases, results = await _generate_results(
-        corpus_root=corpus_root, dataset_root=dataset_root, mode=mode, k=k
+        corpus_root=corpus_root,
+        dataset_root=dataset_root,
+        mode=mode,
+        k=k,
+        evaluation_run_id=rag_run_id,
     )
     judge = JudgeFactory.create(JudgesSettings(llm_provider=llm_provider))
     verdicts = await asyncio.gather(
@@ -155,7 +173,9 @@ async def run_judge_async(
             metrics=case_metrics,
             configuration={'evaluation': 'rag', 'judge_provider': llm_provider.value},
             engine=engine,
+            run_id=rag_run_id,
         )
+        judge_run_id = uuid4()
         judge_run_id = store_rag_judgements(
             rag_run_id=rag_run_id,
             provider=llm_provider.value,
@@ -165,6 +185,7 @@ async def run_judge_async(
             judgements=verdicts,
             configuration={'evaluation': 'judge'},
             engine=engine,
+            run_id=judge_run_id,
         )
     report = _base_report(
         dataset_root=dataset_root, corpus_root=corpus_root, mode=mode, k=k

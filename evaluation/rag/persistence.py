@@ -9,6 +9,7 @@ from sqlalchemy import insert
 from sqlalchemy.engine import Engine
 
 from ai_tour_guide.agent.rag.models import RAGResult
+from ai_tour_guide.agent.rag.persistence import _usage_event_values
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.evaluation import (
     rag_evaluation_results,
@@ -16,6 +17,7 @@ from ai_tour_guide.knowledge_base.database.tables.evaluation import (
     rag_judge_results,
     rag_judge_runs,
 )
+from ai_tour_guide.knowledge_base.database.tables.public import llm_usage_events
 from evaluation.dataset import GoldenCase
 from evaluation.rag.judge import JudgeVerdict
 from evaluation.rag.metrics import RAGCaseMetrics
@@ -34,6 +36,7 @@ def store_rag_evaluation(
     engine: Engine | None = None,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
+    run_id: UUID | None = None,
 ) -> UUID:
     """Store one completed RAG evaluation and its per-case metrics."""
     if k <= 0:
@@ -41,7 +44,7 @@ def store_rag_evaluation(
     if not len(cases) == len(results) == len(metrics):
         raise ValueError('cases, results, and metrics must have the same length')
 
-    run_id = uuid4()
+    run_id = run_id or uuid4()
     finished_at = completed_at or datetime.now(UTC)
     with (
         database_engine(engine, schema_name='evaluation') as db_engine,
@@ -82,12 +85,13 @@ def store_rag_judgements(
     engine: Engine | None = None,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
+    run_id: UUID | None = None,
 ) -> UUID:
     """Store judge verdicts for one previously persisted RAG evaluation run."""
     if not len(cases) == len(results) == len(judgements):
         raise ValueError('cases, results, and judgements must have the same length')
 
-    run_id = uuid4()
+    run_id = run_id or uuid4()
     finished_at = completed_at or datetime.now(UTC)
     with (
         database_engine(engine, schema_name='evaluation') as db_engine,
@@ -112,6 +116,31 @@ def store_rag_judgements(
                 for case, result, verdict in zip(cases, results, judgements)
             ],
         )
+        usage_events = [
+            event
+            for result, verdict in zip(results, judgements)
+            if (
+                event := _usage_event_values(
+                    request_id=result.request_id,
+                    rag_run_id=rag_run_id,
+                    judge_run_id=run_id,
+                    call_type='judge',
+                    provider=provider,
+                    model=model,
+                    usage=(
+                        verdict_usage
+                        if isinstance(
+                            verdict_usage := verdict.metadata.get('usage'), Mapping
+                        )
+                        else {}
+                    ),
+                    connection=connection,
+                )
+            )
+            is not None
+        ]
+        if usage_events:
+            connection.execute(insert(llm_usage_events), usage_events)
     return run_id
 
 
