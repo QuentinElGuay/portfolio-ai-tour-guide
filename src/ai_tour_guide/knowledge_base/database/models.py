@@ -10,8 +10,8 @@ from ai_tour_guide.domain.chunks import EmbeddedChunk
 from ai_tour_guide.domain.documents import DocumentRecord
 from ai_tour_guide.ingestion.config import ChunkingConfig
 
-from .tables import document_chunks, documents, embedding_models
-from .tables import metadata as table_metadata
+from .tables.public import document_chunks, documents, embedding_models
+from .tables.public import metadata as table_metadata
 
 
 class Base(DeclarativeBase):

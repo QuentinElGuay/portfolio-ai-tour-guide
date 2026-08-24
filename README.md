@@ -196,6 +196,7 @@ Run `make help` for every available shortcut.
 | `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
 | `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
 | `make cli-chat`                      | Start the interactive terminal chat.                 |
+| `make dashboard`                     | Start PostgreSQL and the Metabase dashboard.         |
 | `make init-dashboard`                | Start and initialize the Metabase dashboard.         |
 | `make app`                           | Start the agent API and Gradio chat interface.       |
 

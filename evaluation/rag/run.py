@@ -12,13 +12,13 @@ from ai_tour_guide.agent.llm.clients import LLMProvider
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import RAGResult
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
-from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
-from ai_tour_guide.knowledge_base.database.connection import database_engine
-from ai_tour_guide.knowledge_base.database.feedback import (
+from ai_tour_guide.agent.rag.persistence import (
     store_feedback,
     store_rag_result,
 )
+from ai_tour_guide.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
+from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import create_search_strategy
