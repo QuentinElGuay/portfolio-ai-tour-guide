@@ -33,7 +33,8 @@ make ingest DEBUG=1
 
 `make init-db` creates the tables and enables pgvector. The ingestion rejects a source
 URL already present in the database rather than replacing its document and chunks. Use
-`make reset-db` only when you intentionally want a fresh development database.
+`make reset-db` when you intentionally want to clear the selected application schema;
+the separate Metabase database is preserved.
 
 ## Document definitions
 

@@ -11,5 +11,9 @@ tests
 docs
 evaluation
 fixtures
+!fixtures/
+fixtures/*
+!fixtures/metabase/
+!fixtures/metabase/**
 tools
 *.ipynb

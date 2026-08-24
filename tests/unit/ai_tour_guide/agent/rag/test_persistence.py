@@ -1,8 +1,16 @@
 """Tests for RAG-result and user-feedback persistence schema."""
 
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from ai_tour_guide.agent.rag.persistence import _rag_result_values
+from ai_tour_guide.agent.rag.persistence import (
+    UnimplementedModelError,
+    _rag_result_values,
+    _usage_event_values,
+)
 from ai_tour_guide.knowledge_base.database.tables.public import (
     metadata,
     rag_ratings,
@@ -117,3 +125,21 @@ def test_rag_result_values_promote_queryable_result_fields() -> None:
     rag_trace = values['rag_trace']
     assert isinstance(rag_trace, dict)
     assert 'raw_provider_response' not in rag_trace
+
+
+def test_usage_event_rejects_model_without_pricing() -> None:
+    """Fail fast instead of recording an unpriced billable LLM call."""
+    connection = MagicMock()
+    connection.execute.return_value.mappings.return_value.first.return_value = None
+
+    with pytest.raises(UnimplementedModelError, match='openai/unknown-model'):
+        _usage_event_values(
+            request_id=uuid4(),
+            rag_run_id=None,
+            judge_run_id=None,
+            call_type='answer',
+            provider='openai',
+            model='unknown-model',
+            usage={'input_tokens': 10, 'output_tokens': 5},
+            connection=connection,
+        )

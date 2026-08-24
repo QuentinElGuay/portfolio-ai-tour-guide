@@ -227,7 +227,12 @@ services:
       - ai-tour-guide
 
   metabase-database:
-    image: postgres:17-alpine
+    image: ai-tour-guide-metabase-database:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/metabase-database.Dockerfile
 
     profiles:
       - dashboard
@@ -251,8 +256,20 @@ services:
             exit 1
             ;;
         esac
+        database_created=false
         if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$${METABASE_DB_NAME}'" | grep -q 1; then
           createdb "$${METABASE_DB_NAME}"
+          database_created=true
+        fi
+        table_count=$$(psql --dbname "$${METABASE_DB_NAME}" -tAc \
+          "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'")
+        if [ "$${database_created}" = true ] || [ "$${table_count}" -eq 0 ]; then
+          if [ -s /backups/metabase.sql ]; then
+            echo "Restoring bundled Metabase application database backup."
+            psql --dbname "$${METABASE_DB_NAME}" --file /backups/metabase.sql
+          else
+            echo "No bundled Metabase backup found; starting with an empty application database."
+          fi
         fi
 
     depends_on:

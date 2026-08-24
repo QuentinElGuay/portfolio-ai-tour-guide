@@ -96,7 +96,7 @@ to persisted RAG results.
 
 ______________________________________________________________________
 
-## 🔄 Milestone 7 — Monitoring
+## ✅ Milestone 7 — Monitoring
 
 ### [P0] Establish queryable RAG execution records
 
@@ -113,25 +113,38 @@ ______________________________________________________________________
 
 - [x] Provision Metabase with the public and evaluation schemas as queryable data
   sources.
-- [ ] Aggregate persisted RAG outcomes, ratings, latency, errors, and model usage into a
-  curated report or view.
-- [ ] Make the main quality and operational signals easy to inspect during a demo.
+- [x] Provide persisted Search, RAG, and Judge evaluation dashboards, including
+  historical quality and judge-latency views.
+- [x] Aggregate evaluation and operational model usage and cost into curated views,
+  including separate schema-scoped reporting for offline and production calls.
+- [x] Make the main quality and operational signals easy to inspect during a demo with
+  dedicated Quality and Costs dashboards.
 
 **Acceptance criteria**
 
-- [ ] A reviewer can inspect answer quality, failure rates, and latency from persisted
+- [x] A reviewer can inspect answer quality, failure rates, and latency from persisted
   application data.
-- [ ] The report distinguishes successful, insufficient-context, and failed work.
+- [x] The dashboards distinguish successful, insufficient-context, and failed work.
 
 ### [P2] Provide a monitoring view
 
-- [ ] Configure a lightweight Metabase dashboard for request volume, ratings, latency,
-  insufficient-context outcomes, errors, and frequently retrieved destinations.
+- [x] Configure Metabase dashboards for request volume, ratings, latency,
+  insufficient-context outcomes, errors, model usage, and operational costs.
 
 **Acceptance criteria**
 
-- [ ] The dashboard presents the most useful quality and operational trends from
-  persisted data.
+- [x] The dashboards present the most useful quality, feedback, reliability, and cost
+  trends from persisted data.
+
+______________________________________________________________________
+
+## 📦 Release v0.4.0 — Monitoring
+
+**Status:** 📦 Shipped
+
+Delivered persisted operational RAG records, user feedback monitoring, offline
+evaluation reporting, production quality and cost dashboards, schema-separated LLM usage
+tracking, model pricing validation, and Metabase backup/restore support.
 
 ______________________________________________________________________
 

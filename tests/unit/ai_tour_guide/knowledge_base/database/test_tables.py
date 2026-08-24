@@ -4,6 +4,7 @@ from ai_tour_guide.knowledge_base.database.tables import (
     document_chunks,
     documents,
     embedding_models,
+    llm_model_pricing,
     metadata,
 )
 
@@ -14,7 +15,23 @@ def test_tables_share_one_metadata_registry() -> None:
         embedding_models.metadata,
         documents.metadata,
         document_chunks.metadata,
+        llm_model_pricing.metadata,
     } == {metadata}
+
+
+def test_llm_model_pricing_stores_directional_token_costs() -> None:
+    """Pricing keeps input and output rates distinct for accurate estimates."""
+    assert {
+        'provider',
+        'model',
+        'input_cost_per_token',
+        'cached_input_cost_per_token',
+        'output_cost_per_token',
+        'currency',
+        'effective_from',
+    } <= set(llm_model_pricing.c.keys())
+    constraints = {constraint.name for constraint in llm_model_pricing.constraints}
+    assert 'uq_llm_model_pricing_version' in constraints
 
 
 def test_document_chunks_contains_section_and_search_columns() -> None:
