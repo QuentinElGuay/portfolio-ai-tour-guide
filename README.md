@@ -100,7 +100,7 @@ Unsupported questions include:
   configuration.
 - [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
   integration.
-- [Roadmap](roadmap.md): delivered work and planned validation, evaluation, and
+- [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
 ## Data source
@@ -271,7 +271,7 @@ follow-up work.
 ## Roadmap
 
 The complete plan, including milestones and deferred work, is maintained in
-[roadmap.md](roadmap.md).
+[ROADMAP.md](ROADMAP.md).
 
 ### Current release — v0.3.0: Evaluated RAG baseline
 
