@@ -1,6 +1,7 @@
 """Shared and provider-specific language-model settings."""
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,7 @@ class LLMProvider(StrEnum):
     """Supported LLM providers."""
 
     OPENAI = 'openai'
+    FIXTURE = 'fixture'
 
 
 class AgentsSettings(BaseSettings):
@@ -29,6 +31,7 @@ class AgentsSettings(BaseSettings):
         validation_alias='AGENT_LLM_PROVIDER',
     )
     api_key: SecretStr = Field(
+        default=SecretStr(''),
         validation_alias='AGENT_LLM_API_KEY',
         description='Language-model API token',
     )
@@ -40,6 +43,11 @@ class AgentsSettings(BaseSettings):
         default=DEFAULT_REQUESTS_PER_SECOND,
         gt=0,
         validation_alias='AGENT_LLM_REQUESTS_PER_SECOND',
+    )
+    fixture_dataset_path: Path | None = Field(
+        default=None,
+        validation_alias='AGENT_LLM_FIXTURE_DATASET',
+        description='Golden dataset used by the deterministic fixture LLM',
     )
 
 

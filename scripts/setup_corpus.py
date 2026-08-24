@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument('--root', type=Path, default=DEFAULT_CORPUS_ROOT)
     parser.add_argument(
         '--schema',
-        choices=('public', 'test', 'evaluation'),
+        choices=('public', 'test', 'evaluation', 'smoke'),
         default='public',
         help='Database schema to initialize and load.',
     )

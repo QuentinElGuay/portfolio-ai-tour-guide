@@ -99,6 +99,7 @@ def _document_metadata(
 
 
 def test_download_pdf_writes_valid_response_atomically(tmp_path: Path) -> None:
+    """Verify that download pdf writes valid response atomically."""
     payload = _pdf_bytes()
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -123,6 +124,8 @@ def test_download_pdf_writes_valid_response_atomically(tmp_path: Path) -> None:
 
 
 def test_download_pdf_rejects_non_pdf_content_type(tmp_path: Path) -> None:
+    """Verify that download pdf rejects non pdf content type."""
+
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
@@ -146,6 +149,8 @@ def test_download_pdf_rejects_non_pdf_content_type(tmp_path: Path) -> None:
 
 
 def test_download_pdf_rejects_invalid_signature(tmp_path: Path) -> None:
+    """Verify that download pdf rejects invalid signature."""
+
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
@@ -169,6 +174,7 @@ def test_download_pdf_rejects_invalid_signature(tmp_path: Path) -> None:
 
 
 def test_parse_pdf_returns_only_structured_sections(tmp_path: Path) -> None:
+    """Verify that parse pdf returns only structured sections."""
     path = tmp_path / 'fixture.pdf'
     path.write_bytes(
         _pdf_bytes(
@@ -198,6 +204,7 @@ def test_parse_pdf_returns_only_structured_sections(tmp_path: Path) -> None:
 
 
 def test_parse_pdf_returns_empty_structure_for_blank_page(tmp_path: Path) -> None:
+    """Verify that parse pdf returns empty structure for blank page."""
     path = tmp_path / 'blank.pdf'
     path.write_bytes(_pdf_bytes())
 
@@ -209,6 +216,7 @@ def test_parse_pdf_returns_empty_structure_for_blank_page(tmp_path: Path) -> Non
 
 
 def test_parse_pdf_sorts_text_by_page_coordinates(tmp_path: Path) -> None:
+    """Verify that parse pdf sorts text by page coordinates."""
     path = tmp_path / 'sorted.pdf'
 
     with pymupdf.open() as document:
@@ -229,6 +237,7 @@ def test_parse_pdf_sorts_text_by_page_coordinates(tmp_path: Path) -> None:
 def test_parse_pdf_detects_heading_levels_and_paragraph_pages(
     tmp_path: Path,
 ) -> None:
+    """Verify that parse pdf detects heading levels and paragraph pages."""
     path = tmp_path / 'headings.pdf'
 
     with pymupdf.open() as document:
@@ -283,6 +292,7 @@ def test_parse_pdf_detects_heading_levels_and_paragraph_pages(
 
 
 def test_parse_pdf_preserves_original_pages_after_exclusions(tmp_path: Path) -> None:
+    """Verify that parse pdf preserves original pages after exclusions."""
     path = tmp_path / 'excluded.pdf'
     path.write_bytes(
         _pdf_bytes(
@@ -314,6 +324,7 @@ def test_parse_pdf_preserves_original_pages_after_exclusions(tmp_path: Path) -> 
 
 
 def test_parse_pdf_removes_repeated_headers_and_footers(tmp_path: Path) -> None:
+    """Verify that parse pdf removes repeated headers and footers."""
     path = tmp_path / 'margins.pdf'
 
     with pymupdf.open() as document:
@@ -333,6 +344,7 @@ def test_parse_pdf_removes_repeated_headers_and_footers(tmp_path: Path) -> None:
 
 
 def test_parse_pdf_removes_ibanista_domain(tmp_path: Path) -> None:
+    """Verify that parse pdf removes ibanista domain."""
     path = tmp_path / 'fixture.pdf'
 
     with pymupdf.open() as document:
@@ -351,6 +363,7 @@ def test_parse_pdf_removes_ibanista_domain(tmp_path: Path) -> None:
 
 
 def test_parsed_pdf_json_contains_only_canonical_structure(tmp_path: Path) -> None:
+    """Verify that parsed pdf json contains only canonical structure."""
     parsed = ParsedPdf(
         metadata=_document_metadata(
             title='Découvrir la Bretagne',
@@ -391,11 +404,13 @@ def test_parsed_pdf_json_contains_only_canonical_structure(tmp_path: Path) -> No
 
 
 def test_parse_pdf_raises_error_when_file_does_not_exist(tmp_path: Path) -> None:
+    """Verify that parse pdf raises error when file does not exist."""
     with pytest.raises(PdfParseError, match='PDF file does not exist'):
         _parse_downloaded_fixture(tmp_path / 'missing.pdf')
 
 
 def test_parse_pdf_rejects_malformed_pdf(tmp_path: Path) -> None:
+    """Verify that parse pdf rejects malformed pdf."""
     path = tmp_path / 'malformed.pdf'
     path.write_bytes(b'%PDF-this-is-not-a-real-pdf')
 
@@ -406,6 +421,7 @@ def test_parse_pdf_rejects_malformed_pdf(tmp_path: Path) -> None:
 def test_parse_pdf_rejects_exclusions_that_remove_every_page(
     tmp_path: Path,
 ) -> None:
+    """Verify that parse pdf rejects exclusions that remove every page."""
     path = tmp_path / 'single.pdf'
     path.write_bytes(_pdf_bytes(pages=('Only page',)))
 
@@ -416,6 +432,7 @@ def test_parse_pdf_rejects_exclusions_that_remove_every_page(
 def test_parse_pdf_merges_multiline_chapter_title(
     tmp_path: Path,
 ) -> None:
+    """Verify that parse pdf merges multiline chapter title."""
     path = tmp_path / 'multiline-heading.pdf'
 
     with pymupdf.open() as document:
@@ -462,6 +479,7 @@ def test_parse_pdf_merges_multiline_chapter_title(
 def test_parse_pdf_detects_body_sized_bold_level_three_headings(
     tmp_path: Path,
 ) -> None:
+    """Verify that parse pdf detects body sized bold level three headings."""
     path = tmp_path / 'three-heading-levels.pdf'
 
     with pymupdf.open() as document:
@@ -554,6 +572,7 @@ def test_parse_pdf_detects_body_sized_bold_level_three_headings(
 
 
 def test_to_dict_serializes_nested_sections() -> None:
+    """Verify that to dict serializes nested sections."""
     level_three = ParsedSection(
         title='Key features of each departments',
         level=3,

@@ -8,7 +8,7 @@ from .connection import database_engine
 from .settings import DatabaseSettings
 from .tables import metadata
 
-SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation')
+SUPPORTED_SCHEMA_NAMES = ('public', 'test', 'evaluation', 'smoke')
 
 
 def initialize_database(

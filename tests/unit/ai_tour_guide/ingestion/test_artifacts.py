@@ -163,6 +163,7 @@ def test_stage_artifacts_round_trip_as_self_contained_json(
     serializer: ArtifactJsonSerializer[Any],
     artifact: Any,
 ) -> None:
+    """Verify that stage artifacts round trip as self contained json."""
     output_path = tmp_path / 'artifact.json'
 
     serializer.write(artifact, output_path)
@@ -185,6 +186,7 @@ def test_parsed_pdf_serializers_share_serialize_and_write_interface(
     tmp_path: Path,
     serializer: ParsedPdfSerializer,
 ) -> None:
+    """Verify that parsed pdf serializers share serialize and write interface."""
     parsed_pdf = _parsed_pdf()
     output_path = tmp_path / 'parsed-output'
 
@@ -196,6 +198,7 @@ def test_parsed_pdf_serializers_share_serialize_and_write_interface(
 
 
 def test_artifact_reader_rejects_the_wrong_stage_type() -> None:
+    """Verify that artifact reader rejects the wrong stage type."""
     content = PARSED_DOCUMENT_JSON.serialize(_parsed_artifact())
 
     with pytest.raises(ValueError, match='chunked_document'):
@@ -205,6 +208,7 @@ def test_artifact_reader_rejects_the_wrong_stage_type() -> None:
 def test_chunk_command_reads_and_writes_self_contained_artifacts(
     tmp_path: Path,
 ) -> None:
+    """Verify that chunk command reads and writes self contained artifacts."""
     parsed_path = tmp_path / 'guide.parsed.json'
     chunked_path = tmp_path / 'guide.chunked.json'
     PARSED_DOCUMENT_JSON.write(_parsed_artifact(), parsed_path)

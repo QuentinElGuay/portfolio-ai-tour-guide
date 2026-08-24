@@ -57,6 +57,7 @@ def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
 
 
 def test_retrieved_context_derives_text_path_and_exact_pages_from_siblings() -> None:
+    """Verify that retrieved context derives text path and exact pages from siblings."""
     document = _document()
     first = _chunk(
         document,
@@ -89,6 +90,7 @@ def test_retrieved_context_derives_text_path_and_exact_pages_from_siblings() -> 
 
 
 def test_retrieved_context_keeps_original_search_result_metadata_unchanged() -> None:
+    """Verify that retrieved context keeps original search result metadata unchanged."""
     document = _document()
     first = _chunk(document, chunk_id='chunk-1')
     second = _chunk(document, chunk_id='chunk-2', section_chunk_index=1)
@@ -119,6 +121,7 @@ def test_retrieved_context_keeps_original_search_result_metadata_unchanged() -> 
 
 
 def test_retrieved_context_rejects_mixed_document_chunks() -> None:
+    """Verify that retrieved context rejects mixed document chunks."""
     document_a = _document(1)
     document_b = _document(2)
     chunk_a = _chunk(document_a, chunk_id='a')
@@ -135,6 +138,7 @@ def test_retrieved_context_rejects_mixed_document_chunks() -> None:
 
 
 def test_retrieved_context_rejects_search_result_from_another_section() -> None:
+    """Verify that retrieved context rejects search result from another section."""
     document = _document()
     sibling = _chunk(document, chunk_id='a')
     other_section = _chunk(document, chunk_id='b', section_id='section-b')

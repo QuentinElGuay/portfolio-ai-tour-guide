@@ -19,7 +19,7 @@ ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema init-dashboard ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: help init-db reset-db reset-schema init-dashboard ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
@@ -42,6 +42,7 @@ help: ## Show the available commands.
 	@echo "  make evaluate-rag                    Run online RAG metrics without judging"
 	@echo "  make evaluate-judge                  Generate and judge RAG answers only"
 	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
+	@echo "  make smoke-test                      Run deterministic end-to-end RAG smoke tests"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
@@ -137,6 +138,14 @@ evaluate-judge: EVALUATION=judge
 evaluate-judge: evaluate
 
 evaluate-all: evaluate
+
+smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke schema.
+	$(COMPOSE) up -d --wait database
+	uv run python -m ai_tour_guide.knowledge_base.database.init --schema smoke
+	AGENT_LLM_PROVIDER=fixture \
+	AGENT_LLM_API_KEY= \
+	DB_SCHEMA=smoke \
+	uv run pytest tests/smoke
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)

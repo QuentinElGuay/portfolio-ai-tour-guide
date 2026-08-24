@@ -9,8 +9,10 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_tour_guide.agent.llm.factory import create_llm_client
+from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
-from ai_tour_guide.agent.rag.pipeline import answer_question
+from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.feedback import (
     store_feedback,
@@ -126,17 +128,25 @@ def _ensure_knowledge_base_ready() -> None:
         )
 
 
+async def _answer_question(question: str) -> RAGResult:
+    """Create the configured client and run the asynchronous RAG pipeline."""
+    client = create_llm_client(AgentsSettings())
+    if client is None:
+        raise RuntimeError('No LLM client is configured.')
+    return await answer_question_async(question, llm_client=client)
+
+
 @app.get('/health')
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     """Report that the HTTP process and its knowledge base are ready."""
     _ensure_knowledge_base_ready()
     return {'status': 'ok'}
 
 
 @app.post('/ask', response_model=AskResponse)
-def ask(request: AskRequest) -> AskResponse:
+async def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result: RAGResult = answer_question(request.question)
+    result = await _answer_question(request.question)
     try:
         store_rag_result(result.request_id, result.to_dict())
     except SQLAlchemyError as exc:
@@ -152,14 +162,10 @@ def ask(request: AskRequest) -> AskResponse:
 
 
 @app.post('/feedback', response_model=FeedbackResponse)
-def feedback(request: FeedbackRequest) -> FeedbackResponse:
+async def feedback(request: FeedbackRequest) -> FeedbackResponse:
     """Store a rating for a previously generated RAG answer."""
     try:
-        stored = store_feedback(
-            request.request_id,
-            request.helpful,
-            request.comment,
-        )
+        stored = store_feedback(request.request_id, request.helpful, request.comment)
     except SQLAlchemyError as exc:
         logger.exception('Unable to store feedback: request_id=%s', request.request_id)
         raise HTTPException(

@@ -70,6 +70,7 @@ def _result(
 
 
 def test_score_case_matches_sources_and_normalized_sections() -> None:
+    """Verify that score case matches sources and normalized sections."""
     metrics = score_case(_case(), _result())
 
     assert metrics.source_precision == 1.0
@@ -81,6 +82,7 @@ def test_score_case_matches_sources_and_normalized_sections() -> None:
 
 
 def test_score_case_counts_invalid_citations_and_refusal() -> None:
+    """Verify that score case counts invalid citations and refusal."""
     invalid = (
         InvalidCitation(
             source_url='https://other.test',
@@ -102,6 +104,7 @@ def test_score_case_counts_invalid_citations_and_refusal() -> None:
 
 
 def test_summarize_aggregates_case_metrics() -> None:
+    """Verify that summarize aggregates case metrics."""
     report = summarize([score_case(_case(), _result())])
 
     assert report['cases'] == 1

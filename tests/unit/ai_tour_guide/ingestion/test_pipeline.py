@@ -9,6 +9,7 @@ from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
 from ai_tour_guide.ingestion.pipeline import (
     chunk_document_stage,
+    download_pdf_stage,
     embed_document_stage,
     parse_pdf_stage,
 )
@@ -38,6 +39,7 @@ class _FakeEmbedder:
 
 
 def test_typed_stages_compose_without_intermediate_files() -> None:
+    """Verify that typed stages compose without intermediate files."""
     with pymupdf.open() as pdf:
         page = pdf.new_page()
         page.insert_text((72, 72), 'Visit Saint-Malo.')
@@ -75,3 +77,16 @@ def test_typed_stages_compose_without_intermediate_files() -> None:
     assert embedded.chunks[0].chunk.text == 'Visit Saint-Malo.'
     assert embedded.chunks[0].embedding == (0.0, 1.0)
     assert embedded.embedding.dimensions == 2
+
+
+def test_download_stage_reads_a_local_pdf_without_a_network_request(tmp_path) -> None:
+    pdf_path = tmp_path / 'brittany.pdf'
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((72, 72), 'Visit Saint-Malo.')
+        pdf.save(pdf_path)
+    document = IngestionDocument(title='A guide to Brittany', source_path=pdf_path)
+
+    downloaded = download_pdf_stage(document, timeout_seconds=1)
+
+    assert downloaded.document.source_url == pdf_path.resolve().as_uri()
+    assert downloaded.content.startswith(b'%PDF-')

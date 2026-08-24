@@ -65,6 +65,7 @@ def _result(
 
 
 def test_retrieve_section_chunks_is_document_scoped_and_ordered() -> None:
+    """Verify that retrieve section chunks is document scoped and ordered."""
     document = _document(7)
     first = _chunk(
         document,
@@ -103,6 +104,7 @@ def test_retrieve_section_chunks_is_document_scoped_and_ordered() -> None:
 def test_build_retrieved_contexts_queries_once_per_unique_document_section(
     retrieve_siblings: MagicMock,
 ) -> None:
+    """Verify that build retrieved contexts queries once per unique document section."""
     document_a = _document(1)
     document_b = _document(2)
 
@@ -217,6 +219,7 @@ def test_build_retrieved_contexts_queries_once_per_unique_document_section(
 def test_build_retrieved_contexts_empty_results_issue_no_sibling_queries(
     retrieve_siblings: MagicMock,
 ) -> None:
+    """Verify that build retrieved contexts empty results issue no sibling queries."""
     contexts = build_retrieved_contexts(MagicMock(), [])
     assert contexts == ()
     retrieve_siblings.assert_not_called()

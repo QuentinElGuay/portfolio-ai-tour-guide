@@ -46,6 +46,7 @@ def _result(
 
 
 def test_reciprocal_rank_fusion_deduplicates_shared_chunks() -> None:
+    """Verify that reciprocal rank fusion deduplicates shared chunks."""
     shared_vector = _result(
         document_id=1,
         chunk_id='shared',
@@ -81,6 +82,7 @@ def test_reciprocal_rank_fusion_deduplicates_shared_chunks() -> None:
 
 
 def test_reciprocal_rank_fusion_keeps_chunk_and_replaces_search_metadata() -> None:
+    """Verify that reciprocal rank fusion keeps chunk and replaces search metadata."""
     original = _result(
         document_id=1,
         chunk_id='chunk-1',
