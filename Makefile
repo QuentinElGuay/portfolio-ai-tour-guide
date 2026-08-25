@@ -242,4 +242,4 @@ annotate-dataset: ## Interactively annotate golden-dataset answers and source pa
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
 app: ## Start the agent API and Gradio chat interface.
-	$(COMPOSE) --profile app up --build
+	$(COMPOSE) --profile app up --build -d
