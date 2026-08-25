@@ -31,8 +31,9 @@ make ingest SOURCE_FILES=data/another-source.json
 make ingest DEBUG=1
 ```
 
-`make init-db` creates the tables and enables pgvector. The ingestion rejects a source
-URL already present in the database rather than replacing its document and chunks. Use
+`make init-db` creates the tables and enables pgvector. Like the Airflow DAG,
+`make ingest` skips a document whose `(source_url, version)` identity is already in the
+database. To replace an existing document and its chunks, run `make ingest FORCE=1`. Use
 `make reset-db` when you intentionally want to clear the selected application schema;
 the separate Metabase database is preserved.
 

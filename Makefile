@@ -18,6 +18,7 @@ DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
 METABASE_DB_NAME ?= metabase
 FORCE ?= 0
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
+INGEST_EXISTING_FLAG = $(if $(filter 1 true yes,$(FORCE)),--force,--skip-existing)
 COMPOSE_DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--verbose,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
@@ -43,6 +44,7 @@ help: ## Show the available commands.
 	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
 	@echo "  make airflow                         Start Airflow for parameterized ingestion"
 	@echo "  make ingest                          Ingest source_files.json"
+	@echo "  make ingest FORCE=1                  Replace documents already ingested"
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
 	@echo "  make export-csv                      Export ingestion tables to CSV"
@@ -142,7 +144,7 @@ ingest: ## Ingest the documents described by SOURCE_FILES.
 	@test -f "$(SOURCE_FILES)" || (echo "Input file not found: $(SOURCE_FILES)" >&2; exit 1)
 	@if [ -n "$(DEBUG_FLAG)" ]; then mkdir -p tmp && chmod 0777 tmp; fi
 	$(COMPOSE) --profile ingestion run --rm -T ingestion \
-		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) - < "$(SOURCE_FILES)"
+		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) $(INGEST_EXISTING_FLAG) - < "$(SOURCE_FILES)"
 
 validate-db-schema:
 	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac

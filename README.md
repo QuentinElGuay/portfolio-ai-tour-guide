@@ -223,6 +223,7 @@ Run `make help` for every available shortcut.
 | `make purge`                         | Stop everything and remove volumes.                  |
 | `make init-db`                       | Start PostgreSQL and initialise the pgvector schema. |
 | `make ingest`                        | Ingest documents defined in `source_files.json`.     |
+| `make ingest FORCE=1`                | Replace already ingested documents.                  |
 | `make airflow`                       | Start Airflow for parameterized Docker ingestion.    |
 | `make export-corpus`                 | Overwrite the current knowledge-base corpus export.  |
 | `make load-corpus SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
