@@ -107,6 +107,8 @@ Unsupported questions include:
   configuration.
 - [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
   integration.
+- [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
+  and monitoring.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
@@ -346,27 +348,29 @@ follow-up work.
 The complete plan, including milestones and deferred work, is maintained in
 [ROADMAP.md](ROADMAP.md).
 
-### Current release — v0.3.0: Evaluated RAG baseline
+### Current release — v1.0.0: Final submission
 
-This release delivers an evaluated RAG baseline for a French regional guide:
+This release delivers the complete Baguette Voyages portfolio application:
 
-- Grounded answers generated from retrieved context
-- Retrieved source references with deduplicated, ordered page numbers
+- Multi-region document ingestion from regional tourism guides
+- Grounded answers with validated source references and indexed destination discovery
 - Hybrid retrieval selected from vector, full-text, and hybrid measurements
-- Runnable search, RAG, and optional judge evaluation notebooks with saved baseline
-  results
-- A basic Gradio chat interface
+- Airflow 3 orchestration with mapped ingestion, safe skipping, and forced re-ingestion
+- Gradio chat interface, HTTP API, and Metabase monitoring dashboards
+- Reproducible Docker Compose setup with health checks and CI/CD validation
+- End-to-end tutorial, public screenshots, evaluation reports, and smoke tests
 
-### Next release — v0.4.0: Monitoring
+### Follow-up work
 
-The next goal is to collect feedback and make application behaviour observable. Broader
-evaluation experiments, such as prompt/model comparisons and dataset versioning, remain
-follow-up work rather than release blockers.
+Further hardening and experiments remain tracked in the [roadmap](ROADMAP.md), including
+runtime container tests, Airflow integration coverage, prompt comparisons, and optional
+cloud deployment.
 
 ### Capstone success criteria
 
 The project follows the
 [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
+
 A complete submission should demonstrate the following features:
 
 - ✅ A clearly defined problem, target users, supported questions, and limitations.
@@ -379,13 +383,14 @@ A complete submission should demonstrate the following features:
 - ⏳ LLM-answer evaluation that compares multiple prompt or generation approaches and
   selects the best one.
 - ✅ A usable interface for asking questions, such as the chat application and HTTP API.
-- ⏳ Monitoring through user feedback and a dashboard that makes application behaviour
+- ✅ Monitoring through user feedback and dashboards that make application behaviour
   visible.
-- 🔄 Containerised services, pinned dependency versions, and clear setup instructions for
+- ✅ Containerised services, pinned dependency versions, and clear setup instructions for
   a reproducible local run.
-- ⏳ Retrieval best practices evaluated for their value: hybrid search, reranking, and
-  query rewriting.
-- ⏳ Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
+- ✅ Hybrid search evaluated against vector and full-text retrieval and selected as the
+  application default.
+- ⏳ Reranking and query rewriting remain optional follow-up experiments.
+- ✅ Automated tests and CI/CD; cloud deployment remains an optional extension.
 
 #### Delivery status
 

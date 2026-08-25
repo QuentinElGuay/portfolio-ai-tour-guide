@@ -121,13 +121,15 @@ ______________________________________________________________________
 - [x] Provide Dockerfiles, Docker Compose services, persistent database storage, and
   startup health checks.
 - [x] Document setup, configuration, ingestion, usage, and limitations.
+- [x] Provide an end-to-end tutorial covering ingestion, the chat app, evaluation, and
+  monitoring.
 - [x] Provide a deterministic smoke-test command that ingests an original local PDF into
   an isolated schema and checks health, grounded answers, citations, and refusals
   through the API.
 - [x] Publish the latest evaluation evidence and reports in the documentation.
 - [x] Publish versioned application images to GitHub Container Registry when a release
   tag is pushed; deployment remains intentionally out of scope.
-- [ ] Add public application screenshots to the project documentation.
+- [x] Add public application screenshots to the project documentation.
 
 **Acceptance criteria**
 
@@ -143,13 +145,11 @@ ______________________________________________________________________
   checks on pull requests and pushes to the main branch.
 - [x] Publish immutable commit-SHA and release-tagged container images without deploying
   them.
-- [ ] Record a concise demo showing ingestion, a grounded answer, an unsupported
-  question, and sources.
 
 **Acceptance criteria**
 
 - [x] A contributor can verify changes automatically before merge.
-- [ ] A reviewer can understand the project outcome from the README and demo.
+- [x] A reviewer can understand the project outcome from the README and tutorial.
 
 ______________________________________________________________________
 
@@ -157,8 +157,9 @@ ______________________________________________________________________
 
 **Status:** ⏳ Planned
 
-The final submission requires public screenshots and a concise demo. Delivery
-automation, evaluation evidence, and a deterministic smoke test are already available.
+The final submission has public screenshots and a tutorial. Delivery automation,
+evaluation evidence, and a deterministic smoke test are also available. A recorded demo
+is deferred until it adds value beyond the existing documentation.
 
 ______________________________________________________________________
 
