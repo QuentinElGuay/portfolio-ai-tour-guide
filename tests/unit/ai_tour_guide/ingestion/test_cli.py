@@ -11,6 +11,7 @@ from ai_tour_guide.ingestion.cli import main
 from ai_tour_guide.ingestion.config import ChunkingConfig
 from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
 from ai_tour_guide.ingestion.settings import IngestionSettings
+from ai_tour_guide.knowledge_base.database.insert import DocumentAlreadyExistsError
 
 
 def test_cli_exposes_each_stage_and_the_pipeline() -> None:
@@ -112,7 +113,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
         embedder=embedder,
         batch_size=8,
     )
-    load_stage.assert_called_once_with(embedded)
+    load_stage.assert_called_once_with(embedded, force=False)
 
     if debug:
         write_debug_artifacts.assert_called_once_with(
@@ -125,3 +126,39 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
     else:
         write_debug_artifacts.assert_not_called()
         assert not artifact_directory.exists()
+
+
+def test_document_pipeline_can_skip_existing_documents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that duplicate documents can be treated as successful no-ops."""
+    document = IngestionDocument(
+        title='Existing guide',
+        source_url='https://example.test/existing.pdf',
+    )
+    embedder: Embedder = MagicMock(spec=Embedder)
+
+    monkeypatch.setattr(
+        pipeline, 'download_pdf_stage', MagicMock(return_value=object())
+    )
+    monkeypatch.setattr(pipeline, 'parse_pdf_stage', MagicMock(return_value=object()))
+    monkeypatch.setattr(
+        pipeline, 'chunk_document_stage', MagicMock(return_value=object())
+    )
+    monkeypatch.setattr(
+        pipeline, 'embed_document_stage', MagicMock(return_value=object())
+    )
+    load_stage = MagicMock(side_effect=DocumentAlreadyExistsError('already exists'))
+    monkeypatch.setattr(pipeline, 'load_document_stage', load_stage)
+
+    result = pipeline.run_document_pipeline(
+        document,
+        settings=IngestionSettings(timeout=30.0),
+        embedder=embedder,
+        embedding_batch_size=8,
+        chunking_config=ChunkingConfig(500, 700, 1, 2),
+        skip_existing=True,
+    )
+
+    assert result is None
+    load_stage.assert_called_once()

@@ -33,6 +33,7 @@ from ai_tour_guide.ingestion.serialization import (
     PARSED_DOCUMENT_JSON,
 )
 from ai_tour_guide.ingestion.settings import IngestionSettings
+from ai_tour_guide.knowledge_base.database.insert import DocumentAlreadyExistsError
 
 
 def download_pdf_stage(
@@ -120,7 +121,11 @@ def embed_document_stage(
     )
 
 
-def load_document_stage(embedded: EmbeddedDocumentArtifact) -> int:
+def load_document_stage(
+    embedded: EmbeddedDocumentArtifact,
+    *,
+    force: bool = False,
+) -> int:
     """Load one complete embedded document into the knowledge base."""
     from ai_tour_guide.knowledge_base.database import insert_document_with_chunks
 
@@ -129,6 +134,7 @@ def load_document_stage(embedded: EmbeddedDocumentArtifact) -> int:
         embedded.chunks,
         embedded.chunking,
         embedded.embedding,
+        replace_existing=force,
     )
 
 
@@ -170,7 +176,9 @@ def run_document_pipeline(
     embedder: Embedder,
     embedding_batch_size: int,
     chunking_config: ChunkingConfig,
-) -> int:
+    skip_existing: bool = False,
+    force: bool = False,
+) -> int | None:
     """Execute every typed stage sequentially for one source document."""
     downloaded = download_pdf_stage(
         document,
@@ -196,7 +204,12 @@ def run_document_pipeline(
             embedded,
         )
 
-    return load_document_stage(embedded)
+    try:
+        return load_document_stage(embedded, force=force)
+    except DocumentAlreadyExistsError:
+        if not skip_existing:
+            raise
+        return None
 
 
 def run_pipeline(
@@ -206,7 +219,9 @@ def run_pipeline(
     embedder: Embedder,
     embedding_batch_size: int,
     chunking_config: ChunkingConfig,
-) -> tuple[int, ...]:
+    skip_existing: bool = False,
+    force: bool = False,
+) -> tuple[int | None, ...]:
     """Run documents sequentially and return their database identifiers."""
     if settings.debug:
         settings.tmp_folder.mkdir(parents=True, exist_ok=True)
@@ -218,6 +233,8 @@ def run_pipeline(
             embedder=embedder,
             embedding_batch_size=embedding_batch_size,
             chunking_config=chunking_config,
+            skip_existing=skip_existing,
+            force=force,
         )
         for document in documents
     )

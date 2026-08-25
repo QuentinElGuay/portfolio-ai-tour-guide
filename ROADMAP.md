@@ -178,6 +178,12 @@ These improvements are useful but are not priorities for the final submission.
   an isolated schema.
 - [x] Add deterministic ingestion and retrieval smoke coverage with a fixture LLM and an
   isolated schema.
+- [x] Validate the Airflow Compose profile and DAG imports in CI.
+- [ ] Add container-level runtime smoke tests for the production ingestion and agent
+  images, rather than validating application behavior only through the host `uv`
+  environment.
+- [ ] Add an Airflow CI integration test that triggers `ingest_documents` with a small
+  fixture document and verifies initialization, ingestion, and database persistence.
 - [ ] Pin the embedding model artifact and verify reproducibility against it.
 - [ ] Add ingestion-run status, duration, counts, and failure details if operational
   monitoring becomes necessary.

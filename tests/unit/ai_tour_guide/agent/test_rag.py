@@ -10,6 +10,10 @@ from ai_tour_guide.agent.rag.models import (
     SourceReference,
 )
 from ai_tour_guide.agent.rag.pipeline import answer_question, answer_question_async
+from ai_tour_guide.agent.rag.prompting import (
+    build_system_prompt,
+    is_destination_catalog_question,
+)
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
@@ -61,12 +65,15 @@ def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
 @patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
 @patch('ai_tour_guide.agent.rag.pipeline.build_messages')
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve_context')
+@patch('ai_tour_guide.agent.rag.pipeline.list_known_destination_titles')
 def test_answer_question_retrieves_context_and_returns_sources(
+    list_known_destination_titles: MagicMock,
     retrieve_context: MagicMock,
     build_messages: MagicMock,
     validate_citations: MagicMock,
 ) -> None:
     """Verify that answering a question retrieves context, sends it to the LLM, and preserves its sources."""
+    list_known_destination_titles.return_value = ('Guide to Normandy',)
     context = MagicMock()
     retrieve_context.return_value = (context,)
     build_messages.return_value = ({'role': 'user', 'content': 'Question'},)
@@ -81,7 +88,11 @@ def test_answer_question_retrieves_context_and_returns_sources(
 
     retrieve_context.assert_called_once()
     assert retrieve_context.call_args.kwargs['search_mode'].value == 'hybrid'
-    build_messages.assert_called_once_with('Question', (context,))
+    build_messages.assert_called_once_with(
+        'Question',
+        (context,),
+        known_destination_titles=('Guide to Normandy',),
+    )
     client.answer_question.assert_awaited_once_with(build_messages.return_value)
     assert result.answer == 'Answer.'
     assert isinstance(result.request_id, UUID)
@@ -104,8 +115,14 @@ def test_answer_question_assigns_and_propagates_request_id(
     assert result is expected
 
 
+@patch(
+    'ai_tour_guide.agent.rag.pipeline.list_known_destination_titles', return_value=()
+)
 @patch('ai_tour_guide.agent.rag.pipeline.retrieve_context', return_value=())
-def test_answer_question_handles_empty_retrieval(retrieve_context: MagicMock) -> None:
+def test_answer_question_handles_empty_retrieval(
+    retrieve_context: MagicMock,
+    list_known_destination_titles: MagicMock,
+) -> None:
     """Verify that an unanswered retrieval returns the insufficient-context response without sources."""
     client = MagicMock()
     client.answer_question = AsyncMock()
@@ -117,6 +134,62 @@ def test_answer_question_handles_empty_retrieval(retrieve_context: MagicMock) ->
     assert result.sources == ()
     client.answer_question.assert_not_awaited()
     retrieve_context.assert_called_once()
+    list_known_destination_titles.assert_called_once()
+
+
+@patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
+@patch('ai_tour_guide.agent.rag.pipeline.build_messages')
+@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context')
+@patch('ai_tour_guide.agent.rag.pipeline.list_known_destination_titles')
+def test_answer_question_answers_catalog_questions_without_retrieval(
+    list_known_destination_titles: MagicMock,
+    retrieve_context: MagicMock,
+    build_messages: MagicMock,
+    validate_citations: MagicMock,
+) -> None:
+    """Verify that available-destination questions use only the document catalog."""
+    list_known_destination_titles.return_value = (
+        'Guide to Normandy',
+        'Guide to Occitanie',
+    )
+    build_messages.return_value = ({'role': 'user', 'content': 'Question'},)
+    validate_citations.return_value = CitationValidationResult((), ())
+    client = MagicMock()
+    client.answer_question = AsyncMock(
+        return_value=GeneratedAnswer('We cover Normandy.')
+    )
+
+    result = asyncio.run(
+        answer_question_async('Which destinations do you cover?', llm_client=client)
+    )
+
+    retrieve_context.assert_not_called()
+    build_messages.assert_called_once_with(
+        'Which destinations do you cover?',
+        (),
+        known_destination_titles=('Guide to Normandy', 'Guide to Occitanie'),
+    )
+    client.answer_question.assert_awaited_once_with(build_messages.return_value)
+    assert result.answer == 'We cover Normandy.'
+    assert result.contexts == ()
+    assert result.sources == ()
+
+
+def test_destination_catalog_detection_rejects_detailed_questions() -> None:
+    """Verify that destination-specific questions must use retrieved context."""
+    assert is_destination_catalog_question('Which destinations do you cover?')
+    assert not is_destination_catalog_question(
+        'What are the best places to visit in Normandy?'
+    )
+
+
+def test_system_prompt_includes_current_destination_catalog() -> None:
+    """Verify that catalog answers are limited to the currently indexed guides."""
+    prompt = build_system_prompt(('Guide to Normandy', 'Guide to Occitanie'))
+
+    assert '- Guide to Normandy' in prompt
+    assert '- Guide to Occitanie' in prompt
+    assert 'Do not provide any destination\ndetails from the catalog alone.' in prompt
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.create_llm_client', return_value=None)

@@ -68,6 +68,31 @@ def test_insert_document_rejects_duplicate_source_identity() -> None:
     create_document.assert_not_called()
 
 
+def test_insert_document_replaces_duplicate_when_requested() -> None:
+    """Verify that force mode removes the old aggregate before inserting its replacement."""
+    session = MagicMock()
+    existing = MagicMock()
+    session.scalar.return_value = existing
+    document = MagicMock()
+    document.metadata.source_url = 'https://example.test/guide.pdf'
+    document.version = None
+    replacement = MagicMock()
+
+    with patch.object(insert.ModelFactory, 'create_document', return_value=replacement):
+        result = insert.insert_document(
+            session,
+            document,
+            [MagicMock()],
+            ChunkingConfig(100, 200, None, None),
+            embedding_model_id=1,
+            replace_existing=True,
+        )
+
+    assert result is replacement
+    session.delete.assert_called_once_with(existing)
+    assert session.flush.call_count == 2
+
+
 @patch('ai_tour_guide.knowledge_base.database.insert.insert_document')
 @patch('ai_tour_guide.knowledge_base.database.insert.get_or_create_embedding_model')
 @patch('ai_tour_guide.knowledge_base.database.insert.Session')

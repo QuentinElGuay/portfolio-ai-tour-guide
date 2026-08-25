@@ -17,10 +17,14 @@ Return to the [project overview](../../../README.md).
 ## Request flow
 
 1. The agent receives a question through the CLI or `POST /ask`.
-2. It retrieves the most relevant chunks from PostgreSQL using vector search by default.
-3. It builds a prompt containing the retrieved context and question.
-4. The configured `LLMClient` generates an answer and document/page citations.
-5. The agent validates citations against the retrieved provenance, then returns only
+2. It reads the titles of indexed documents as its live destination catalog. Only a
+   question asking which destinations or guides are available may be answered from this
+   catalog alone.
+3. For every other question, it retrieves the most relevant chunks from PostgreSQL using
+   vector search by default.
+4. It builds a prompt containing the catalog, retrieved context, and question.
+5. The configured `LLMClient` generates an answer and document/page citations.
+6. The agent validates citations against the retrieved provenance, then returns only
    validated source references to user interfaces.
 
 The project currently supports the OpenAI API for answer generation. Additional LLM
@@ -74,17 +78,17 @@ The CLI uses the same retrieval and RAG pipeline. The Docker shortcuts start any
 agent dependencies:
 
 ```bash
-make vector_search QUESTION='Where is the Brittany coast?'
-make text_search QUESTION='Brittany coast'
-make ask QUESTION='What are the best places to visit in Brittany?' K=5
-make ask QUESTION='What are the best places to visit in Brittany?' K=5 VERBOSE=1
+make vector_search QUESTION='Where are the Normandy D-Day beaches?'
+make text_search QUESTION='Normandy coast'
+make ask QUESTION='What are the best places to visit in Normandy?' K=5
+make ask QUESTION='What are the best places to visit in Normandy?' K=5 VERBOSE=1
 ```
 
 Run directly with Python after configuring `DB_*`, `EMBEDDING_*`, and `AGENT_LLM_*`:
 
 ```bash
-uv run portfolio-ai-tour-guide-agent search --mode vector --k 5 'Where is Dinan?'
-uv run portfolio-ai-tour-guide-agent ask --k 5 'What should I visit in Brittany?'
+uv run portfolio-ai-tour-guide-agent search --mode vector --k 5 'Where is Rouen?'
+uv run portfolio-ai-tour-guide-agent ask --k 5 'What should I visit in Occitanie?'
 ```
 
 `search` supports `vector`, `text`, and `hybrid` modes. `ask` uses vector retrieval by
@@ -105,7 +109,7 @@ metadata, and any handled operational error.
 
 ```json
 {
-  "question": "What should I visit in Brittany?"
+  "question": "What should I visit in Normandy?"
 }
 ```
 
@@ -117,9 +121,9 @@ It returns an answer and source references:
   "answer": "The guide recommends ...",
   "sources": [
     {
-      "source_url": "https://example.com/brittany-guide.pdf",
+      "source_url": "https://example.com/normandy-guide.pdf",
       "version": "2026",
-      "title": "Guide to the Region of Brittany",
+      "title": "Guide to the Region of Normandy",
       "publisher": "Regional Tourism Board",
       "collection": "Tour Guides",
       "publication_date": "2026-01-01",

@@ -72,22 +72,26 @@ def insert_document(
     chunking: ChunkingConfig,
     *,
     embedding_model_id: int,
+    replace_existing: bool = False,
 ) -> DocumentRow:
-    """Insert one document aggregate into an existing transaction without replacing rows."""
+    """Insert one document aggregate into an existing transaction."""
     if not chunks:
         raise ValueError('a document must contain at least one embedded chunk')
 
-    existing_document_id = session.scalar(
+    existing = session.scalar(
         select(DocumentRow.document_id).where(
             DocumentRow.source_url == document.metadata.source_url,
             DocumentRow.version == document.version,
         )
     )
-    if existing_document_id is not None:
+    if existing is not None and not replace_existing:
         raise DocumentAlreadyExistsError(
             'Document already exists for source identity '
             f'({document.metadata.source_url!r}, {document.version!r})'
         )
+    if existing is not None:
+        session.delete(existing)
+        session.flush()
 
     row = ModelFactory.create_document(
         document,
@@ -114,6 +118,8 @@ def insert_document_with_chunks(
     chunks: Sequence[EmbeddedChunk],
     chunking_metadata: ChunkingConfig,
     embedding_metadata: EmbeddingMetadata,
+    *,
+    replace_existing: bool = False,
 ) -> int:
     """Persist a fully embedded document atomically and return its database ID."""
     engine = create_database_engine()
@@ -130,6 +136,7 @@ def insert_document_with_chunks(
                         chunks,
                         chunking_metadata,
                         embedding_model_id=embedding_model.embedding_model_id,
+                        replace_existing=replace_existing,
                     )
             except IntegrityError as exc:
                 if _is_document_identity_violation(exc):

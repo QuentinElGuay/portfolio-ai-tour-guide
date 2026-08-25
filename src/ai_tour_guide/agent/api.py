@@ -93,7 +93,7 @@ class FeedbackResponse(BaseModel):
     request_id: UUID
 
 
-app = FastAPI(title='AI Tour Guide Agent')
+app = FastAPI(title='Baguette Voyages Agent')
 
 
 def _ensure_knowledge_base_ready() -> None:

@@ -100,6 +100,6 @@
 {"id":100,"category":"Climate and seasonal weather","question":"How is rainfall distributed throughout the year?","expected":{"answerable":true,"reference_answer":"Rainfall is fairly evenly distributed throughout the year.","relevant_source":{"source_url":"https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf","version":null,"section_path":["guide-to-the-region-of-brittany","geography-and-climate","climate"]}}}
 {"id":101,"category":"Unsupported current information","question":"What is the weather in Brest today?","expected":{"answerable":false,"reference_answer":null}}
 {"id":102,"category":"Unsupported booking request","question":"Can you book a hotel in Saint-Malo for this weekend?","expected":{"answerable":false,"reference_answer":null}}
-{"id":103,"category":"Unsupported external destination","question":"What are the best places to visit in Normandy?","expected":{"answerable":false,"reference_answer":null}}
+{"id":103,"category":"Unsupported external destination","question":"What are the best places to visit in Corsica?","expected":{"answerable":false,"reference_answer":null}}
 {"id":104,"category":"Unsupported finance question","question":"Should I invest in renewable-energy stocks?","expected":{"answerable":false,"reference_answer":null}}
 {"id":105,"category":"Unsupported unrelated topic","question":"How does quantum entanglement work?","expected":{"answerable":false,"reference_answer":null}}

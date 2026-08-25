@@ -6,10 +6,35 @@ x-app-environment: &app-environment
   DB_NAME: "${DB_NAME:?DB_NAME is required}"
   DB_USER: "${DB_USER:?DB_USER is required}"
   DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
-  DB_SCHEMA: "${DB_SCHEMA:-public}"
+  DB_SCHEMA: "${DB_SCHEMA:?DB_SCHEMA is required}"
   EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:?EMBEDDING_DIMENSIONS is required}"
   EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
-  EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:-true}"
+  EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:?EMBEDDING_NORMALIZE is required}"
+
+x-airflow-environment: &airflow-environment
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+  AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-webserver:8080/execution/
+  AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY:?AIRFLOW_FERNET_KEY is required}"
+  AIRFLOW__CORE__HOSTNAME_CALLABLE: socket.gethostname
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+  AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW_API_SECRET_KEY:?AIRFLOW_API_SECRET_KEY is required}"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://${DB_USER:?DB_USER is required}:${DB_PASSWORD:?DB_PASSWORD is required}@database:5432/${AIRFLOW_DB_NAME:?AIRFLOW_DB_NAME is required}"
+  AIRFLOW__API__SECRET_KEY: "${AIRFLOW_API_SECRET_KEY}"
+  AIRFLOW_APPLICATION_DB_HOST: database
+  AIRFLOW_APPLICATION_DB_PORT: "5432"
+  AIRFLOW_DOCKER_URL: unix://var/run/docker.sock
+  AIRFLOW_INGESTION_IMAGE: ai-tour-guide-ingestion:local
+  AIRFLOW_INGESTION_NETWORK: ai-tour-guide-network
+  DB_NAME: "${DB_NAME:?DB_NAME is required}"
+  DB_USER: "${DB_USER:?DB_USER is required}"
+  DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+  DB_SCHEMA: "${DB_SCHEMA:?DB_SCHEMA is required}"
+  EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:?EMBEDDING_DIMENSIONS is required}"
+  EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:?EMBEDDING_MODEL_NAME is required}"
+  EMBEDDING_NORMALIZE: "${EMBEDDING_NORMALIZE:?EMBEDDING_NORMALIZE is required}"
 
 services:
   ai-tour-guide-base:
@@ -27,6 +52,7 @@ services:
       - ingestion
       - agent
       - app
+      - airflow
 
     scale: 0
 
@@ -39,7 +65,7 @@ services:
       POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
 
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:?DB_PORT is required}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -51,7 +77,7 @@ services:
           "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
         ]
       interval: 5s
-      timeout: 5s
+      timeout: 15s
       retries: 10
       start_period: 10s
 
@@ -121,6 +147,223 @@ services:
     networks:
       - ai-tour-guide
 
+  # This one-shot service builds the image that Airflow later starts through the host daemon.
+  airflow-ingestion-image:
+    image: ai-tour-guide-ingestion:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/ingestion.Dockerfile
+      additional_contexts:
+        ai-tour-guide-base: service:ai-tour-guide-base
+
+    profiles:
+      - airflow
+
+    entrypoint: ["/bin/true"]
+
+    restart: "no"
+
+  airflow-database:
+    image: postgres:17-alpine
+
+    profiles:
+      - airflow
+
+    environment:
+      PGHOST: database
+      PGPORT: "5432"
+      PGDATABASE: "${DB_NAME:?DB_NAME is required}"
+      PGUSER: "${DB_USER:?DB_USER is required}"
+      PGPASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      AIRFLOW_DB_NAME: "${AIRFLOW_DB_NAME:?AIRFLOW_DB_NAME is required}"
+
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${AIRFLOW_DB_NAME}" in
+          ''|*[!a-z0-9_]*|[0-9]*)
+            echo "AIRFLOW_DB_NAME must be a lowercase PostgreSQL identifier" >&2
+            exit 1
+            ;;
+        esac
+        if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$${AIRFLOW_DB_NAME}'" | grep -q 1; then
+          createdb "$${AIRFLOW_DB_NAME}"
+        fi
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    restart: "no"
+
+    networks:
+      - ai-tour-guide
+
+  airflow-init:
+    image: ai-tour-guide-airflow:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+
+    profiles:
+      - airflow
+
+    # Airflow 3 installs Python packages for the airflow user. Its root group
+    # membership still permits access to the mounted Docker socket.
+    user: "50000:0"
+
+    environment:
+      <<: *airflow-environment
+      AIRFLOW_ADMIN_USERNAME: "${AIRFLOW_ADMIN_USERNAME:?AIRFLOW_ADMIN_USERNAME is required}"
+      AIRFLOW_ADMIN_PASSWORD: "${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD is required}"
+
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+
+    entrypoint: ["/bin/bash"]
+    command:
+      - -ec
+      - |
+        airflow db migrate
+        airflow fab-db migrate
+        airflow users create \
+          --username "$${AIRFLOW_ADMIN_USERNAME}" \
+          --password "$${AIRFLOW_ADMIN_PASSWORD}" \
+          --firstname Airflow \
+          --lastname Admin \
+          --role Admin \
+          --email "$${AIRFLOW_ADMIN_USERNAME}@localhost" || true
+
+    depends_on:
+      airflow-database:
+        condition: service_completed_successfully
+
+    restart: "no"
+
+    networks:
+      - ai-tour-guide
+
+  airflow-webserver:
+    image: ai-tour-guide-airflow:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+
+    profiles:
+      - airflow
+
+    user: "50000:0"
+    hostname: airflow-webserver
+
+    environment:
+      <<: *airflow-environment
+
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+
+    command: api-server
+
+    ports:
+      - "${AIRFLOW_PORT:?AIRFLOW_PORT is required}:8080"
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import json, urllib.request; health=json.load(urllib.request.urlopen(
+          'http://localhost:8080/api/v2/monitor/health')); assert all(
+          health.get(component, {}).get('status') == 'healthy' for component in
+          ('metadatabase', 'scheduler', 'dag_processor'))"
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 0s
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+    networks:
+      - ai-tour-guide
+
+  airflow-scheduler:
+    image: ai-tour-guide-airflow:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+
+    profiles:
+      - airflow
+
+    user: "50000:0"
+    hostname: airflow-scheduler
+    group_add:
+      - "${DOCKER_GID:?DOCKER_GID is required}"
+
+    environment:
+      <<: *airflow-environment
+
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    command: scheduler
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-ingestion-image:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+    networks:
+      - ai-tour-guide
+
+  airflow-dag-processor:
+    image: ai-tour-guide-airflow:local
+    pull_policy: build
+
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+
+    profiles:
+      - airflow
+
+    user: "50000:0"
+    hostname: airflow-dag-processor
+
+    environment:
+      <<: *airflow-environment
+
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+
+    command: dag-processor
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+    networks:
+      - ai-tour-guide
+
   agent:
     image: ai-tour-guide-agent:local
     pull_policy: build
@@ -137,12 +380,12 @@ services:
 
     environment:
       <<: *app-environment
-      AGENT_LLM_PROVIDER: "${AGENT_LLM_PROVIDER:-openai}"
-      AGENT_LLM_API_KEY: "${AGENT_LLM_API_KEY:-}"
-      AGENT_LLM_MODEL: "${AGENT_LLM_MODEL:-gpt-4.1-mini}"
+      AGENT_LLM_PROVIDER: "${AGENT_LLM_PROVIDER:?AGENT_LLM_PROVIDER is required}"
+      AGENT_LLM_API_KEY: "${AGENT_LLM_API_KEY:?AGENT_LLM_API_KEY is required}"
+      AGENT_LLM_MODEL: "${AGENT_LLM_MODEL:?AGENT_LLM_MODEL is required}"
 
     ports:
-      - "${AGENT_PORT:-8000}:8000"
+      - "${AGENT_PORT:?AGENT_PORT is required}:8000"
 
     depends_on:
       database:
@@ -177,12 +420,12 @@ services:
       CHAT_API_URL: http://agent:8000/ask
       CHAT_HOST: 0.0.0.0
       CHAT_PORT: "7860"
-      CHAT_TITLE: "${CHAT_TITLE:-Brittany AI Tour Guide}"
+      CHAT_TITLE: "${CHAT_TITLE:?CHAT_TITLE is required}"
 
     command: ["python", "-m", "ai_tour_guide.agent.chat.app"]
 
     ports:
-      - "${CHAT_PORT:-7860}:7860"
+      - "${CHAT_PORT:?CHAT_PORT is required}:7860"
 
     depends_on:
       agent:
@@ -201,14 +444,14 @@ services:
 
     environment:
       MB_DB_TYPE: postgres
-      MB_DB_DBNAME: "${METABASE_DB_NAME:-metabase}"
+      MB_DB_DBNAME: "${METABASE_DB_NAME:?METABASE_DB_NAME is required}"
       MB_DB_PORT: "5432"
       MB_DB_USER: "${DB_USER:?DB_USER is required}"
       MB_DB_PASS: "${DB_PASSWORD:?DB_PASSWORD is required}"
       MB_DB_HOST: database
 
     ports:
-      - "${DASHBOARD_PORT:-3000}:3000"
+      - "${DASHBOARD_PORT:?DASHBOARD_PORT is required}:3000"
 
     depends_on:
       metabase-database:
@@ -243,7 +486,7 @@ services:
       PGDATABASE: "${DB_NAME:?DB_NAME is required}"
       PGUSER: "${DB_USER:?DB_USER is required}"
       PGPASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
-      METABASE_DB_NAME: "${METABASE_DB_NAME:-metabase}"
+      METABASE_DB_NAME: "${METABASE_DB_NAME:?METABASE_DB_NAME is required}"
 
     command:
       - /bin/sh
@@ -291,10 +534,10 @@ services:
       METABASE_URL: http://dashboard:3000
       METABASE_ADMIN_EMAIL: "${METABASE_ADMIN_EMAIL:?METABASE_ADMIN_EMAIL is required}"
       METABASE_ADMIN_PASSWORD: "${METABASE_ADMIN_PASSWORD:?METABASE_ADMIN_PASSWORD is required}"
-      METABASE_DATABASE_NAME: "${METABASE_DATABASE_NAME:-AI Tour Guide}"
+      METABASE_DATABASE_NAME: "${METABASE_DATABASE_NAME:?METABASE_DATABASE_NAME is required}"
       METABASE_DATABASE_HOST: database
-      METABASE_HEALTH_TIMEOUT_SECONDS: "${METABASE_HEALTH_TIMEOUT_SECONDS:-300}"
-      METABASE_DB_NAME: "${METABASE_DB_NAME:-metabase}"
+      METABASE_HEALTH_TIMEOUT_SECONDS: "${METABASE_HEALTH_TIMEOUT_SECONDS:?METABASE_HEALTH_TIMEOUT_SECONDS is required}"
+      METABASE_DB_NAME: "${METABASE_DB_NAME:?METABASE_DB_NAME is required}"
       DB_NAME: "${DB_NAME:?DB_NAME is required}"
       DB_USER: "${DB_USER:?DB_USER is required}"
       DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
@@ -319,7 +562,9 @@ services:
 
 volumes:
   postgres_data:
+  airflow_logs:
 
 networks:
   ai-tour-guide:
+    name: ai-tour-guide-network
     driver: bridge

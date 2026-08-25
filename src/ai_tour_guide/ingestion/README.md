@@ -88,6 +88,16 @@ uv sync
 uv run portfolio-ai-tour-guide-ingestion run source_files.json
 ```
 
+The Airflow ingestion DAG adds `--skip-existing`, so a document whose
+`(source_url, version)` identity is already present is reported as skipped and the task
+succeeds. The CLI remains strict by default; pass `--skip-existing` explicitly when a
+local rerun should also treat existing documents as successful no-ops.
+
+Use `--force` to replace an existing document. The replacement deletes the existing
+document and its related chunks in the same database transaction as the new insertion.
+The Airflow DAG exposes this as the `force_reingestion` trigger parameter; it is
+mutually exclusive with skipping existing documents.
+
 When connecting to the Compose database from the host, use the values in `.env`,
 including `DB_HOST=localhost` and `DB_PORT=5432`.
 

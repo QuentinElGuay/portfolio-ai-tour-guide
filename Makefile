@@ -25,10 +25,12 @@ DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all simulate-rag smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: help stop purge init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore airflow ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all simulate-rag smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
 
 help: ## Show the available commands.
 	@echo "Available commands:"
+	@echo "  make stop                            Stop every Compose profile and remove containers"
+	@echo "  make purge                           Stop everything and remove volumes (destructive)"
 	@echo "  make init-db                         Initialize the PostgreSQL schema"
 	@echo "  make reset-db                        Reset the selected application schema"
 	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
@@ -39,6 +41,7 @@ help: ## Show the available commands.
 	@echo "  make dashboard-export                Export the dashboard application database"
 	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
 	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
+	@echo "  make airflow                         Start Airflow for parameterized ingestion"
 	@echo "  make ingest                          Ingest source_files.json"
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
@@ -65,6 +68,12 @@ help: ## Show the available commands.
 	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
 	@echo "  make app                             Start the agent API and Gradio chat"
 	@echo "  DEBUG=1                              Enable verbose Docker Compose diagnostics"
+
+stop: ## Stop every Compose profile and remove containers, networks, and orphans.
+	$(COMPOSE) --profile "*" down --remove-orphans
+
+purge: ## Stop everything and remove containers, networks, orphans, and volumes.
+	$(COMPOSE) --profile "*" down --volumes --remove-orphans
 
 init-db: validate-db-schema ## Start PostgreSQL and initialize its schema.
 	$(COMPOSE) --profile tools run --build --rm init-db \
@@ -124,6 +133,10 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	fi
 	$(COMPOSE) --profile dashboard build metabase-database
 	$(COMPOSE) --profile dashboard run --rm metabase-database
+
+airflow: ## Start Airflow and its host-Docker ingestion orchestration.
+	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile airflow up --build -d --wait \
+		database airflow-webserver airflow-scheduler airflow-dag-processor
 
 ingest: ## Ingest the documents described by SOURCE_FILES.
 	@test -f "$(SOURCE_FILES)" || (echo "Input file not found: $(SOURCE_FILES)" >&2; exit 1)

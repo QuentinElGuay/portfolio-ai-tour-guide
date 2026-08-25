@@ -1,11 +1,10 @@
-# Brittany AI Tour Guide
+# Baguette Voyages
 
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
-Degemer mat ("Welcome" in Breton)!
-
-An AI tour guide for Brittany, France. It uses **Retrieval-Augmented Generation (RAG)**
-to answer travellers' questions from an indexed tourism guide.
+Bonjour! Baguette Voyages is a fictional French travel company powered by
+**Retrieval-Augmented Generation (RAG)**. Its travel assistant answers questions from
+indexed regional tourism guides.
 
 > [!IMPORTANT]
 > 🚧 This project is under **<ins>active development</ins>**.
@@ -20,6 +19,7 @@ to answer travellers' questions from an indexed tourism guide.
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
 - [Common commands](#common-commands)
+- [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
 - [Roadmap](#roadmap)
 - [Capstone success criteria](#capstone-success-criteria)
@@ -30,9 +30,9 @@ to answer travellers' questions from an indexed tourism guide.
 
 Created as a capstone project for
 [LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) by
-[DataTalks.Club](https://datatalks.club), this project turns a Brittany tourism guide
-into a question-answering experience that helps travellers explore the region. It
-processes the guide into searchable passages, uses **vector embeddings** and
+[DataTalks.Club](https://datatalks.club), this project turns French regional tourism
+guides into a question-answering experience that helps travellers plan their trips. It
+processes the guides into searchable passages, uses **vector embeddings** and
 **PostgreSQL with pgvector** to retrieve relevant context, then asks an LLM to generate
 an answer based on that context.
 
@@ -52,13 +52,13 @@ The project also focuses on the practices that make RAG applications reliable:
 
 ## Architecture
 
-The ingestion pipeline indexes the tourism guide in PostgreSQL with pgvector. The chat
-interface sends questions to the agent API, which retrieves context and calls an LLM API
-to generate an answer.
+The ingestion pipeline indexes regional tourism guides in PostgreSQL with pgvector. The
+chat interface sends questions to the agent API, which retrieves context and calls an
+LLM API to generate an answer.
 
 ```mermaid
 flowchart LR
-    PDF[Tourism guide PDF] --> Ingestion[Ingestion pipeline]
+    PDF[Regional tourism guides] --> Ingestion[Ingestion pipeline]
     Ingestion --> KB[(PostgreSQL + pgvector)]
     User --> Chat[Chat]
     Chat --> Agent[Agent API]
@@ -69,20 +69,27 @@ flowchart LR
 
 ## Question scope
 
-The project supports English questions about Brittany's regions, geography and natural
-landscapes, climate, transport, cost of living, real estate, family relocation and
-education, outdoor recreation, history and heritage, and Breton culture, food,
-festivals, and local life.
+The project supports English questions about the French destinations covered by the
+indexed regional guides. Topics include geography and natural landscapes, climate,
+transport, outdoor recreation, history and heritage, culture, food, festivals, and local
+life.
+
+The assistant can list the destinations it covers from the titles of the documents
+currently indexed in the knowledge base. This catalog is the only information it may
+answer without retrieved passages; destination-specific advice and every other detailed
+question must be grounded in retrieved context.
 
 Supported examples:
 
-- ✅ “What are the main places to visit in Brittany?”
-- ✅ “What is special about Breton culture?”
+- ✅ “Which destinations do you cover?”
+- ✅ “What are the main places to visit in Normandy?”
+- ✅ “What should I see in Occitanie?”
 
 Unsupported questions include:
 
-- ❌ “What are the best places to visit in Normandy?” — another destination.
-- ❌ “What is the weather in Brest today?” — current information absent from the guide.
+- ❌ “What are the best places to visit in Corsica?” — a destination not covered by the
+  guides.
+- ❌ “What is the weather in Paris today?” — current information absent from the guides.
 - ❌ “Can you book a hotel in Saint-Malo for this weekend?” — booking, availability, or
   reservation requests.
 - ❌ “Should I invest in renewable-energy stocks?” — an unrelated finance topic.
@@ -105,10 +112,10 @@ Unsupported questions include:
 
 ## Data source
 
-The project indexes the freely available
-*[Discovering Brittany](https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf)*
-guide published by [Ibanista](https://www.ibanista.com/). It is used for educational
-purposes only and is not redistributed in this repository.
+The project indexes the freely available French regional guides listed in
+[`source_files.json`](source_files.json), published by
+[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
+are not redistributed in this repository.
 
 ## Prerequisites
 
@@ -212,8 +219,11 @@ Run `make help` for every available shortcut.
 
 | Command                              | Description                                          |
 | ------------------------------------ | ---------------------------------------------------- |
+| `make stop`                          | Stop all Compose profiles and remove containers.     |
+| `make purge`                         | Stop everything and remove volumes.                  |
 | `make init-db`                       | Start PostgreSQL and initialise the pgvector schema. |
 | `make ingest`                        | Ingest documents defined in `source_files.json`.     |
+| `make airflow`                       | Start Airflow for parameterized Docker ingestion.    |
 | `make export-corpus`                 | Overwrite the current knowledge-base corpus export.  |
 | `make load-corpus SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
 | `make evaluate`                      | Run search, RAG, and judge evaluation.               |
@@ -235,6 +245,67 @@ Run `make help` for every available shortcut.
 See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
 [agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python
 workflows.
+
+## Airflow ingestion
+
+Start the optional Airflow profile:
+
+```bash
+make airflow
+```
+
+`make airflow` returns only after Airflow is ready: its API health check confirms the
+metadata database, scheduler, and DAG processor are healthy. Open the Airflow UI at
+[http://localhost:8080](http://localhost:8080), then sign in with
+`AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` from `.env`, then trigger the
+`ingest_documents` DAG with a configuration shaped as follows:
+
+```json
+{
+  "source_files": [
+    {
+      "source_url": "https://example.com/guide.pdf",
+      "title": "Example guide",
+      "collection": "Regional Guides",
+      "publisher": "Example publisher"
+    }
+  ]
+}
+```
+
+`source_files` is the same array format accepted by `source_files.json`. The DAG runs
+`initialize_database` before one mapped `run_ingestion` task per source file. Each task
+runs the complete ingestion CLI in the `ai-tour-guide-ingestion:local` image, so a
+failed document can be retried without rerunning the other submitted documents.
+
+Existing documents are skipped successfully by default. Set `force_reingestion` to
+`true` in the trigger configuration to remove the existing document and its chunks
+before inserting the replacement. For example:
+
+```json
+{
+  "source_files": [
+    {
+      "source_url": "https://example.com/guide.pdf",
+      "title": "Example guide"
+    }
+  ],
+  "force_reingestion": true
+}
+```
+
+The template supplies local-development Airflow credentials and encryption keys so this
+optional profile does not break existing `.env` files. Change the `AIRFLOW_*` secrets
+before sharing an Airflow instance.
+
+The Airflow scheduler mounts the host Docker socket and uses the host daemon to create
+the ingestion container on the `ai-tour-guide-network` network. This is intentionally
+not Docker-in-Docker: it avoids a nested daemon and lets the task resolve the Compose
+database as `database`. Access to the Docker socket is highly privileged; enable this
+profile only on trusted development hosts.
+
+Task logs are stored in the persistent `airflow_logs` volume, shared by the scheduler
+and API server. This keeps completed task logs available after either service restarts.
 
 ## Evaluation
 
@@ -276,7 +347,7 @@ The complete plan, including milestones and deferred work, is maintained in
 
 ### Current release — v0.3.0: Evaluated RAG baseline
 
-This release delivers an evaluated RAG baseline for the Brittany guide:
+This release delivers an evaluated RAG baseline for a French regional guide:
 
 - Grounded answers generated from retrieved context
 - Retrieved source references with deduplicated, ordered page numbers
