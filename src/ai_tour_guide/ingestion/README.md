@@ -47,11 +47,11 @@ and document identity:
 
 ```json
 {
-  "title": "Guide to the Region of Brittany",
-  "source_url": "https://example.com/brittany-guide.pdf",
+  "title": "Guide to the Region of Normandy",
+  "source_url": "https://example.com/normandy-guide.pdf",
   "collection": "Regional Guides",
   "publisher": "Example publisher",
-  "keywords": ["Tourism", "Brittany", "France"],
+  "keywords": ["Tourism", "Normandy", "France"],
   "excluded_leading_pages": 4,
   "excluded_trailing_pages": 2,
   "ignored_text_patterns": ["example\\.com"]
@@ -62,9 +62,9 @@ An external orchestrator can download a document itself and pass its local path:
 
 ```json
 {
-  "title": "Guide to the Region of Brittany",
-  "source_url": "https://example.com/brittany-guide.pdf",
-  "source_path": "/data/brittany-guide.pdf"
+  "title": "Guide to the Region of Normandy",
+  "source_url": "https://example.com/normandy-guide.pdf",
+  "source_path": "/data/normandy-guide.pdf"
 }
 ```
 

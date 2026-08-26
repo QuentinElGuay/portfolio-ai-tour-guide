@@ -399,10 +399,10 @@ services:
           "-c",
           "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)",
         ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      interval: 2s
+      timeout: 3s
+      retries: 3
+      start_period: 2s
 
     restart: unless-stopped
 

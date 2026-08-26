@@ -94,19 +94,25 @@ class FeedbackResponse(BaseModel):
 
 
 app = FastAPI(title='Baguette Voyages Agent')
+_last_health_failure: str | None = None
 
 
 def _ensure_knowledge_base_ready() -> None:
     """Raise a service error when the configured schema has no corpus."""
+    global _last_health_failure
+
     engine = create_database_engine()
     try:
         with engine.connect() as connection:
             document_id = connection.scalar(select(DocumentRow.document_id).limit(1))
     except SQLAlchemyError as exc:
-        logger.warning(
-            'Knowledge-base health check failed: PostgreSQL is unavailable. '
-            'Check the database service and run `make init-db`.',
-        )
+        failure = 'database-unavailable'
+        if _last_health_failure != failure:
+            logger.warning(
+                'Knowledge-base health check failed: PostgreSQL is unavailable. '
+                'Check the database service and run `make init-db`.',
+            )
+            _last_health_failure = failure
         raise HTTPException(
             status_code=503,
             detail='The knowledge base is unavailable. Check the database service.',
@@ -115,17 +121,24 @@ def _ensure_knowledge_base_ready() -> None:
         engine.dispose()
 
     if document_id is None:
-        logger.warning(
-            'Knowledge-base health check failed: the public schema contains no '
-            'documents. Run `make ingest` or `make load-corpus DB_SCHEMA=public`.'
-        )
+        failure = 'empty-knowledge-base'
+        if _last_health_failure != failure:
+            logger.warning(
+                'Knowledge-base health check failed: the public schema contains no '
+                'documents. Run `make airflow`, `make ingest` or `make load-corpus DB_SCHEMA=public` '
+                'to ingest documents in the knowledge-base.'
+            )
+            _last_health_failure = failure
         raise HTTPException(
             status_code=503,
             detail=(
-                'The knowledge base is empty. Run `make ingest` or '
-                '`make load-corpus DB_SCHEMA=public` before starting the application.'
+                'Knowledge-base health check failed: the public schema contains no '
+                'documents. Run `make airflow`, `make ingest` or `make load-corpus DB_SCHEMA=public` '
+                'to ingest documents in the knowledge-base.'
             ),
         )
+
+    _last_health_failure = None
 
 
 async def _answer_question(question: str) -> RAGResult:

@@ -153,9 +153,9 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## 🗓️ Release v1.0.0 — Final submission
+## 📦 Release v1.0.0 — Final submission
 
-**Status:** ⏳ Planned
+**Status:** 📦 Shipped
 
 The final submission has public screenshots and a tutorial. Delivery automation,
 evaluation evidence, and a deterministic smoke test are also available. A recorded demo

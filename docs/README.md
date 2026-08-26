@@ -26,11 +26,11 @@ Username: admin
 Password: pa$$word123
 ```
 
-![Airflow sign in screen](tutorial/00_airflow_sign_in.png "Airflow sign in screen")
+![Airflow sign in screen](tutorial/images/00_airflow_sign_in.png "Airflow sign in screen")
 
 Open the **DAGs** tab and click **Trigger** for the `ingest_documents` DAG.
 
-![DAGs screen](tutorial/01_airflow_dags.png "Click on 'Trigger the DAG'")
+![DAGs screen](tutorial/images/01_airflow_dags.png "Click on 'Trigger the DAG'")
 
 Copy the JSON array from `source_files.json` into the **Source files** field, then click
 **Trigger**. The DAG first initializes the application database, then runs one ingestion
@@ -40,12 +40,12 @@ By default, an already ingested document is skipped successfully. Select **Force
 re-ingestion** only when you intend to replace a document: it deletes the existing
 document and its related chunks before inserting the replacement.
 
-![Trigger DAG screen](tutorial/02_airflow_trigger_dag.png "Set the DAG parameters")
+![Trigger DAG screen](tutorial/images/02_airflow_trigger_dag.png "Set the DAG parameters")
 
 Wait for the DAG run to finish. Ingestion duration depends on the number and size of the
 documents, and the first run may need to download the embedding model.
 
-![All the tasks are marked as success](tutorial/03_airflow_dag_run.png "Successful DAG")
+![All the tasks are marked as success](tutorial/images/03_airflow_dag_run.png "Successful DAG")
 
 ## Ingestion with the command line
 
@@ -92,9 +92,10 @@ make app
 ```
 
 The command starts the agent API and the Gradio chat interface. Open
-[http://localhost:7860](http://localhost:7860) in your browser. The API is available at
-[http://localhost:8000](http://localhost:8000), with interactive documentation at
-[http://localhost:8000/docs](http://localhost:8000/docs).
+[http://localhost:7860](http://localhost:7860) in your browser.
+
+The API is available at [http://localhost:8000](http://localhost:8000), with interactive
+documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 The chat can answer which destinations are covered from the titles of the indexed
 guides. For detailed questions, ask about a destination covered by the guides—for
@@ -110,9 +111,9 @@ The first question uses the indexed destination catalog. The detailed questions 
 retrieved passages and display their source titles and page numbers below the answer.
 Use the Like and Dislike controls to record feedback about an answer.
 
-![Chat app welcome screen](tutorial/04_chat_app_welcome.png "Baguette Voyages chat")
+![Chat app welcome screen](tutorial/images/04_chat_app_welcome.png "Baguette Voyages chat")
 
-![Chat app answer with sources](tutorial/05_chat_app_answers.png "Answer with sources")
+![Chat app answer with sources](tutorial/images/05_chat_app_answers.png "Answer with sources")
 
 ## Evaluation
 
