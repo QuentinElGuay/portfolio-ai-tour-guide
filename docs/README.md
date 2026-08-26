@@ -233,6 +233,4 @@ make simulate-rag
 ```
 
 The simulated traffic is marked as synthetic and is useful for exploring the dashboard
-before real chat requests and feedback have accumulated. To save the current dashboard
-configuration, run `make dashboard-export`. To restore the bundled configuration into an
-empty dashboard database, run `make dashboard-restore`.
+without real chat requests and feedback.
