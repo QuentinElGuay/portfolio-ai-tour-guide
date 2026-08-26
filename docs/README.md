@@ -62,11 +62,11 @@ Password: pa$$word123
 > > [!IMPORTANT]
 > > Do not use those values in production.
 
-![Airflow sign in screen](tutorial/images/00_airflow_sign_in.png "Airflow sign in screen")
+![Airflow sign in screen](tutorial/00_airflow_sign_in.png "Airflow sign in screen")
 
 Open the **DAGs** tab and click **Trigger** next to the `ingest_documents` DAG.
 
-![DAGs screen](tutorial/images/01_airflow_dags.png "Click on 'Trigger the DAG'")
+![DAGs screen](tutorial/01_airflow_dags.png "Click on 'Trigger the DAG'")
 
 Copy the JSON array from `source_files.json` into the **Source files** field and click
 **Trigger**. The DAG first initializes the application database, then runs one ingestion
@@ -76,12 +76,12 @@ By default, an already ingested document is skipped successfully. Select **Force
 re-ingestion** only when you intend to replace a document: it deletes the existing
 document and its related chunks before inserting the replacement.
 
-![Trigger DAG screen](tutorial/images/02_airflow_trigger_dag.png "Set the DAG parameters")
+![Trigger DAG screen](tutorial/02_airflow_trigger_dag.png "Set the DAG parameters")
 
 Wait for the DAG run to finish. The ingestion time depends on the number and size of the
 documents. The first run may also need to download the embedding model.
 
-![All the tasks are marked as success](tutorial/images/03_airflow_dag_run.png "Successful DAG")
+![All the tasks are marked as success](tutorial/03_airflow_dag_run.png "Successful DAG")
 
 ## Ingestion with the command line
 
@@ -130,7 +130,7 @@ make app
 The command starts the agent API and the Gradio chat interface. Open
 [http://localhost:7860](http://localhost:7860) in your browser.
 
-![Chat app welcome screen](tutorial/images/04_chat_app_welcome.png "Baguette Voyages chat")
+![Chat app welcome screen](tutorial/04_chat_app_welcome.png "Baguette Voyages chat")
 
 The chat can list the destinations covered by the indexed guides. For detailed
 questions, ask about a destination covered by one of the guides—for example:
@@ -144,11 +144,11 @@ What should I see in Occitanie?
 The first question uses the indexed destination catalog. The detailed questions use
 retrieved passages and display the source titles and page numbers below each answer.
 
-![Chat app answer with sources](tutorial/images/05_chat_app_answers.png "Answers with sources")
+![Chat app answer with sources](tutorial/05_chat_app_answers.png "Answers with sources")
 
 Use the Like and Dislike controls to record feedback about an answer.
 
-![Positive feedback using the Like button](tutorial/images/06_chat_app_feedback.png "Positive feedback")
+![Positive feedback using the Like button](tutorial/06_chat_app_feedback.png "Positive feedback")
 
 ## Evaluation
 
@@ -217,12 +217,12 @@ Password: pa$$word123
 The default `Operational Overview` dashboard displays request volume, error rate, and
 user feedback. The `Cost` tab provides charts for token usage and costs.
 
-![Operational Overview dashboard with operational-related charts](tutorial/images/07_dashboard_operational_overview.png "Operational Overview dashboard")
+![Operational Overview dashboard with operational-related charts](tutorial/07_dashboard_operational_overview.png "Operational Overview dashboard")
 
 Under `Our analytics`, you can find the `Evaluation dashboard`, which provides an
 overview of the `Search`, `RAG`, and `LLM Judge` evaluations.
 
-[Evaluation dashboard with search-related charts](tutorial/images/08_dashboard_evaluation.png "Search Evaluation dashboard.")
+![Evaluation dashboard with search-related charts](tutorial/08_dashboard_evaluation.png "Search Evaluation dashboard.")
 
 ### Traffic simulation
 
