@@ -2,7 +2,8 @@
 
 This tutorial guides you through document ingestion, the Baguette Voyages chat app,
 evaluation, and monitoring. See the [project README](../README.md) for prerequisites and
-environment configuration.
+environment configuration, and the [Make command reference](commands.md) for every
+available project command.
 
 ## Table of contents
 

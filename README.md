@@ -107,6 +107,8 @@ Unsupported questions include:
   configuration.
 - [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
   integration.
+- [Make command reference](docs/commands.md): every project command, its options, and
+  its operational cautions.
 - [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
   and monitoring.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
@@ -129,27 +131,27 @@ local installation.
 
 ## Quick start
 
-Clone the repository and create your environment file:
+With Docker, Docker Compose, and GNU Make installed, run:
 
 ```bash
 git clone https://github.com/QuentinElGuay/portfolio-ai-tour-guide.git
 cd portfolio-ai-tour-guide
 cp .env.template .env
+make db-init
+make ingest
+make app
 ```
 
-The template defaults to the no-cost Brittany demo. It does not require an API key:
+The template starts the no-cost, limited Brittany demo. Its minimum LLM configuration
+is:
 
 ```dotenv
 AGENT_LLM_PROVIDER=baguette-llm
-AGENT_LLM_API_KEY=
 AGENT_LLM_MODEL=mini-croissant-1.0
 ```
 
-The demo uses the bundled golden dataset to answer a prepared set of Brittany questions.
-For an unsupported question or when its expected evidence is unavailable, it explains
-the limitation and suggests a random supported question to try.
-
-For live answer generation, switch to OpenAI and add your API key:
+The demo does not use an API key. To use a live LLM, replace those settings and add your
+OpenAI API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
@@ -157,114 +159,34 @@ AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-`make evaluate` and `make evaluate-judge` can optionally use a separate judge
-configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MODEL`.
-When these are absent, it reuses `AGENT_LLM_API_KEY` and `AGENT_LLM_MODEL`.
+OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
+the recommended model. Open [http://localhost:7860](http://localhost:7860) to use the
+chat. The API is available at [http://localhost:8000](http://localhost:8000), with
+interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-> [!NOTE]
-> OpenAI is the only supported provider for live answer generation. We recommend
-> `gpt-4.1-mini` for this project. The bundled `baguette-llm` provider, with the
-> `mini-croissant-1.0` model, is a zero-cost deterministic alternative for the limited
-> Brittany demo.
-
-Initialize the database, ingest the bundled source definitions, and start the app:
-
-```bash
-make db-init
-make ingest
-make app
-```
-
-To start and initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
-`METABASE_ADMIN_PASSWORD` in `.env`, then run:
-
-```bash
-make dashboard
-```
-
-`make dashboard` also runs this initialization automatically. Use `make dashboard-init`
-when the dashboard is already running and only the Metabase setup needs to be rerun.
-
-To version the current Metabase configuration, questions, and dashboards for the Docker
-setup, run:
-
-```bash
-make dashboard-export
-```
-
-This writes `fixtures/metabase/metabase.sql`. The dashboard database image bundles and
-restores that backup when creating a new Metabase application database. Existing
-application databases are not overwritten. Review the dump for sensitive values before
-committing it.
-
-To restore the bundled backup manually, use:
-
-```bash
-make dashboard-restore
-```
-
-This refuses to overwrite a non-empty Metabase database. To explicitly replace the
-current Metabase configuration and dashboards, use:
-
-```bash
-make dashboard-restore FORCE=1
-```
-
-Only the separate `metabase` database is replaced; the application database and its
-schemas are preserved.
-
-This starts Metabase, creates the initial admin user if necessary, and registers the
-project PostgreSQL database as a Metabase data source. The command is safe to rerun.
-Metabase is available at `http://localhost:3000`.
-
-Open `http://localhost:7860` to use the chat. The agent API is available at
-`http://localhost:8000`; its interactive API documentation is at
-`http://localhost:8000/docs`.
-
-The first ingestion or image build can download the configured embedding model. To
-recreate the application knowledge base, use `make db-reset`, then run `make ingest` to
-populate the selected schema. The reset preserves the separate Metabase application
-database. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
-example when isolating future evaluation data from local development data.
-
-> [!WARNING]
-> `make db-reset` removes all data in the selected application schema. To intentionally
-> remove the entire PostgreSQL volume, including Metabase and its dashboards, run
-> `docker compose --profile dashboard down --volumes --remove-orphans` explicitly.
+For detailed setup, demo limitations, Airflow ingestion, evaluation, and dashboard
+monitoring, follow the [tutorial](docs/README.md).
 
 ## Common commands
 
-Run `make help` for every available shortcut.
+These are the commands used most often during local development:
 
-| Command                              | Description                                          |
-| ------------------------------------ | ---------------------------------------------------- |
-| `make stop`                          | Stop all Compose profiles and remove containers.     |
-| `make purge`                         | Stop everything and remove volumes.                  |
-| `make db-init`                       | Start PostgreSQL and initialise the pgvector schema. |
-| `make ingest`                        | Ingest documents defined in `source_files.json`.     |
-| `make ingest FORCE=1`                | Replace already ingested documents.                  |
-| `make airflow`                       | Start Airflow for parameterized Docker ingestion.    |
-| `make export-corpus`                 | Overwrite the current knowledge-base corpus export.  |
-| `make load-corpus SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
-| `make evaluate`                      | Run search, RAG, and judge evaluation.               |
-| `make evaluate-search`               | Run offline search metrics only.                     |
-| `make evaluate-rag`                  | Run RAG metrics without answer judging.              |
-| `make evaluate-judge`                | Generate and judge RAG answers only.                 |
-| `make evaluate-all`                  | Alias for `make evaluate`.                           |
-| `make simulate-rag`                  | Populate dashboards with synthetic fixture traffic.  |
-| `make vector_search QUESTION='...'`  | Search chunks semantically.                          |
-| `make text_search QUESTION='...'`    | Search chunks with PostgreSQL full-text search.      |
-| `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
-| `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
-| `make cli-chat`                      | Start the interactive terminal chat.                 |
-| `make dashboard`                     | Start PostgreSQL and the Metabase dashboard.         |
-| `make dashboard-init`                | Start and initialize the Metabase dashboard.         |
-| `make dashboard-export`              | Export Metabase configuration and dashboards.        |
-| `make app`                           | Start the agent API and Gradio chat interface.       |
+| Command             | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| `make db-init`      | Initialize the pgvector application schema.         |
+| `make ingest`       | Ingest the documents in `source_files.json`.        |
+| `make app`          | Start the agent API and Gradio chat interface.      |
+| `make airflow`      | Start Airflow for parameterized ingestion.          |
+| `make evaluate`     | Run the full evaluation suite.                      |
+| `make dashboard`    | Start and initialize PostgreSQL and Metabase.       |
+| `make simulate-rag` | Add synthetic traffic to the monitoring dashboards. |
+| `make stop`         | Stop the running Compose services.                  |
 
-See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
-[agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python
-workflows.
+For every command, its options, and operational cautions, see the
+[Make command reference](docs/commands.md). `make help` remains the short terminal
+reference. The [tutorial](docs/README.md),
+[ingestion guide](src/ai_tour_guide/ingestion/README.md), and
+[agent guide](src/ai_tour_guide/agent/README.md) cover the related workflows in detail.
 
 ## Airflow ingestion
 
