@@ -4,6 +4,16 @@ This tutorial guides you through document ingestion, the Baguette Voyages chat a
 evaluation, and monitoring. See the [project README](../README.md) for prerequisites and
 environment configuration.
 
+## Table of contents
+
+- [Before you begin](#before-you-begin)
+- [Ingestion with Airflow](#ingestion-with-airflow)
+- [Ingestion with the command line](#ingestion-with-the-command-line)
+- [Chat app](#chat-app)
+- [Evaluation](#evaluation)
+- [Monitoring](#monitoring)
+  - [Traffic simulation](#traffic-simulation)
+
 ## Before you begin
 
 Create a local environment file from the template:
