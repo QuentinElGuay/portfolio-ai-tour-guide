@@ -59,8 +59,8 @@ Username: admin
 Password: pa$$word123
 ```
 
-> > [!IMPORTANT]
-> > Do not use those values in production.
+> [!IMPORTANT]
+> Do not use those values in production.
 
 ![Airflow sign in screen](tutorial/00_airflow_sign_in.png "Airflow sign in screen")
 
@@ -211,8 +211,8 @@ Email address: admin@example.com
 Password: pa$$word123
 ```
 
-> > [!IMPORTANT]
-> > Do not use those values in production.
+> [!IMPORTANT]
+> Do not use those values in production.
 
 The default `Operational Overview` dashboard displays request volume, error rate, and
 user feedback. The `Cost` tab provides charts for token usage and costs.
