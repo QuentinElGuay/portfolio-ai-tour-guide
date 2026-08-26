@@ -129,7 +129,8 @@ def _items(value: object) -> list[object]:
 
 
 def _success(error: Mapping[str, Any], contexts: list[object]) -> bool:
-    return not error and bool(contexts)
+    # Until separating Answer and RAGResult, ignore missing context
+    return not error  # and bool(contexts)
 
 
 def _rag_result_values(rag_result: Mapping[str, Any]) -> dict[str, object]:

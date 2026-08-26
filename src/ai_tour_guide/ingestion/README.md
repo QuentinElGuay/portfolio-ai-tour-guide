@@ -19,7 +19,7 @@ Return to the [project overview](../../../README.md).
 The Docker workflow is the recommended path:
 
 ```bash
-make init-db
+make db-init
 make ingest
 ```
 
@@ -31,9 +31,10 @@ make ingest SOURCE_FILES=data/another-source.json
 make ingest DEBUG=1
 ```
 
-`make init-db` creates the tables and enables pgvector. The ingestion rejects a source
-URL already present in the database rather than replacing its document and chunks. Use
-`make reset-db` when you intentionally want to clear the selected application schema;
+`make db-init` creates the tables and enables pgvector. Like the Airflow DAG,
+`make ingest` skips a document whose `(source_url, version)` identity is already in the
+database. To replace an existing document and its chunks, run `make ingest FORCE=1`. Use
+`make db-reset` when you intentionally want to clear the selected application schema;
 the separate Metabase database is preserved.
 
 ## Document definitions
@@ -46,11 +47,11 @@ and document identity:
 
 ```json
 {
-  "title": "Guide to the Region of Brittany",
-  "source_url": "https://example.com/brittany-guide.pdf",
+  "title": "Guide to the Region of Normandy",
+  "source_url": "https://example.com/normandy-guide.pdf",
   "collection": "Regional Guides",
   "publisher": "Example publisher",
-  "keywords": ["Tourism", "Brittany", "France"],
+  "keywords": ["Tourism", "Normandy", "France"],
   "excluded_leading_pages": 4,
   "excluded_trailing_pages": 2,
   "ignored_text_patterns": ["example\\.com"]
@@ -61,9 +62,9 @@ An external orchestrator can download a document itself and pass its local path:
 
 ```json
 {
-  "title": "Guide to the Region of Brittany",
-  "source_url": "https://example.com/brittany-guide.pdf",
-  "source_path": "/data/brittany-guide.pdf"
+  "title": "Guide to the Region of Normandy",
+  "source_url": "https://example.com/normandy-guide.pdf",
+  "source_path": "/data/normandy-guide.pdf"
 }
 ```
 
@@ -87,6 +88,16 @@ Install the project and run the pipeline:
 uv sync
 uv run portfolio-ai-tour-guide-ingestion run source_files.json
 ```
+
+The Airflow ingestion DAG adds `--skip-existing`, so a document whose
+`(source_url, version)` identity is already present is reported as skipped and the task
+succeeds. The CLI remains strict by default; pass `--skip-existing` explicitly when a
+local rerun should also treat existing documents as successful no-ops.
+
+Use `--force` to replace an existing document. The replacement deletes the existing
+document and its related chunks in the same database transaction as the new insertion.
+The Airflow DAG exposes this as the `force_reingestion` trigger parameter; it is
+mutually exclusive with skipping existing documents.
 
 When connecting to the Compose database from the host, use the values in `.env`,
 including `DB_HOST=localhost` and `DB_PORT=5432`.
@@ -164,9 +175,9 @@ The PDF parsing flow is documented in
 | `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                    |
 
 `DB_SCHEMA` can isolate another knowledge base in the same PostgreSQL database, for
-example `DB_SCHEMA=evaluation make init-db`. `EMBEDDING_DIMENSIONS` must match the
+example `DB_SCHEMA=evaluation make db-init`. `EMBEDDING_DIMENSIONS` must match the
 selected model. Changing it after database initialisation requires recreating the
-schema, for example with `make reset-db`.
+schema, for example with `make db-reset`.
 
 The Docker images preload `EMBEDDING_MODEL_NAME` during their build. Rebuild the images
 after intentionally changing the model configuration.

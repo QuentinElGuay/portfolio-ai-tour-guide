@@ -27,6 +27,16 @@ LOGGER = logging.getLogger(__name__)
 )
 @click.option('--timeout', type=click.FloatRange(min=0.1), default=None)
 @click.option('--debug/--no-debug', default=None)
+@click.option(
+    '--skip-existing',
+    is_flag=True,
+    help='Treat documents already in the database as successful no-ops.',
+)
+@click.option(
+    '--force',
+    is_flag=True,
+    help='Replace existing documents and all of their related chunks.',
+)
 @click.option('--target-chars', type=click.IntRange(min=1), default=None)
 @click.option('--max-chars', type=click.IntRange(min=1), default=None)
 @click.option('--section-chunk-min-depth', type=click.IntRange(min=0), default=None)
@@ -36,12 +46,17 @@ def run_command(
     tmp_folder: Path | None,
     timeout: float | None,
     debug: bool | None,
+    skip_existing: bool,
+    force: bool,
     target_chars: int | None,
     max_chars: int | None,
     section_chunk_min_depth: int | None,
     section_chunk_max_depth: int | None,
 ) -> None:
     """Run all ingestion stages sequentially for one or more DOCUMENTS."""
+    if skip_existing and force:
+        raise click.UsageError('--skip-existing and --force are mutually exclusive')
+
     try:
         ingestion_documents = load_documents(documents)
         settings_values = {
@@ -76,6 +91,8 @@ def run_command(
             embedder=embedder,
             embedding_batch_size=embedding_settings.batch_size,
             chunking_config=ingestion_settings.chunking_config,
+            skip_existing=skip_existing,
+            force=force,
         )
     except (
         OSError,
@@ -86,14 +103,23 @@ def run_command(
     ) as exc:
         raise click.ClickException(str(exc)) from exc
 
+    skipped_count = 0
     for document, document_id in zip(
         ingestion_documents,
         document_ids,
         strict=True,
     ):
-        LOGGER.info('Inserted %s as document_id=%d', document.title, document_id)
+        if document_id is None:
+            skipped_count += 1
+            LOGGER.info('Skipped existing document: %s', document.title)
+        else:
+            LOGGER.info('Inserted %s as document_id=%d', document.title, document_id)
 
-    click.echo(f'Ingested {len(document_ids)} document(s)')
+    ingested_count = len(document_ids) - skipped_count
+    click.echo(
+        f'Ingested {ingested_count} document(s); '
+        f'skipped {skipped_count} existing document(s)'
+    )
 
 
 __all__ = ['run_command']

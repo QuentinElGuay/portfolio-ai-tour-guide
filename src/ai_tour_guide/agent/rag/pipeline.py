@@ -15,13 +15,17 @@ from ai_tour_guide.agent.llm.clients import (
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGError, RAGResult
-from ai_tour_guide.agent.rag.prompting import build_messages
+from ai_tour_guide.agent.rag.prompting import (
+    build_messages,
+    is_destination_catalog_question,
+)
 from ai_tour_guide.agent.rag.sources import validate_citations
 from ai_tour_guide.agent.responses import (
     GENERATION_ERROR_ANSWER,
     INSUFFICIENT_CONTEXT_ANSWER,
     RETRIEVAL_ERROR_ANSWER,
 )
+from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
@@ -61,12 +65,17 @@ async def answer_question_async(
     retrieval_started = perf_counter()
 
     try:
-        contexts = retrieve_context(
-            question,
-            search_mode=selected_mode,
-            k=k,
-            engine=engine,
-            strategy=strategy,
+        known_destination_titles = list_known_destination_titles(engine)
+        contexts = (
+            ()
+            if is_destination_catalog_question(question)
+            else retrieve_context(
+                question,
+                search_mode=selected_mode,
+                k=k,
+                engine=engine,
+                strategy=strategy,
+            )
         )
     except (OSError, SQLAlchemyError) as exc:
         retrieval_latency = _elapsed_ms(retrieval_started)
@@ -85,7 +94,7 @@ async def answer_question_async(
 
     retrieval_latency = _elapsed_ms(retrieval_started)
 
-    if not contexts:
+    if not contexts and not is_destination_catalog_question(question):
         return RAGResult(
             question=question,
             request_id=selected_request_id,
@@ -98,7 +107,11 @@ async def answer_question_async(
             total_latency_ms=_elapsed_ms(started),
         )
 
-    messages = build_messages(question, contexts)
+    messages = build_messages(
+        question,
+        contexts,
+        known_destination_titles=known_destination_titles,
+    )
 
     generation_started = perf_counter()
 

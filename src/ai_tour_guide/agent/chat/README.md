@@ -43,6 +43,10 @@ The defaults in `.env.template` configure the chat to call `http://localhost:800
 `CHAT_API_URL`, `CHAT_HOST`, `CHAT_PORT`, and `CHAT_TITLE` can be changed for another
 environment.
 
+The assistant can answer which destinations it covers from the titles of the currently
+indexed guides. It uses retrieved passages for all destination details and other travel
+questions, so this catalog never substitutes for source-grounded advice.
+
 `CHAT_API_URL` is required when starting the chat service. The application does not use
 a local fallback in production. The agent service raises a configuration error when no
 OpenAI API key is configured.
@@ -57,7 +61,7 @@ The chat sends the latest user question:
 
 ```json
 {
-  "question": "What should I visit in Brittany?"
+  "question": "What should I visit in Normandy?"
 }
 ```
 
@@ -69,9 +73,9 @@ The agent returns its answer and validated source references:
   "answer": "The guide recommends ...",
   "sources": [
     {
-      "source_url": "https://example.com/brittany-guide.pdf",
+      "source_url": "https://example.com/normandy-guide.pdf",
       "version": "2026",
-      "title": "Guide to the Region of Brittany",
+      "title": "Guide to the Region of Normandy",
       "publisher": "Regional Tourism Board",
       "collection": "Tour Guides",
       "publication_date": "2026-01-01",

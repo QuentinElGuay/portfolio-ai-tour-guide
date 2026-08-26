@@ -4,7 +4,156 @@
     "title": "Guide to the Region of Brittany",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
-    "keywords": ["Tourism", "Brittany", "France", "Relocation"],
+    "keywords": [
+      "Brittany",
+      "Atlantic Coast",
+      "Saint-Malo",
+      "Quimper",
+      "Celtic Culture",
+      "Beaches",
+      "Islands",
+      "Medieval Towns",
+      "Seafood",
+      "Coastal Villages"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Normandy-Nov-2025.pdf",
+    "title": "Guide to the Region of Normandy",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "Normandy",
+      "English Channel Coast",
+      "Mont-Saint-Michel",
+      "D-Day Beaches",
+      "Bayeux",
+      "Rouen",
+      "Honfleur",
+      "Cider",
+      "Calvados",
+      "Coastal Villages"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Occitanie-Nov-2025.pdf",
+    "title": "Guide to the Occitanie Region",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "Occitanie",
+      "Mediterranean Coast",
+      "Pyrenees",
+      "Toulouse",
+      "Montpellier",
+      "Carcassonne",
+      "Canal du Midi",
+      "Cathar Country",
+      "Vineyards",
+      "Beaches"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Nouvelle-Aquitaine-Nov-2025.pdf",
+    "title": "Guide to Nouvelle-Aquitaine",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "Nouvelle-Aquitaine",
+      "Atlantic Coast",
+      "Bordeaux Wine Region",
+      "Basque Country",
+      "La Rochelle",
+      "Dordogne",
+      "Pyrenees",
+      "Surfing",
+      "Cognac",
+      "Arcachon Bay"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-The-Alps-Nov-2025.pdf",
+    "title": "Guide to the French Alps",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "French Alps",
+      "Mountains",
+      "Mont Blanc",
+      "Chamonix",
+      "Annecy",
+      "Grenoble",
+      "Alpine Lakes",
+      "Skiing",
+      "Hiking",
+      "Winter Sports"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discovering-the-French-Riviera-Nov-2025.pdf",
+    "title": "Guide to the French Riviera",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "French Riviera",
+      "Cote d'Azur",
+      "Nice",
+      "Cannes",
+      "Monaco",
+      "Antibes",
+      "Mediterranean Coast",
+      "Beaches",
+      "Provence",
+      "Luxury Tourism"
+    ],
+    "excluded_leading_pages": 4,
+    "excluded_trailing_pages": 2,
+    "ignored_text_patterns": [
+        "(?:https?://)?(?:www\\.)?ibanista\\s*\\.\\s*com/?"
+    ]
+  },
+  {
+    "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Paris-Ile-de-France-Nov-2025.pdf",
+    "title": "Guide to Paris & Île-de-France",
+    "collection": "Regional Guides",
+    "publisher": "Ibanista",
+    "keywords": [
+      "Paris",
+      "Île-de-France",
+      "French Capital",
+      "Versailles",
+      "Seine River",
+      "Museums",
+      "Landmarks",
+      "French Culture",
+      "Urban Tourism",
+      "Royal Heritage"
+    ],
     "excluded_leading_pages": 4,
     "excluded_trailing_pages": 2,
     "ignored_text_patterns": [

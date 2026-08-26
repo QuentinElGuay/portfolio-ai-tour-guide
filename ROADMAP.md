@@ -58,8 +58,9 @@ ______________________________________________________________________
 ## ✅ Milestone 4 — RAG Application
 
 **Delivered:** configurable LLM generation, structured and validated citations, clear
-failure handling, HTTP and CLI access, a Gradio chat interface, and a deterministic
-fixture LLM for end-to-end tests.
+failure handling, HTTP and CLI access, a Gradio chat interface, a deterministic fixture
+LLM for end-to-end tests, and a zero-cost Brittany demo provider with friendly
+supported-question suggestions.
 
 ______________________________________________________________________
 
@@ -114,51 +115,22 @@ tracking, model pricing validation, and Metabase backup/restore support.
 
 ______________________________________________________________________
 
-## 🔄 Milestone 8 — Reproducibility and Delivery
+## ✅ Milestone 8 — Reproducibility and Delivery
 
-### [P0] Containerize and document the project
-
-- [x] Provide Dockerfiles, Docker Compose services, persistent database storage, and
-  startup health checks.
-- [x] Document setup, configuration, ingestion, usage, and limitations.
-- [x] Provide a deterministic smoke-test command that ingests an original local PDF into
-  an isolated schema and checks health, grounded answers, citations, and refusals
-  through the API.
-- [x] Publish the latest evaluation evidence and reports in the documentation.
-- [x] Publish versioned application images to GitHub Container Registry when a release
-  tag is pushed; deployment remains intentionally out of scope.
-- [ ] Add public application screenshots to the project documentation.
-
-**Acceptance criteria**
-
-- [x] A new user can run the application through Docker Compose.
-- [x] Services start in the required order and data persists across restarts.
-- [x] The complete ingestion and RAG path can be validated without an external LLM.
-
-### [P1] Add delivery automation and demo material
-
-- [x] Expand unit coverage for LLM output validation, fixture behavior, database engine
-  ownership/schema selection, retrieval strategies, and golden-dataset annotation.
-- [x] Run lockfile, lint, formatting, Markdown, type, unit, and fixture-backed smoke
-  checks on pull requests and pushes to the main branch.
-- [x] Publish immutable commit-SHA and release-tagged container images without deploying
-  them.
-- [ ] Record a concise demo showing ingestion, a grounded answer, an unsupported
-  question, and sources.
-
-**Acceptance criteria**
-
-- [x] A contributor can verify changes automatically before merge.
-- [ ] A reviewer can understand the project outcome from the README and demo.
+**Delivered:** containerized application and Airflow-orchestrated ingestion services
+with persistent storage and health checks, a no-cost Brittany demo, deterministic smoke
+tests, CI validation and release-image publishing, current evaluation evidence, and
+complete README, tutorial, screenshot, and configuration documentation.
 
 ______________________________________________________________________
 
-## 🗓️ Release v1.0.0 — Final submission
+## 📦 Release v1.0.0 — Final submission
 
-**Status:** ⏳ Planned
+**Status:** 📦 Shipped
 
-The final submission requires public screenshots and a concise demo. Delivery
-automation, evaluation evidence, and a deterministic smoke test are already available.
+The final submission expands the service from Brittany-only content to multi-regional
+travel guides, with public screenshots and a tutorial. Delivery automation, evaluation
+evidence, and a deterministic smoke test are also available.
 
 ______________________________________________________________________
 
@@ -178,6 +150,12 @@ These improvements are useful but are not priorities for the final submission.
   an isolated schema.
 - [x] Add deterministic ingestion and retrieval smoke coverage with a fixture LLM and an
   isolated schema.
+- [x] Validate the Airflow Compose profile and DAG imports in CI.
+- [ ] Add container-level runtime smoke tests for the production ingestion and agent
+  images, rather than validating application behavior only through the host `uv`
+  environment.
+- [ ] Add an Airflow CI integration test that triggers `ingest_documents` with a small
+  fixture document and verifies initialization, ingestion, and database persistence.
 - [ ] Pin the embedding model artifact and verify reproducibility against it.
 - [ ] Add ingestion-run status, duration, counts, and failure details if operational
   monitoring becomes necessary.

@@ -4,6 +4,7 @@ FROM ai-tour-guide-base
 
 # Copy and install the application itself.
 COPY --chown=10001:10001 src ./src
+COPY --chown=10001:10001 evaluation/datasets/golden_dataset.jsonl ./evaluation/datasets/golden_dataset.jsonl
 
 RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=10001,gid=10001 \
     uv sync \

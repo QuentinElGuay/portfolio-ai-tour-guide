@@ -1,14 +1,10 @@
-# Brittany AI Tour Guide
+# Baguette Voyages
 
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
-Degemer mat ("Welcome" in Breton)!
-
-An AI tour guide for Brittany, France. It uses **Retrieval-Augmented Generation (RAG)**
-to answer travellers' questions from an indexed tourism guide.
-
-> [!IMPORTANT]
-> 🚧 This project is under **<ins>active development</ins>**.
+Bonjour! Baguette Voyages is a fictional French travel company powered by
+**Retrieval-Augmented Generation (RAG)**. Its travel assistant answers questions from
+indexed regional tourism guides.
 
 ## Table of contents
 
@@ -20,6 +16,7 @@ to answer travellers' questions from an indexed tourism guide.
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
 - [Common commands](#common-commands)
+- [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
 - [Roadmap](#roadmap)
 - [Capstone success criteria](#capstone-success-criteria)
@@ -30,9 +27,9 @@ to answer travellers' questions from an indexed tourism guide.
 
 Created as a capstone project for
 [LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) by
-[DataTalks.Club](https://datatalks.club), this project turns a Brittany tourism guide
-into a question-answering experience that helps travellers explore the region. It
-processes the guide into searchable passages, uses **vector embeddings** and
+[DataTalks.Club](https://datatalks.club), this project turns French regional tourism
+guides into a question-answering experience that helps travellers plan their trips. It
+processes the guides into searchable passages, uses **vector embeddings** and
 **PostgreSQL with pgvector** to retrieve relevant context, then asks an LLM to generate
 an answer based on that context.
 
@@ -52,13 +49,13 @@ The project also focuses on the practices that make RAG applications reliable:
 
 ## Architecture
 
-The ingestion pipeline indexes the tourism guide in PostgreSQL with pgvector. The chat
-interface sends questions to the agent API, which retrieves context and calls an LLM API
-to generate an answer.
+The ingestion pipeline indexes regional tourism guides in PostgreSQL with pgvector. The
+chat interface sends questions to the agent API, which retrieves context and calls an
+LLM API to generate an answer.
 
 ```mermaid
 flowchart LR
-    PDF[Tourism guide PDF] --> Ingestion[Ingestion pipeline]
+    PDF[Regional tourism guides] --> Ingestion[Ingestion pipeline]
     Ingestion --> KB[(PostgreSQL + pgvector)]
     User --> Chat[Chat]
     Chat --> Agent[Agent API]
@@ -69,20 +66,27 @@ flowchart LR
 
 ## Question scope
 
-The project supports English questions about Brittany's regions, geography and natural
-landscapes, climate, transport, cost of living, real estate, family relocation and
-education, outdoor recreation, history and heritage, and Breton culture, food,
-festivals, and local life.
+The project supports English questions about the French destinations covered by the
+indexed regional guides. Topics include geography and natural landscapes, climate,
+transport, outdoor recreation, history and heritage, culture, food, festivals, and local
+life.
+
+The assistant can list the destinations it covers from the titles of the documents
+currently indexed in the knowledge base. This catalog is the only information it may
+answer without retrieved passages; destination-specific advice and every other detailed
+question must be grounded in retrieved context.
 
 Supported examples:
 
-- ✅ “What are the main places to visit in Brittany?”
-- ✅ “What is special about Breton culture?”
+- ✅ “Which destinations do you cover?”
+- ✅ “What are the main places to visit in Normandy?”
+- ✅ “What should I see in Occitanie?”
 
 Unsupported questions include:
 
-- ❌ “What are the best places to visit in Normandy?” — another destination.
-- ❌ “What is the weather in Brest today?” — current information absent from the guide.
+- ❌ “What are the best places to visit in Corsica?” — a destination not covered by the
+  guides.
+- ❌ “What is the weather in Paris today?” — current information absent from the guides.
 - ❌ “Can you book a hotel in Saint-Malo for this weekend?” — booking, availability, or
   reservation requests.
 - ❌ “Should I invest in renewable-energy stocks?” — an unrelated finance topic.
@@ -100,15 +104,19 @@ Unsupported questions include:
   configuration.
 - [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
   integration.
+- [Make command reference](docs/commands.md): every project command, its options, and
+  its operational cautions.
+- [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
+  and monitoring.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
 ## Data source
 
-The project indexes the freely available
-*[Discovering Brittany](https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf)*
-guide published by [Ibanista](https://www.ibanista.com/). It is used for educational
-purposes only and is not redistributed in this repository.
+The project indexes the freely available French regional guides listed in
+[`source_files.json`](source_files.json), published by
+[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
+are not redistributed in this repository.
 
 ## Prerequisites
 
@@ -120,15 +128,27 @@ local installation.
 
 ## Quick start
 
-Clone the repository and create your environment file:
+With Docker, Docker Compose, and GNU Make installed, run:
 
 ```bash
 git clone https://github.com/QuentinElGuay/portfolio-ai-tour-guide.git
 cd portfolio-ai-tour-guide
 cp .env.template .env
+make db-init
+make ingest
+make app
 ```
 
-Set an OpenAI API key in `.env` to generate answers:
+The template starts the no-cost, limited Brittany demo. Its minimum LLM configuration
+is:
+
+```dotenv
+AGENT_LLM_PROVIDER=baguette-llm
+AGENT_LLM_MODEL=mini-croissant-1.0
+```
+
+The demo does not use an API key. To use a live LLM, replace those settings and add your
+OpenAI API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
@@ -136,105 +156,95 @@ AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-`make evaluate` and `make evaluate-judge` can optionally use a separate judge
-configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MODEL`.
-When these are absent, it reuses `AGENT_LLM_API_KEY` and `AGENT_LLM_MODEL`.
+OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
+the recommended model. Open [http://localhost:7860](http://localhost:7860) to use the
+chat. The API is available at [http://localhost:8000](http://localhost:8000), with
+interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-> [!NOTE]
-> OpenAI is the only currently supported LLM provider at the moment but more might be
-> added in the future.
-
-Initialize the database, ingest the bundled source definitions, and start the app:
-
-```bash
-make init-db
-make ingest
-make app
-```
-
-To initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
-`METABASE_ADMIN_PASSWORD` in `.env`, then run:
-
-```bash
-make dashboard-init
-```
-
-To version the current Metabase configuration, questions, and dashboards for the Docker
-setup, run:
-
-```bash
-make dashboard-export
-```
-
-This writes `fixtures/metabase/metabase.sql`. The dashboard database image bundles and
-restores that backup when creating a new Metabase application database. Existing
-application databases are not overwritten. Review the dump for sensitive values before
-committing it.
-
-To restore the bundled backup manually, use:
-
-```bash
-make dashboard-restore
-```
-
-This refuses to overwrite a non-empty Metabase database. To explicitly replace the
-current Metabase configuration and dashboards, use:
-
-```bash
-make dashboard-restore FORCE=1
-```
-
-Only the separate `metabase` database is replaced; the application database and its
-schemas are preserved.
-
-This starts Metabase, creates the initial admin user if necessary, and registers the
-project PostgreSQL database as a Metabase data source. The command is safe to rerun.
-Metabase is available at `http://localhost:3000`.
-
-Open `http://localhost:7860` to use the chat. The agent API is available at
-`http://localhost:8000`; its interactive API documentation is at
-`http://localhost:8000/docs`.
-
-The first ingestion or image build can download the configured embedding model. To
-recreate the application knowledge base, use `make reset-db`, then run `make ingest` to
-populate the selected schema. The reset preserves the separate Metabase application
-database. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
-example when isolating future evaluation data from local development data.
-
-> [!WARNING]
-> `make reset-db` removes all data in the selected application schema. To intentionally
-> remove the entire PostgreSQL volume, including Metabase and its dashboards, run
-> `docker compose --profile dashboard down --volumes --remove-orphans` explicitly.
+For detailed setup, demo limitations, Airflow ingestion, evaluation, and dashboard
+monitoring, follow the [tutorial](docs/README.md).
 
 ## Common commands
 
-Run `make help` for every available shortcut.
+These are the commands used most often during local development:
 
-| Command                              | Description                                          |
-| ------------------------------------ | ---------------------------------------------------- |
-| `make init-db`                       | Start PostgreSQL and initialise the pgvector schema. |
-| `make ingest`                        | Ingest documents defined in `source_files.json`.     |
-| `make export-corpus`                 | Overwrite the current knowledge-base corpus export.  |
-| `make load-corpus SCHEMA=evaluation` | Load the corpus into the evaluation schema.          |
-| `make evaluate`                      | Run search, RAG, and judge evaluation.               |
-| `make evaluate-search`               | Run offline search metrics only.                     |
-| `make evaluate-rag`                  | Run RAG metrics without answer judging.              |
-| `make evaluate-judge`                | Generate and judge RAG answers only.                 |
-| `make evaluate-all`                  | Alias for `make evaluate`.                           |
-| `make simulate-rag`                  | Populate dashboards with synthetic fixture traffic.  |
-| `make vector_search QUESTION='...'`  | Search chunks semantically.                          |
-| `make text_search QUESTION='...'`    | Search chunks with PostgreSQL full-text search.      |
-| `make ask QUESTION='...'`            | Generate an answer from retrieved context.           |
-| `make ask QUESTION='...' VERBOSE=1`  | Print the complete serialized RAG trace.             |
-| `make cli-chat`                      | Start the interactive terminal chat.                 |
-| `make dashboard`                     | Start PostgreSQL and the Metabase dashboard.         |
-| `make dashboard-init`                | Start and initialize the Metabase dashboard.         |
-| `make dashboard-export`              | Export Metabase configuration and dashboards.        |
-| `make app`                           | Start the agent API and Gradio chat interface.       |
+| Command             | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| `make db-init`      | Initialize the pgvector application schema.         |
+| `make ingest`       | Ingest the documents in `source_files.json`.        |
+| `make app`          | Start the agent API and Gradio chat interface.      |
+| `make airflow`      | Start Airflow for parameterized ingestion.          |
+| `make evaluate`     | Run the full evaluation suite.                      |
+| `make dashboard`    | Start and initialize PostgreSQL and Metabase.       |
+| `make simulate-rag` | Add synthetic traffic to the monitoring dashboards. |
+| `make stop`         | Stop the running Compose services.                  |
 
-See the [ingestion guide](src/ai_tour_guide/ingestion/README.md) and
-[agent guide](src/ai_tour_guide/agent/README.md) for command options and local Python
-workflows.
+For every command, its options, and operational cautions, see the
+[Make command reference](docs/commands.md). `make help` remains the short terminal
+reference. The [tutorial](docs/README.md),
+[ingestion guide](src/ai_tour_guide/ingestion/README.md), and
+[agent guide](src/ai_tour_guide/agent/README.md) cover the related workflows in detail.
+
+## Airflow ingestion
+
+Start the optional Airflow profile:
+
+```bash
+make airflow
+```
+
+`make airflow` returns only after Airflow is ready: its API health check confirms the
+metadata database, scheduler, and DAG processor are healthy. Open the Airflow UI at
+[http://localhost:8080](http://localhost:8080), then sign in with
+`AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` from `.env`, then trigger the
+`ingest_documents` DAG with a configuration shaped as follows:
+
+```json
+{
+  "source_files": [
+    {
+      "source_url": "https://example.com/guide.pdf",
+      "title": "Example guide",
+      "collection": "Regional Guides",
+      "publisher": "Example publisher"
+    }
+  ]
+}
+```
+
+`source_files` is the same array format accepted by `source_files.json`. The DAG runs
+`initialize_database` before one mapped `run_ingestion` task per source file. Each task
+runs the complete ingestion CLI in the `ai-tour-guide-ingestion:local` image, so a
+failed document can be retried without rerunning the other submitted documents.
+
+Existing documents are skipped successfully by default. Set `force_reingestion` to
+`true` in the trigger configuration to remove the existing document and its chunks
+before inserting the replacement. For example:
+
+```json
+{
+  "source_files": [
+    {
+      "source_url": "https://example.com/guide.pdf",
+      "title": "Example guide"
+    }
+  ],
+  "force_reingestion": true
+}
+```
+
+The template supplies local-development Airflow credentials and encryption keys so this
+optional profile does not break existing `.env` files. Change the `AIRFLOW_*` secrets
+before sharing an Airflow instance.
+
+The Airflow scheduler mounts the host Docker socket and uses the host daemon to create
+the ingestion container on the `ai-tour-guide-network` network. This is intentionally
+not Docker-in-Docker: it avoids a nested daemon and lets the task resolve the Compose
+database as `database`. Access to the Docker socket is highly privileged; enable this
+profile only on trusted development hosts.
+
+Task logs are stored in the persistent `airflow_logs` volume, shared by the scheduler
+and API server. This keeps completed task logs available after either service restarts.
 
 ## Evaluation
 
@@ -274,27 +284,29 @@ follow-up work.
 The complete plan, including milestones and deferred work, is maintained in
 [ROADMAP.md](ROADMAP.md).
 
-### Current release — v0.3.0: Evaluated RAG baseline
+### Current release — v1.0.0: Final submission
 
-This release delivers an evaluated RAG baseline for the Brittany guide:
+This release delivers the complete Baguette Voyages portfolio application:
 
-- Grounded answers generated from retrieved context
-- Retrieved source references with deduplicated, ordered page numbers
+- Multi-region document ingestion from regional tourism guides
+- Grounded answers with validated source references and indexed destination discovery
 - Hybrid retrieval selected from vector, full-text, and hybrid measurements
-- Runnable search, RAG, and optional judge evaluation notebooks with saved baseline
-  results
-- A basic Gradio chat interface
+- Airflow 3 orchestration with mapped ingestion, safe skipping, and forced re-ingestion
+- Gradio chat interface, HTTP API, and Metabase monitoring dashboards
+- Reproducible Docker Compose setup with health checks and CI/CD validation
+- End-to-end tutorial, public screenshots, evaluation reports, and smoke tests
 
-### Next release — v0.4.0: Monitoring
+### Follow-up work
 
-The next goal is to collect feedback and make application behaviour observable. Broader
-evaluation experiments, such as prompt/model comparisons and dataset versioning, remain
-follow-up work rather than release blockers.
+Further hardening and experiments remain tracked in the [roadmap](ROADMAP.md), including
+runtime container tests, Airflow integration coverage, prompt comparisons, and optional
+cloud deployment.
 
 ### Capstone success criteria
 
 The project follows the
 [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
+
 A complete submission should demonstrate the following features:
 
 - ✅ A clearly defined problem, target users, supported questions, and limitations.
@@ -307,13 +319,14 @@ A complete submission should demonstrate the following features:
 - ⏳ LLM-answer evaluation that compares multiple prompt or generation approaches and
   selects the best one.
 - ✅ A usable interface for asking questions, such as the chat application and HTTP API.
-- ⏳ Monitoring through user feedback and a dashboard that makes application behaviour
+- ✅ Monitoring through user feedback and dashboards that make application behaviour
   visible.
-- 🔄 Containerised services, pinned dependency versions, and clear setup instructions for
+- ✅ Containerised services, pinned dependency versions, and clear setup instructions for
   a reproducible local run.
-- ⏳ Retrieval best practices evaluated for their value: hybrid search, reranking, and
-  query rewriting.
-- ⏳ Automated tests and CI/CD, followed by a cloud deployment as an optional extension.
+- ✅ Hybrid search evaluated against vector and full-text retrieval and selected as the
+  application default.
+- ⏳ Reranking and query rewriting remain optional follow-up experiments.
+- ✅ Automated tests and CI/CD; cloud deployment remains an optional extension.
 
 #### Delivery status
 

@@ -9,15 +9,15 @@ in `golden_dataset.example.jsonl`. Evidence uses the stable RAG identity
 {
   "id": 1,
   "category": "Climate and seasonal weather",
-  "question": "What are typical summer temperatures in Brittany?",
+  "question": "What are typical summer temperatures in Normandy?",
   "expected": {
     "answerable": true,
     "reference_answer": "...",
     "relevant_source": {
-      "source_url": "https://example.com/brittany-guide.pdf",
+      "source_url": "https://example.com/normandy-guide.pdf",
       "version": null,
       "section_path": [
-        "guide-to-the-region-of-brittany",
+        "guide-to-the-region-of-normandy",
         "geography-and-climate",
         "climate"
       ]

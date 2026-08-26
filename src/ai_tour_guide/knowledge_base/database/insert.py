@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,7 @@ from ai_tour_guide.ingestion.config import ChunkingConfig
 
 from .connection import create_database_engine
 from .models import DocumentRow, EmbeddingModelRow, ModelFactory
+from .tables.public import embedding_models
 
 
 class DocumentAlreadyExistsError(RuntimeError):
@@ -38,31 +40,35 @@ def get_or_create_embedding_model(
         EmbeddingModelRow.model_revision == metadata.model_revision,
     )
     existing = session.scalar(statement)
-    if existing is not None:
-        if (
-            existing.dimensions != metadata.dimensions
-            or existing.normalized != metadata.normalized
-            or existing.distance_metric != metadata.distance_metric
-        ):
-            raise EmbeddingModelConfigurationError(
-                'Stored embedding model configuration does not match the effective ingestion model'
+    if existing is None:
+        session.execute(
+            postgres_insert(embedding_models)
+            .values(
+                provider=metadata.provider,
+                model_name=metadata.model_name,
+                model_revision=metadata.model_revision,
+                dimensions=metadata.dimensions,
+                normalized=metadata.normalized,
+                tokenizer_name=getattr(metadata, 'tokenizer_name', None),
+                tokenizer_revision=getattr(metadata, 'tokenizer_revision', None),
+                max_input_tokens=getattr(metadata, 'max_input_tokens', None),
+                distance_metric=metadata.distance_metric,
             )
-        return existing
+            .on_conflict_do_nothing(constraint='uq_embedding_models_identity')
+        )
+        existing = session.scalar(statement)
 
-    row = EmbeddingModelRow(
-        provider=metadata.provider,
-        model_name=metadata.model_name,
-        model_revision=metadata.model_revision,
-        dimensions=metadata.dimensions,
-        normalized=metadata.normalized,
-        tokenizer_name=getattr(metadata, 'tokenizer_name', None),
-        tokenizer_revision=getattr(metadata, 'tokenizer_revision', None),
-        max_input_tokens=getattr(metadata, 'max_input_tokens', None),
-        distance_metric=metadata.distance_metric,
-    )
-    session.add(row)
-    session.flush()
-    return row
+    if existing is None:
+        raise RuntimeError('Embedding model insert did not produce a database row.')
+    if (
+        existing.dimensions != metadata.dimensions
+        or existing.normalized != metadata.normalized
+        or existing.distance_metric != metadata.distance_metric
+    ):
+        raise EmbeddingModelConfigurationError(
+            'Stored embedding model configuration does not match the effective ingestion model'
+        )
+    return existing
 
 
 def insert_document(
@@ -72,22 +78,26 @@ def insert_document(
     chunking: ChunkingConfig,
     *,
     embedding_model_id: int,
+    replace_existing: bool = False,
 ) -> DocumentRow:
-    """Insert one document aggregate into an existing transaction without replacing rows."""
+    """Insert one document aggregate into an existing transaction."""
     if not chunks:
         raise ValueError('a document must contain at least one embedded chunk')
 
-    existing_document_id = session.scalar(
+    existing = session.scalar(
         select(DocumentRow.document_id).where(
             DocumentRow.source_url == document.metadata.source_url,
             DocumentRow.version == document.version,
         )
     )
-    if existing_document_id is not None:
+    if existing is not None and not replace_existing:
         raise DocumentAlreadyExistsError(
             'Document already exists for source identity '
             f'({document.metadata.source_url!r}, {document.version!r})'
         )
+    if existing is not None:
+        session.delete(existing)
+        session.flush()
 
     row = ModelFactory.create_document(
         document,
@@ -114,6 +124,8 @@ def insert_document_with_chunks(
     chunks: Sequence[EmbeddedChunk],
     chunking_metadata: ChunkingConfig,
     embedding_metadata: EmbeddingMetadata,
+    *,
+    replace_existing: bool = False,
 ) -> int:
     """Persist a fully embedded document atomically and return its database ID."""
     engine = create_database_engine()
@@ -130,6 +142,7 @@ def insert_document_with_chunks(
                         chunks,
                         chunking_metadata,
                         embedding_model_id=embedding_model.embedding_model_id,
+                        replace_existing=replace_existing,
                     )
             except IntegrityError as exc:
                 if _is_document_identity_violation(exc):

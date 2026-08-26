@@ -55,13 +55,13 @@ def test_health_logs_how_to_populate_an_empty_knowledge_base(
 
     with (
         caplog.at_level(logging.WARNING),
-        pytest.raises(HTTPException, match='knowledge base is empty') as exc_info,
+        pytest.raises(HTTPException, match='schema contains no documents') as exc_info,
     ):
         _ensure_knowledge_base_ready()
 
     assert exc_info.value.status_code == 503
     assert 'make ingest' in exc_info.value.detail
-    assert 'make load-corpus DB_SCHEMA=public' in caplog.messages[-1]
+    assert 'make load-corpus' in caplog.messages[-1]
     engine.dispose.assert_called_once_with()
 
 

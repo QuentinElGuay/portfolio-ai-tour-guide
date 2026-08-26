@@ -18,6 +18,7 @@ DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
 METABASE_DB_NAME ?= metabase
 FORCE ?= 0
 DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--debug,)
+INGEST_EXISTING_FLAG = $(if $(filter 1 true yes,$(FORCE)),--force,--skip-existing)
 COMPOSE_DEBUG_FLAG = $(if $(filter 1 true yes,$(DEBUG)),--verbose,)
 ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
@@ -25,71 +26,33 @@ DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: help init-db reset-db reset-schema dashboard dashboard-init dashboard-export dashboard-restore ingest export-csv export-corpus load-corpus evaluate evaluate-search evaluate-rag evaluate-judge evaluate-all simulate-rag smoke-test validate-db-schema vector_search text_search ask cli-chat annotate-dataset app
+.PHONY: airflow annotate-dataset app ask cli-chat dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
 
-help: ## Show the available commands.
-	@echo "Available commands:"
-	@echo "  make init-db                         Initialize the PostgreSQL schema"
-	@echo "  make reset-db                        Reset the selected application schema"
-	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
-	@echo "  make reset-schema SCHEMA=evaluation  Delete and recreate one schema"
-	@echo "  make dashboard                       Start PostgreSQL and Metabase"
-	@echo "  make dashboard DEBUG=1               Start dashboard with Docker Compose diagnostics"
-	@echo "  make dashboard-init                  Start and initialize Metabase"
-	@echo "  make dashboard-export                Export the dashboard application database"
-	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
-	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
-	@echo "  make ingest                          Ingest source_files.json"
-	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
-	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
-	@echo "  make export-csv                      Export ingestion tables to CSV"
-	@echo "  make export-csv EXPORT_DIR=path      Export CSV files to another directory"
-	@echo "  make export-csv CSV_LIMIT=100        Limit each export to 100 data rows"
-	@echo "  make export-corpus                   Overwrite the current corpus export"
-	@echo "  make load-corpus                     Replace the public database corpus"
-	@echo "  make load-corpus SCHEMA=evaluation   Replace the evaluation corpus"
-	@echo "  make evaluate                        Run search, RAG, and judge evaluation"
-	@echo "  make evaluate-search                 Run offline search metrics only"
-	@echo "  make evaluate-rag                    Run online RAG metrics without judging"
-	@echo "  make evaluate-judge                  Generate and judge RAG answers only"
-	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
-	@echo "  make simulate-rag                    Populate dashboards with synthetic RAG traffic"
-	@echo "  make simulate-rag SIMULATE_ARGS='--days 30 --requests-per-day 50'"
-	@echo "  make smoke-test                      Run deterministic end-to-end RAG smoke tests"
-	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
-	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
-	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
-	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
-	@echo "  make cli-chat                        Start the interactive terminal chat"
-	@echo "  make annotate-dataset                Fill answers and source pages interactively"
-	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
-	@echo "  make app                             Start the agent API and Gradio chat"
-	@echo "  DEBUG=1                              Enable verbose Docker Compose diagnostics"
+airflow: ## Start Airflow and its host-Docker ingestion orchestration.
+	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile airflow up --build -d --wait \
+		database airflow-webserver airflow-scheduler airflow-dag-processor
 
-init-db: validate-db-schema ## Start PostgreSQL and initialize its schema.
-	$(COMPOSE) --profile tools run --build --rm init-db \
-		python -m ai_tour_guide.knowledge_base.database.init \
-		--schema "$(SCHEMA)"
+annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
+	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
-reset-db: validate-db-schema ## Reset the selected application schema without touching Metabase.
-	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
-	$(MAKE) reset-schema SCHEMA="$(SCHEMA)"
+app: ## Start the agent API and Gradio chat interface.
+	@if ! $(COMPOSE) --profile app up --build -d --wait; then \
+		echo "Agent startup failed. Recent agent diagnostics:" >&2; \
+		$(COMPOSE) --profile app logs --tail=2 agent >&2 || true; \
+		exit 1; \
+	fi
+ask: ## Answer a QUESTION using retrieved context and optional K.
+	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
 
-reset-schema: validate-db-schema ## Delete and recreate only the selected schema.
-	@test "$(origin SCHEMA)" = "command line" || \
-		(echo "SCHEMA must be provided explicitly, for example: make reset-schema SCHEMA=evaluation" >&2; exit 1)
-	$(DATABASE_UP)
-	$(COMPOSE) exec -T database sh -c \
-		'psql --username "$$POSTGRES_USER" \
-		--dbname "$$POSTGRES_DB" \
-		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
-	$(MAKE) init-db SCHEMA="$(SCHEMA)"
+cli-chat: ## Start the interactive terminal chat after the agent is ready.
+	$(COMPOSE) --profile agent up -d --wait agent
+	$(COMPOSE) --profile agent run --rm -T agent \
+		portfolio-ai-tour-guide-agent chat --k "$(K)"
 
-dashboard: ## Start PostgreSQL and the Metabase dashboard.
+dashboard: dashboard-init ## Start and initialize PostgreSQL and the Metabase dashboard.
 	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up --build -d --wait database dashboard
-
-dashboard-init: ## Start Metabase and initialize its first admin user.
-	$(COMPOSE) --profile dashboard run --rm dashboard-init
 
 dashboard-export: dashboard dashboard-init ## Export the dashboard application database into the repository.
 	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up -d --wait database dashboard
@@ -102,6 +65,9 @@ dashboard-export: dashboard dashboard-init ## Export the dashboard application d
 	@mv "$(DASHBOARD_BACKUP).tmp" "$(DASHBOARD_BACKUP)"
 	$(COMPOSE) --profile dashboard build metabase-database
 	@echo "Exported dashboard configuration to $(DASHBOARD_BACKUP)"
+
+dashboard-init: ## Start Metabase and initialize its first admin user.
+	$(COMPOSE) --profile dashboard run --rm dashboard-init
 
 dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard application database.
 	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up -d --wait database
@@ -125,22 +91,57 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	$(COMPOSE) --profile dashboard build metabase-database
 	$(COMPOSE) --profile dashboard run --rm metabase-database
 
-ingest: ## Ingest the documents described by SOURCE_FILES.
-	@test -f "$(SOURCE_FILES)" || (echo "Input file not found: $(SOURCE_FILES)" >&2; exit 1)
-	@if [ -n "$(DEBUG_FLAG)" ]; then mkdir -p tmp && chmod 0777 tmp; fi
-	$(COMPOSE) --profile ingestion run --rm -T ingestion \
-		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) - < "$(SOURCE_FILES)"
+db-init: db-validate-schema ## Start PostgreSQL and initialize its schema.
+	$(COMPOSE) --profile tools run --build --rm init-db \
+		python -m ai_tour_guide.knowledge_base.database.init \
+		--schema "$(SCHEMA)"
 
-validate-db-schema:
+db-reset: db-validate-schema ## Reset the selected application schema without touching Metabase.
+	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
+	$(MAKE) db-reset-schema SCHEMA="$(SCHEMA)"
+
+db-reset-schema: db-validate-schema ## Delete and recreate only the selected schema.
+	@test "$(origin SCHEMA)" = "command line" || \
+		(echo "SCHEMA must be provided explicitly, for example: make db-reset-schema SCHEMA=evaluation" >&2; exit 1)
+	$(DATABASE_UP)
+	$(COMPOSE) exec -T database sh -c \
+		'psql --username "$$POSTGRES_USER" \
+		--dbname "$$POSTGRES_DB" \
+		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
+	$(MAKE) db-init SCHEMA="$(SCHEMA)"
+
+db-validate-schema:
 	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 
-validate-dashboard-backup:
-	@test -s "$(DASHBOARD_BACKUP)" || \
-		(echo "Dashboard backup not found: $(DASHBOARD_BACKUP). Run 'make dashboard-export' first." >&2; exit 1)
-	@case "$(METABASE_DB_NAME)" in *[!a-z0-9_]*|[0-9]*|'') echo "METABASE_DB_NAME must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
-	@case "$(FORCE)" in 0|1) ;; *) echo "FORCE must be 0 or 1" >&2; exit 1;; esac
+evaluate: ## Run all evaluation metrics.
+	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
+	$(DATABASE_UP)
+	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" SCHEMA=evaluation
+	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = all ]; then \
+		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
+	fi
+	@if [ "$(EVALUATION)" = rag ]; then \
+		uv run python -m evaluation.rag.run rag --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
+	fi
+	@if [ "$(EVALUATION)" = judge ] || [ "$(EVALUATION)" = all ]; then \
+		uv run python -m evaluation.rag.run judge --provider "$(JUDGE_PROVIDER)" --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
+	fi
 
-export-csv: validate-db-schema ## Export ingestion tables as deterministic CSV files.
+evaluate-all: evaluate
+
+evaluate-judge: EVALUATION=judge
+evaluate-judge: evaluate
+
+evaluate-rag: EVALUATION=rag
+evaluate-rag: evaluate
+
+evaluate-search: EVALUATION=search
+evaluate-search: evaluate
+
+export-corpus: ## Overwrite the current knowledge-base corpus export.
+	uv run python scripts/export_corpus.py --root "$(CORPUS_ROOT)"
+
+export-csv: db-validate-schema ## Export ingestion tables as deterministic CSV files.
 	@case "$(CSV_LIMIT)" in *[!0-9]*|'') echo "CSV_LIMIT must be a positive integer" >&2; exit 1;; esac
 	@test "$(CSV_LIMIT)" -gt 0 || (echo "CSV_LIMIT must be greater than zero" >&2; exit 1)
 	@mkdir -p "$(EXPORT_DIR)"
@@ -158,8 +159,58 @@ export-csv: validate-db-schema ## Export ingestion tables as deterministic CSV f
 	@mv "$(EXPORT_DIR)/document_chunks.csv.tmp" "$(EXPORT_DIR)/document_chunks.csv"
 	@echo "Exported up to $(CSV_LIMIT) data rows per table to $(EXPORT_DIR)/"
 
-export-corpus: ## Overwrite the current knowledge-base corpus export.
-	uv run python scripts/export_corpus.py --root "$(CORPUS_ROOT)"
+help: ## Show the available commands.
+	@echo "Available commands:"
+	@echo "  make airflow                         Start Airflow for parameterized ingestion"
+	@echo "  make annotate-dataset                Fill answers and source pages interactively"
+	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
+	@echo "  make app                             Start the agent API and Gradio chat"
+	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
+	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
+	@echo "  make cli-chat                        Start the interactive terminal chat"
+	@echo "  make dashboard                       Start and initialize PostgreSQL and Metabase"
+	@echo "  make dashboard DEBUG=1               Start dashboard with Docker Compose diagnostics"
+	@echo "  make dashboard-export                Export the dashboard application database"
+	@echo "  make dashboard-init                  Initialize an already running Metabase instance"
+	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
+	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
+	@echo "  make db-init                         Initialize the PostgreSQL schema"
+	@echo "  make db-init SCHEMA=evaluation       Initialize another PostgreSQL schema"
+	@echo "  make db-reset                        Reset the selected application schema"
+	@echo "  make db-reset-schema SCHEMA=evaluation Delete and recreate one schema"
+	@echo "  make db-validate-schema              Validate the selected database schema"
+	@echo "  make evaluate                        Run search, RAG, and judge evaluation"
+	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
+	@echo "  make evaluate-all                    Run all evaluation metrics"
+	@echo "  make evaluate-judge                  Generate and judge RAG answers only"
+	@echo "  make evaluate-rag                    Run online RAG metrics without judging"
+	@echo "  make evaluate-search                 Run offline search metrics only"
+	@echo "  make export-corpus                   Overwrite the current corpus export"
+	@echo "  make export-csv                      Export ingestion tables to CSV"
+	@echo "  make export-csv CSV_LIMIT=100        Limit each export to 100 data rows"
+	@echo "  make export-csv EXPORT_DIR=path      Export CSV files to another directory"
+	@echo "  make help                            Show the available commands"
+	@echo "  make ingest                          Ingest source_files.json"
+	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
+	@echo "  make ingest FORCE=1                  Replace documents already ingested"
+	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
+	@echo "  make load-corpus                     Replace the public database corpus"
+	@echo "  make load-corpus SCHEMA=evaluation   Replace the evaluation corpus"
+	@echo "  make purge                           Stop everything and remove volumes (destructive)"
+	@echo "  make simulate-rag                    Populate dashboards with synthetic RAG traffic"
+	@echo "  make simulate-rag SIMULATE_ARGS='--days 30 --requests-per-day 50'"
+	@echo "  make smoke-test                      Run deterministic end-to-end RAG smoke tests"
+	@echo "  make stop                            Stop every Compose profile and remove containers"
+	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
+	@echo "  make validate-dashboard-backup       Validate the Metabase dashboard backup"
+	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
+	@echo "  DEBUG=1                              Enable verbose Docker Compose diagnostics"
+
+ingest: ## Ingest the documents described by SOURCE_FILES.
+	@test -f "$(SOURCE_FILES)" || (echo "Input file not found: $(SOURCE_FILES)" >&2; exit 1)
+	@if [ -n "$(DEBUG_FLAG)" ]; then mkdir -p tmp && chmod 0777 tmp; fi
+	$(COMPOSE) --profile ingestion run --rm -T ingestion \
+		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) $(INGEST_EXISTING_FLAG) - < "$(SOURCE_FILES)"
 
 load-corpus: ## Replace the knowledge-base corpus in the selected SCHEMA.
 	@test -f "$(CORPUS_ROOT)/embedding_models.jsonl" \
@@ -168,30 +219,8 @@ load-corpus: ## Replace the knowledge-base corpus in the selected SCHEMA.
 		|| (echo "Corpus files are missing from $(CORPUS_ROOT). Run 'make export-corpus' first." >&2; exit 1)
 	uv run python scripts/setup_corpus.py --root "$(CORPUS_ROOT)" --schema "$(SCHEMA)" --allow-destructive
 
-evaluate: ## Run all evaluation metrics.
-	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
-	$(DATABASE_UP)
-	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" SCHEMA=evaluation
-	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = all ]; then \
-		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
-	fi
-	@if [ "$(EVALUATION)" = rag ]; then \
-		uv run python -m evaluation.rag.run rag --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
-	fi
-	@if [ "$(EVALUATION)" = judge ] || [ "$(EVALUATION)" = all ]; then \
-		uv run python -m evaluation.rag.run judge --provider "$(JUDGE_PROVIDER)" --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
-	fi
-
-evaluate-search: EVALUATION=search
-evaluate-search: evaluate
-
-evaluate-rag: EVALUATION=rag
-evaluate-rag: evaluate
-
-evaluate-judge: EVALUATION=judge
-evaluate-judge: evaluate
-
-evaluate-all: evaluate
+purge: ## Stop everything and remove containers, networks, orphans, and volumes.
+	$(COMPOSE) --profile "*" down --volumes --remove-orphans
 
 simulate-rag: ## Populate operational dashboards with deterministic synthetic RAG traffic.
 	$(DATABASE_UP)
@@ -205,28 +234,21 @@ smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke sche
 	DB_SCHEMA=smoke \
 	uv run pytest tests/smoke
 
-vector_search: ## Search chunks semantically using QUESTION and optional K.
-	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
-	$(COMPOSE) --profile agent run --rm -T agent \
-		portfolio-ai-tour-guide-agent search --mode vector --k "$(K)" "$(QUESTION)"
+stop: ## Stop every Compose profile and remove containers, networks, and orphans.
+	$(COMPOSE) --profile "*" down --remove-orphans
 
 text_search: ## Search chunks lexically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make text_search QUESTION='Brittany coast'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent search --mode text --k "$(K)" "$(QUESTION)"
 
-ask: ## Answer a QUESTION using retrieved context and optional K.
-	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
+validate-dashboard-backup:
+	@test -s "$(DASHBOARD_BACKUP)" || \
+		(echo "Dashboard backup not found: $(DASHBOARD_BACKUP). Run 'make dashboard-export' first." >&2; exit 1)
+	@case "$(METABASE_DB_NAME)" in *[!a-z0-9_]*|[0-9]*|'') echo "METABASE_DB_NAME must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
+	@case "$(FORCE)" in 0|1) ;; *) echo "FORCE must be 0 or 1" >&2; exit 1;; esac
+
+vector_search: ## Search chunks semantically using QUESTION and optional K.
+	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
-		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
-
-cli-chat: ## Start the interactive terminal chat after the agent is ready.
-	$(COMPOSE) --profile agent up -d --wait agent
-	$(COMPOSE) --profile agent run --rm -T agent \
-		portfolio-ai-tour-guide-agent chat --k "$(K)"
-
-annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
-	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
-
-app: ## Start the agent API and Gradio chat interface.
-	$(COMPOSE) --profile app up --build
+		portfolio-ai-tour-guide-agent search --mode vector --k "$(K)" "$(QUESTION)"

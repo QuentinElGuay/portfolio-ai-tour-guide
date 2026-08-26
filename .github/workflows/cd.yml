@@ -59,6 +59,12 @@ jobs:
           done
 
           docker buildx build --push \
+            --file docker/airflow.Dockerfile \
+            --tag "${image_prefix}-airflow:${version}" \
+            --tag "${image_prefix}-airflow:${revision}" \
+            .
+
+          docker buildx build --push \
             --file docker/metabase-database.Dockerfile \
             --tag "${image_prefix}-metabase-database:${version}" \
             --tag "${image_prefix}-metabase-database:${revision}" \

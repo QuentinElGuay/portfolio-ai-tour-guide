@@ -2,7 +2,9 @@
 
 import argparse
 import asyncio
+import logging
 import random
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -30,6 +32,19 @@ from evaluation.dataset import (
     golden_dataset_path,
     load_golden_dataset,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationSummary:
+    """Counts of the synthetic records inserted by one simulation run."""
+
+    rag_results: int
+    usage_events: int
+    ratings: int
+    errors: int
+
+
+_pipeline_logger = logging.getLogger('ai_tour_guide.agent.rag.pipeline')
 
 
 def _simulated_timestamp(
@@ -78,12 +93,15 @@ async def _simulate(
     simulate_usage: bool,
     model: str,
     clear_simulated: bool,
-) -> int:
+) -> SimulationSummary:
     rng = random.Random(seed)
     now = datetime.now(UTC)
     strategy = create_search_strategy(mode)
     client = FixtureLLMClient(dataset_path=dataset_path)
     total_requests = 0
+    usage_events = 0
+    ratings = 0
+    errors = 0
 
     with (
         corpus_context(root=corpus_root, schema_name='public'),
@@ -109,88 +127,98 @@ async def _simulate(
                         llm_usage_events.c.metadata.op('->>')('simulated') == 'true'
                     )
                 )
-        for day_index in range(days):
-            daily_factor = rng.uniform(1 - variance, 1 + variance)
-            requests_today = max(1, round(requests_per_day * daily_factor))
-            rate_factor = rng.uniform(1 - variance, 1 + variance)
-            daily_error_rate = min(1, error_rate * rate_factor)
-            daily_feedback_rate = min(1, feedback_rate * rate_factor)
-            for slot in range(requests_today):
-                case = cases[total_requests % len(cases)]
-                result = await answer_question_async(
-                    case.question,
-                    mode=mode,
-                    k=k,
-                    llm_client=client,
-                    engine=engine,
-                    strategy=strategy,
-                )
-                payload = result.to_dict()
-                retrieval_latency = round(max(5, rng.gauss(35 * daily_factor, 8)))
-                generation_latency = round(max(20, rng.gauss(260 * daily_factor, 55)))
-                payload['retrieval_latency_ms'] = retrieval_latency
-                payload['generation_latency_ms'] = generation_latency
-                payload['total_latency_ms'] = retrieval_latency + generation_latency
-                if rng.random() < daily_error_rate:
-                    payload['success'] = False
-                    payload['error'] = {
-                        'stage': 'generation',
-                        'type': 'SimulatedError',
-                        'message': 'Synthetic dashboard traffic failure',
-                    }
-                    payload['generated']['answer'] = GENERATION_ERROR_ANSWER
-
-                store_rag_result(result.request_id, payload, engine=engine)
-                simulated_at = _simulated_timestamp(
-                    now=now,
-                    day_index=day_index,
-                    slot=slot,
-                    requests_per_day=requests_today,
-                    days=days,
-                )
-                with engine.begin() as connection:
-                    connection.execute(
-                        update(rag_results)
-                        .where(rag_results.c.request_id == result.request_id)
-                        .values(created_at=simulated_at)
+        previous_pipeline_logging = _pipeline_logger.disabled
+        _pipeline_logger.disabled = True
+        try:
+            for day_index in range(days):
+                daily_factor = rng.uniform(1 - variance, 1 + variance)
+                requests_today = max(1, round(requests_per_day * daily_factor))
+                rate_factor = rng.uniform(1 - variance, 1 + variance)
+                daily_error_rate = min(1, error_rate * rate_factor)
+                daily_feedback_rate = min(1, feedback_rate * rate_factor)
+                for slot in range(requests_today):
+                    case = cases[total_requests % len(cases)]
+                    result = await answer_question_async(
+                        case.question,
+                        mode=mode,
+                        k=k,
+                        llm_client=client,
+                        engine=engine,
+                        strategy=strategy,
                     )
-                    if simulate_usage:
-                        usage_event = _usage_event_values(
-                            request_id=result.request_id,
-                            rag_run_id=None,
-                            judge_run_id=None,
-                            call_type='answer',
-                            provider='openai',
-                            model=model,
-                            usage=_simulated_usage(
-                                index=total_requests,
-                                rng=rng,
-                                daily_factor=daily_factor,
-                            ),
-                            connection=connection,
-                        )
-                        assert usage_event is not None
-                        usage_event['metadata'] = {
-                            'simulated': True,
-                            'source': 'tools/simulate_rag_traffic.py',
+                    payload = result.to_dict()
+                    retrieval_latency = round(max(5, rng.gauss(35 * daily_factor, 8)))
+                    generation_latency = round(
+                        max(20, rng.gauss(260 * daily_factor, 55))
+                    )
+                    payload['retrieval_latency_ms'] = retrieval_latency
+                    payload['generation_latency_ms'] = generation_latency
+                    payload['total_latency_ms'] = retrieval_latency + generation_latency
+                    if rng.random() < daily_error_rate:
+                        payload['success'] = False
+                        payload['error'] = {
+                            'stage': 'generation',
+                            'type': 'SimulatedError',
+                            'message': 'Synthetic dashboard traffic failure',
                         }
+                        payload['generated']['answer'] = GENERATION_ERROR_ANSWER
+
+                    errors += int(payload['error'] is not None)
+                    store_rag_result(result.request_id, payload, engine=engine)
+                    simulated_at = _simulated_timestamp(
+                        now=now,
+                        day_index=day_index,
+                        slot=slot,
+                        requests_per_day=requests_today,
+                        days=days,
+                    )
+                    with engine.begin() as connection:
                         connection.execute(
-                            insert(llm_usage_events).values(
-                                **usage_event,
-                                created_at=simulated_at,
-                            )
+                            update(rag_results)
+                            .where(rag_results.c.request_id == result.request_id)
+                            .values(created_at=simulated_at)
                         )
-                    if rng.random() < daily_feedback_rate:
-                        connection.execute(
-                            insert(rag_ratings).values(
+                        if simulate_usage:
+                            usage_event = _usage_event_values(
                                 request_id=result.request_id,
-                                helpful=rng.random() >= 0.2,
-                                comment='Synthetic dashboard feedback',
-                                created_at=simulated_at,
+                                rag_run_id=None,
+                                judge_run_id=None,
+                                call_type='answer',
+                                provider='openai',
+                                model=model,
+                                usage=_simulated_usage(
+                                    index=total_requests,
+                                    rng=rng,
+                                    daily_factor=daily_factor,
+                                ),
+                                connection=connection,
                             )
-                        )
-                total_requests += 1
-    return total_requests
+                            assert usage_event is not None
+                            usage_event['metadata'] = {
+                                'simulated': True,
+                                'source': 'tools/simulate_rag_traffic.py',
+                            }
+                            connection.execute(
+                                insert(llm_usage_events).values(
+                                    **usage_event,
+                                    created_at=simulated_at,
+                                )
+                            )
+                            usage_events += 1
+                        if rng.random() < daily_feedback_rate:
+                            connection.execute(
+                                insert(rag_ratings).values(
+                                    request_id=result.request_id,
+                                    helpful=rng.random() >= 0.2,
+                                    comment='Synthetic dashboard feedback',
+                                    created_at=simulated_at,
+                                )
+                            )
+                            ratings += 1
+                    total_requests += 1
+        finally:
+            _pipeline_logger.disabled = previous_pipeline_logging
+    return SimulationSummary(total_requests, usage_events, ratings, errors)
 
 
 def main() -> None:
@@ -238,7 +266,7 @@ def main() -> None:
     cases = load_golden_dataset(root=args.dataset)
     if not cases:
         parser.error('the golden dataset contains no cases')
-    total = asyncio.run(
+    summary = asyncio.run(
         _simulate(
             cases=cases,
             dataset_path=golden_dataset_path(root=args.dataset),
@@ -256,7 +284,10 @@ def main() -> None:
             clear_simulated=args.clear_simulated,
         )
     )
-    print(f'Simulated {total} RAG requests in the public schema.')
+    print(f'Inserted {summary.rag_results} RAG results.')
+    print(f'Inserted {summary.usage_events} usage events.')
+    print(f'Inserted {summary.ratings} ratings.')
+    print(f'RAG results with errors: {summary.errors}.')
 
 
 if __name__ == '__main__':

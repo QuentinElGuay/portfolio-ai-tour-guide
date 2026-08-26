@@ -1,6 +1,7 @@
 """Deterministic test-only LLM backed by golden-dataset answers."""
 
 import json
+import random
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -64,6 +65,52 @@ class FixtureLLMClient:
             case.answer or '',
             citations=(LLMCitation(source_url, version, pages[0], pages[0]),),
             llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
+        )
+
+
+class BaguetteLLMClient(FixtureLLMClient):
+    """A friendly, zero-cost Brittany demo backed by golden-dataset answers."""
+
+    def __init__(self, dataset_path: Path) -> None:
+        super().__init__(dataset_path)
+        self._answerable_questions = tuple(
+            question for question, case in self._cases.items() if case.answerable
+        )
+
+    async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
+        """Return a prepared answer or suggest a question the demo can answer."""
+        question = _question_from_messages(messages)
+        case = self._cases.get(question)
+        if (
+            case is None
+            or not case.answerable
+            or _matching_context(messages, case) is None
+        ):
+            return self._fallback_answer()
+        generated = await super().answer_question(messages)
+        return GeneratedAnswer(
+            generated.answer,
+            citations=generated.citations,
+            llm_metadata={
+                'provider': 'baguette-llm',
+                'dataset': str(self.dataset_path),
+            },
+            raw_provider_response=generated.raw_provider_response,
+        )
+
+    def _fallback_answer(self) -> GeneratedAnswer:
+        if not self._answerable_questions:
+            raise GenerationError(
+                'The demo fixture does not contain answerable questions.'
+            )
+        suggestion = random.choice(self._answerable_questions)
+        return GeneratedAnswer(
+            'This is a demo backend with limited knowledge of Brittany, so I do not '
+            f'have a prepared answer for that question. Try asking: “{suggestion}”',
+            llm_metadata={
+                'provider': 'baguette-llm',
+                'dataset': str(self.dataset_path),
+            },
         )
 
 
@@ -145,4 +192,4 @@ def _context_descriptions(messages: Sequence[Message]) -> tuple[str, ...]:
     )
 
 
-__all__ = ['FixtureLLMClient']
+__all__ = ['BaguetteLLMClient', 'FixtureLLMClient']

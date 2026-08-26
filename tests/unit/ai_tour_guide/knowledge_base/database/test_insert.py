@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy.dialects.postgresql import dialect
 
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.ingestion.config import ChunkingConfig
@@ -45,6 +46,24 @@ def test_get_or_create_embedding_model_rejects_incompatible_existing_row() -> No
         insert.get_or_create_embedding_model(session, _embedding_metadata())
 
 
+def test_get_or_create_embedding_model_uses_conflict_safe_insert() -> None:
+    """Verify that a concurrent model insert is resolved by the unique constraint."""
+    session = MagicMock()
+    existing = MagicMock(spec=EmbeddingModelRow)
+    existing.dimensions = 2
+    existing.normalized = True
+    existing.distance_metric = 'cosine'
+    session.scalar.side_effect = [None, existing]
+
+    assert (
+        insert.get_or_create_embedding_model(session, _embedding_metadata()) is existing
+    )
+    statement = session.execute.call_args.args[0]
+    assert 'ON CONFLICT ON CONSTRAINT uq_embedding_models_identity DO NOTHING' in str(
+        statement.compile(dialect=dialect())
+    )
+
+
 def test_insert_document_rejects_duplicate_source_identity() -> None:
     """Verify that duplicate source identities do not create a replacement aggregate."""
     session = MagicMock()
@@ -66,6 +85,31 @@ def test_insert_document_rejects_duplicate_source_identity() -> None:
         )
 
     create_document.assert_not_called()
+
+
+def test_insert_document_replaces_duplicate_when_requested() -> None:
+    """Verify that force mode removes the old aggregate before inserting its replacement."""
+    session = MagicMock()
+    existing = MagicMock()
+    session.scalar.return_value = existing
+    document = MagicMock()
+    document.metadata.source_url = 'https://example.test/guide.pdf'
+    document.version = None
+    replacement = MagicMock()
+
+    with patch.object(insert.ModelFactory, 'create_document', return_value=replacement):
+        result = insert.insert_document(
+            session,
+            document,
+            [MagicMock()],
+            ChunkingConfig(100, 200, None, None),
+            embedding_model_id=1,
+            replace_existing=True,
+        )
+
+    assert result is replacement
+    session.delete.assert_called_once_with(existing)
+    assert session.flush.call_count == 2
 
 
 @patch('ai_tour_guide.knowledge_base.database.insert.insert_document')

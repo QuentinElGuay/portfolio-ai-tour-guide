@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -50,8 +51,8 @@ jobs:
 
       - name: Lint and format Python
         run: |
-          uv run ruff check src tests evaluation tools scripts
-          uv run ruff format --check src tests evaluation tools scripts
+          uv run ruff check src tests evaluation tools scripts airflow/dags
+          uv run ruff format --check src tests evaluation tools scripts airflow/dags
 
       - name: Type check
         run: uv run pyright
@@ -109,3 +110,84 @@ jobs:
       - name: Stop the test database
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+  airflow-changes:
+    name: Detect Airflow changes
+    runs-on: ubuntu-latest
+    outputs:
+      airflow: ${{ steps.filter.outputs.airflow }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            airflow:
+              - 'airflow/**'
+              - 'docker-compose.yml'
+              - 'docker/airflow.Dockerfile'
+              - 'docker/base.Dockerfile'
+              - 'docker/ingestion.Dockerfile'
+              - 'src/ai_tour_guide/ingestion/**'
+              - 'src/ai_tour_guide/knowledge_base/**'
+              - '.env.template'
+              - 'pyproject.toml'
+              - 'uv.lock'
+
+  airflow-config:
+    name: Airflow configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Airflow Compose environment
+        run: cp .env.template .env
+
+      - name: Validate Airflow Compose configuration
+        run: docker compose --profile airflow config --quiet
+
+  airflow:
+    name: Airflow DAG integration
+    needs: airflow-changes
+    if: >-
+      github.event_name == 'push' ||
+      needs.airflow-changes.outputs.airflow == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Airflow Compose environment
+        run: cp .env.template .env
+
+      - name: Start Airflow services
+        run: >-
+          docker compose --profile airflow up --build -d --wait
+          database airflow-webserver airflow-scheduler airflow-dag-processor
+
+      - name: Verify DAG import
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if ! import_errors=$(docker compose --profile airflow exec -T \
+              airflow-dag-processor airflow dags list-import-errors --output json); then
+              sleep 5
+              continue
+            fi
+            printf '%s\n' "$import_errors"
+            if [ "$(jq 'length' <<<"$import_errors")" -eq 0 ]; then
+              docker compose --profile airflow exec -T \
+                airflow-dag-processor airflow dags list | grep -q 'ingest_documents'
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Airflow DAG import errors did not clear.' >&2
+          exit 1
+
+      - name: Stop Airflow
+        if: always()
+        run: docker compose --profile airflow down --volumes --remove-orphans

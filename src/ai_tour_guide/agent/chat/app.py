@@ -213,8 +213,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             feedback_value=[],
             height=400,
             placeholder=(
-                '<h2>Explore Brittany</h2>'
-                '<p>Ask a question grounded in the tourism guide.</p>'
+                '<h2>Explore France with Baguette Voyages</h2>'
+                '<p>Ask a question grounded in our regional travel guides.</p>'
             ),
         )
         gr.ChatInterface(
@@ -224,13 +224,15 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             additional_outputs=request_ids,
             textbox=textbox,
             show_progress='full',
-            title=os.getenv('CHAT_TITLE', 'AI TOUR GUIDE'),
+            title=os.getenv('CHAT_TITLE', 'Baguette Voyages'),
             description=(
-                'Ask questions about Brittany and receive answers grounded in the guide.'
+                'Ask questions about French destinations and receive answers grounded in '
+                'our regional travel guides.'
             ),
             examples=[
-                ['What are the main places to visit in Brittany?'],
-                ['What is special about Breton culture?'],
+                ['Which destinations do you cover?'],
+                ['What are the main places to visit in Normandy?'],
+                ['What should I see in Occitanie?'],
             ],
             cache_examples=False,
         )
