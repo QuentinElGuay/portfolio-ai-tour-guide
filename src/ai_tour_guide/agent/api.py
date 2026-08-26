@@ -110,7 +110,7 @@ def _ensure_knowledge_base_ready() -> None:
         if _last_health_failure != failure:
             logger.warning(
                 'Knowledge-base health check failed: PostgreSQL is unavailable. '
-                'Check the database service and run `make init-db`.',
+                'Check the database service and run `make db-init`.',
             )
             _last_health_failure = failure
         raise HTTPException(

@@ -8,12 +8,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ai_tour_guide.agent.llm.rate_limit import DEFAULT_REQUESTS_PER_SECOND
 
+DEFAULT_BAGUETTE_LLM_DATASET_PATH = Path('evaluation/datasets/golden_dataset.jsonl')
+
 
 class LLMProvider(StrEnum):
     """Supported LLM providers."""
 
     OPENAI = 'openai'
     FIXTURE = 'fixture'
+    BAGUETTE_LLM = 'baguette-llm'
 
 
 class AgentsSettings(BaseSettings):
@@ -51,4 +54,4 @@ class AgentsSettings(BaseSettings):
     )
 
 
-__all__ = ['AgentsSettings', 'LLMProvider']
+__all__ = ['DEFAULT_BAGUETTE_LLM_DATASET_PATH', 'AgentsSettings', 'LLMProvider']

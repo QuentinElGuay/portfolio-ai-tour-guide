@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy.dialects.postgresql import dialect
 
 from ai_tour_guide.embedding import EmbeddingMetadata
 from ai_tour_guide.ingestion.config import ChunkingConfig
@@ -43,6 +44,24 @@ def test_get_or_create_embedding_model_rejects_incompatible_existing_row() -> No
 
     with pytest.raises(insert.EmbeddingModelConfigurationError):
         insert.get_or_create_embedding_model(session, _embedding_metadata())
+
+
+def test_get_or_create_embedding_model_uses_conflict_safe_insert() -> None:
+    """Verify that a concurrent model insert is resolved by the unique constraint."""
+    session = MagicMock()
+    existing = MagicMock(spec=EmbeddingModelRow)
+    existing.dimensions = 2
+    existing.normalized = True
+    existing.distance_metric = 'cosine'
+    session.scalar.side_effect = [None, existing]
+
+    assert (
+        insert.get_or_create_embedding_model(session, _embedding_metadata()) is existing
+    )
+    statement = session.execute.call_args.args[0]
+    assert 'ON CONFLICT ON CONSTRAINT uq_embedding_models_identity DO NOTHING' in str(
+        statement.compile(dialect=dialect())
+    )
 
 
 def test_insert_document_rejects_duplicate_source_identity() -> None:

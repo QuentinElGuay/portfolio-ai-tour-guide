@@ -58,8 +58,9 @@ ______________________________________________________________________
 ## ✅ Milestone 4 — RAG Application
 
 **Delivered:** configurable LLM generation, structured and validated citations, clear
-failure handling, HTTP and CLI access, a Gradio chat interface, and a deterministic
-fixture LLM for end-to-end tests.
+failure handling, HTTP and CLI access, a Gradio chat interface, a deterministic fixture
+LLM for end-to-end tests, and a zero-cost Brittany demo provider with friendly
+supported-question suggestions.
 
 ______________________________________________________________________
 
@@ -126,6 +127,8 @@ ______________________________________________________________________
 - [x] Provide a deterministic smoke-test command that ingests an original local PDF into
   an isolated schema and checks health, grounded answers, citations, and refusals
   through the API.
+- [x] Provide a no-cost, containerized Brittany demo backend that uses bundled fixture
+  data and explains its limited question coverage.
 - [x] Publish the latest evaluation evidence and reports in the documentation.
 - [x] Publish versioned application images to GitHub Container Registry when a release
   tag is pushed; deployment remains intentionally out of scope.
@@ -136,6 +139,7 @@ ______________________________________________________________________
 - [x] A new user can run the application through Docker Compose.
 - [x] Services start in the required order and data persists across restarts.
 - [x] The complete ingestion and RAG path can be validated without an external LLM.
+- [x] A new user can run a limited Brittany demo without an OpenAI API key.
 
 ### [P1] Add delivery automation and demo material
 
@@ -145,6 +149,8 @@ ______________________________________________________________________
   checks on pull requests and pushes to the main branch.
 - [x] Publish immutable commit-SHA and release-tagged container images without deploying
   them.
+- [x] Provide a deterministic, no-cost demo mode for scripted Brittany questions and a
+  friendly fallback for unsupported questions.
 
 **Acceptance criteria**
 

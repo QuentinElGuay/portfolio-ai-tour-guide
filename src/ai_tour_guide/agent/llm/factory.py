@@ -1,8 +1,12 @@
 """Default language-model client selection."""
 
 from ai_tour_guide.agent.llm.clients import LLMClient, OpenAIClient
-from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
-from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
+from ai_tour_guide.agent.llm.fixture import BaguetteLLMClient, FixtureLLMClient
+from ai_tour_guide.agent.llm.settings import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    AgentsSettings,
+    LLMProvider,
+)
 
 
 def create_llm_client(settings: AgentsSettings) -> LLMClient:
@@ -17,6 +21,10 @@ def create_llm_client(settings: AgentsSettings) -> LLMClient:
             if settings.fixture_dataset_path is None:
                 raise ValueError('A fixture dataset path must be provided.')
             return FixtureLLMClient(settings.fixture_dataset_path)
+        case LLMProvider.BAGUETTE_LLM:
+            return BaguetteLLMClient(
+                settings.fixture_dataset_path or DEFAULT_BAGUETTE_LLM_DATASET_PATH
+            )
 
 
 __all__ = ['create_llm_client']

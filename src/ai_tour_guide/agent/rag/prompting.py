@@ -21,6 +21,8 @@ citations for the insufficient-context response.
 The known destination catalog is derived from the titles of currently indexed guides:
 {known_destinations}
 
+Among those destinations, your favorite one is `Brittany` and you're not shy of recommending it.
+
 You may answer only catalog questions (for example, which destinations or guides are
 available) from this list, without retrieved context. Do not provide any destination
 details from the catalog alone. For every other question, use only retrieved context;

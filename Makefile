@@ -26,7 +26,7 @@ DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: airflow annotate-dataset app ask cli-chat dashboard dashboard-export dashboard-init dashboard-restore evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest init-db load-corpus purge reset-db reset-schema simulate-rag smoke-test stop text_search validate-dashboard-backup validate-db-schema vector_search
+.PHONY: airflow annotate-dataset app ask cli-chat dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
 
 airflow: ## Start Airflow and its host-Docker ingestion orchestration.
 	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile airflow up --build -d --wait \
@@ -51,7 +51,7 @@ cli-chat: ## Start the interactive terminal chat after the agent is ready.
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent chat --k "$(K)"
 
-dashboard: ## Start PostgreSQL and the Metabase dashboard.
+dashboard: dashboard-init ## Start and initialize PostgreSQL and the Metabase dashboard.
 	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile dashboard up --build -d --wait database dashboard
 
 dashboard-export: dashboard dashboard-init ## Export the dashboard application database into the repository.
@@ -91,6 +91,28 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	$(COMPOSE) --profile dashboard build metabase-database
 	$(COMPOSE) --profile dashboard run --rm metabase-database
 
+db-init: db-validate-schema ## Start PostgreSQL and initialize its schema.
+	$(COMPOSE) --profile tools run --build --rm init-db \
+		python -m ai_tour_guide.knowledge_base.database.init \
+		--schema "$(SCHEMA)"
+
+db-reset: db-validate-schema ## Reset the selected application schema without touching Metabase.
+	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
+	$(MAKE) db-reset-schema SCHEMA="$(SCHEMA)"
+
+db-reset-schema: db-validate-schema ## Delete and recreate only the selected schema.
+	@test "$(origin SCHEMA)" = "command line" || \
+		(echo "SCHEMA must be provided explicitly, for example: make db-reset-schema SCHEMA=evaluation" >&2; exit 1)
+	$(DATABASE_UP)
+	$(COMPOSE) exec -T database sh -c \
+		'psql --username "$$POSTGRES_USER" \
+		--dbname "$$POSTGRES_DB" \
+		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
+	$(MAKE) db-init SCHEMA="$(SCHEMA)"
+
+db-validate-schema:
+	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
+
 evaluate: ## Run all evaluation metrics.
 	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
 	$(DATABASE_UP)
@@ -119,7 +141,7 @@ evaluate-search: evaluate
 export-corpus: ## Overwrite the current knowledge-base corpus export.
 	uv run python scripts/export_corpus.py --root "$(CORPUS_ROOT)"
 
-export-csv: validate-db-schema ## Export ingestion tables as deterministic CSV files.
+export-csv: db-validate-schema ## Export ingestion tables as deterministic CSV files.
 	@case "$(CSV_LIMIT)" in *[!0-9]*|'') echo "CSV_LIMIT must be a positive integer" >&2; exit 1;; esac
 	@test "$(CSV_LIMIT)" -gt 0 || (echo "CSV_LIMIT must be greater than zero" >&2; exit 1)
 	@mkdir -p "$(EXPORT_DIR)"
@@ -146,12 +168,17 @@ help: ## Show the available commands.
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
 	@echo "  make cli-chat                        Start the interactive terminal chat"
-	@echo "  make dashboard                       Start PostgreSQL and Metabase"
+	@echo "  make dashboard                       Start and initialize PostgreSQL and Metabase"
 	@echo "  make dashboard DEBUG=1               Start dashboard with Docker Compose diagnostics"
 	@echo "  make dashboard-export                Export the dashboard application database"
-	@echo "  make dashboard-init                  Start and initialize Metabase"
+	@echo "  make dashboard-init                  Initialize an already running Metabase instance"
 	@echo "  make dashboard-restore               Restore the dashboard if its database is empty"
 	@echo "  make dashboard-restore FORCE=1       Overwrite and restore the dashboard"
+	@echo "  make db-init                         Initialize the PostgreSQL schema"
+	@echo "  make db-init SCHEMA=evaluation       Initialize another PostgreSQL schema"
+	@echo "  make db-reset                        Reset the selected application schema"
+	@echo "  make db-reset-schema SCHEMA=evaluation Delete and recreate one schema"
+	@echo "  make db-validate-schema              Validate the selected database schema"
 	@echo "  make evaluate                        Run search, RAG, and judge evaluation"
 	@echo "  make evaluate K=10                   Evaluate the first 10 ranked chunks"
 	@echo "  make evaluate-all                    Run all evaluation metrics"
@@ -167,20 +194,15 @@ help: ## Show the available commands.
 	@echo "  make ingest DEBUG=1                  Ingest and retain debug artifacts"
 	@echo "  make ingest FORCE=1                  Replace documents already ingested"
 	@echo "  make ingest SOURCE_FILES=path.json   Ingest another JSON input file"
-	@echo "  make init-db                         Initialize the PostgreSQL schema"
-	@echo "  make init-db SCHEMA=evaluation       Initialize another PostgreSQL schema"
 	@echo "  make load-corpus                     Replace the public database corpus"
 	@echo "  make load-corpus SCHEMA=evaluation   Replace the evaluation corpus"
 	@echo "  make purge                           Stop everything and remove volumes (destructive)"
-	@echo "  make reset-db                        Reset the selected application schema"
-	@echo "  make reset-schema SCHEMA=evaluation  Delete and recreate one schema"
 	@echo "  make simulate-rag                    Populate dashboards with synthetic RAG traffic"
 	@echo "  make simulate-rag SIMULATE_ARGS='--days 30 --requests-per-day 50'"
 	@echo "  make smoke-test                      Run deterministic end-to-end RAG smoke tests"
 	@echo "  make stop                            Stop every Compose profile and remove containers"
 	@echo "  make text_search QUESTION='...'      Run full-text search (K defaults to 5)"
 	@echo "  make validate-dashboard-backup       Validate the Metabase dashboard backup"
-	@echo "  make validate-db-schema              Validate the selected database schema"
 	@echo "  make vector_search QUESTION='...'    Run semantic search (K defaults to 5)"
 	@echo "  DEBUG=1                              Enable verbose Docker Compose diagnostics"
 
@@ -189,11 +211,6 @@ ingest: ## Ingest the documents described by SOURCE_FILES.
 	@if [ -n "$(DEBUG_FLAG)" ]; then mkdir -p tmp && chmod 0777 tmp; fi
 	$(COMPOSE) --profile ingestion run --rm -T ingestion \
 		python -m ai_tour_guide.ingestion.cli run $(DEBUG_FLAG) $(INGEST_EXISTING_FLAG) - < "$(SOURCE_FILES)"
-
-init-db: validate-db-schema ## Start PostgreSQL and initialize its schema.
-	$(COMPOSE) --profile tools run --build --rm init-db \
-		python -m ai_tour_guide.knowledge_base.database.init \
-		--schema "$(SCHEMA)"
 
 load-corpus: ## Replace the knowledge-base corpus in the selected SCHEMA.
 	@test -f "$(CORPUS_ROOT)/embedding_models.jsonl" \
@@ -204,20 +221,6 @@ load-corpus: ## Replace the knowledge-base corpus in the selected SCHEMA.
 
 purge: ## Stop everything and remove containers, networks, orphans, and volumes.
 	$(COMPOSE) --profile "*" down --volumes --remove-orphans
-
-reset-db: validate-db-schema ## Reset the selected application schema without touching Metabase.
-	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
-	$(MAKE) reset-schema SCHEMA="$(SCHEMA)"
-
-reset-schema: validate-db-schema ## Delete and recreate only the selected schema.
-	@test "$(origin SCHEMA)" = "command line" || \
-		(echo "SCHEMA must be provided explicitly, for example: make reset-schema SCHEMA=evaluation" >&2; exit 1)
-	$(DATABASE_UP)
-	$(COMPOSE) exec -T database sh -c \
-		'psql --username "$$POSTGRES_USER" \
-		--dbname "$$POSTGRES_DB" \
-		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
-	$(MAKE) init-db SCHEMA="$(SCHEMA)"
 
 simulate-rag: ## Populate operational dashboards with deterministic synthetic RAG traffic.
 	$(DATABASE_UP)
@@ -244,9 +247,6 @@ validate-dashboard-backup:
 		(echo "Dashboard backup not found: $(DASHBOARD_BACKUP). Run 'make dashboard-export' first." >&2; exit 1)
 	@case "$(METABASE_DB_NAME)" in *[!a-z0-9_]*|[0-9]*|'') echo "METABASE_DB_NAME must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 	@case "$(FORCE)" in 0|1) ;; *) echo "FORCE must be 0 or 1" >&2; exit 1;; esac
-
-validate-db-schema:
-	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)

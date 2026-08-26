@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -38,31 +39,35 @@ def get_or_create_embedding_model(
         EmbeddingModelRow.model_revision == metadata.model_revision,
     )
     existing = session.scalar(statement)
-    if existing is not None:
-        if (
-            existing.dimensions != metadata.dimensions
-            or existing.normalized != metadata.normalized
-            or existing.distance_metric != metadata.distance_metric
-        ):
-            raise EmbeddingModelConfigurationError(
-                'Stored embedding model configuration does not match the effective ingestion model'
+    if existing is None:
+        session.execute(
+            postgres_insert(EmbeddingModelRow.__table__)
+            .values(
+                provider=metadata.provider,
+                model_name=metadata.model_name,
+                model_revision=metadata.model_revision,
+                dimensions=metadata.dimensions,
+                normalized=metadata.normalized,
+                tokenizer_name=getattr(metadata, 'tokenizer_name', None),
+                tokenizer_revision=getattr(metadata, 'tokenizer_revision', None),
+                max_input_tokens=getattr(metadata, 'max_input_tokens', None),
+                distance_metric=metadata.distance_metric,
             )
-        return existing
+            .on_conflict_do_nothing(constraint='uq_embedding_models_identity')
+        )
+        existing = session.scalar(statement)
 
-    row = EmbeddingModelRow(
-        provider=metadata.provider,
-        model_name=metadata.model_name,
-        model_revision=metadata.model_revision,
-        dimensions=metadata.dimensions,
-        normalized=metadata.normalized,
-        tokenizer_name=getattr(metadata, 'tokenizer_name', None),
-        tokenizer_revision=getattr(metadata, 'tokenizer_revision', None),
-        max_input_tokens=getattr(metadata, 'max_input_tokens', None),
-        distance_metric=metadata.distance_metric,
-    )
-    session.add(row)
-    session.flush()
-    return row
+    if existing is None:
+        raise RuntimeError('Embedding model insert did not produce a database row.')
+    if (
+        existing.dimensions != metadata.dimensions
+        or existing.normalized != metadata.normalized
+        or existing.distance_metric != metadata.distance_metric
+    ):
+        raise EmbeddingModelConfigurationError(
+            'Stored embedding model configuration does not match the effective ingestion model'
+        )
+    return existing
 
 
 def insert_document(

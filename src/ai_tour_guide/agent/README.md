@@ -27,11 +27,14 @@ Return to the [project overview](../../../README.md).
 6. The agent validates citations against the retrieved provenance, then returns only
    validated source references to user interfaces.
 
-The project currently supports the OpenAI API for answer generation. Additional LLM
-providers may be added in the future.
+OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
+the recommended model. The bundled `baguette-llm` provider, using the
+`mini-croissant-1.0` model, is a no-cost deterministic Brittany demo; it is not a
+general-purpose LLM.
 
-If no OpenAI API key is configured, the service raises a configuration error before
-querying the knowledge base.
+The `baguette-llm` provider does not require an API key. OpenAI requires an API key;
+without one, the service raises a configuration error before querying the knowledge
+base.
 
 ## Run the services
 
@@ -39,15 +42,16 @@ The agent requires the knowledge-base database. Initialise its schema and ingest
 least one document before starting the RAG application:
 
 ```bash
-make init-db
+make db-init
 make ingest
 ```
 
-For the RAG application, `.env` must define `AGENT_LLM_API_KEY`; it also needs the
-database and embedding settings used for retrieval. The template provides a default
-`AGENT_LLM_PROVIDER` and `AGENT_LLM_MODEL`.
+The template defaults to the no-cost `baguette-llm` provider with the
+`mini-croissant-1.0` model. It still needs the database and embedding settings used for
+retrieval. The demo is limited to prepared Brittany questions and suggests a supported
+question when it cannot answer.
 
-Add your API key:
+To use live answer generation, switch to OpenAI and add your API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
@@ -61,10 +65,10 @@ Start the agent API and Gradio chat together:
 make app
 ```
 
-Docker Compose gives the OpenAI credential only to the `agent` service. The separate
-`chat` service calls `http://agent:8000/ask` over the internal network. `make app`
-starts the database service as an agent dependency, but it does not initialise or ingest
-the database.
+Docker Compose gives the optional OpenAI credential only to the `agent` service. The
+separate `chat` service calls `http://agent:8000/ask` over the internal network.
+`make app` starts the database service as an agent dependency, but it does not
+initialise or ingest the database.
 
 To run only the API locally:
 
@@ -143,29 +147,30 @@ The document identity constraint changed from `source_url` to `(source_url, vers
 Reinitialize the database schema before using this version of the agent:
 
 ```bash
-make reset-db
+make db-reset
 make ingest
 ```
 
-`make reset-db` resets only the selected application schema and preserves Metabase.
+`make db-reset` resets only the selected application schema and preserves Metabase.
 
 ## Configuration
 
-| Variable             | Purpose                                | Template value      |
-| -------------------- | -------------------------------------- | ------------------- |
-| `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `openai`            |
-| `AGENT_LLM_API_KEY`  | LLM API key for answer generation      | Empty               |
-| `AGENT_LLM_MODEL`    | LLM model for answer generation        | `gpt-4.1-mini`      |
-| `AGENT_PORT`         | Host port for the agent API            | `8000`              |
-| `DB_*`               | Database connection used for retrieval | See `.env.template` |
-| `EMBEDDING_*`        | Query embedding configuration          | See `.env.template` |
+| Variable             | Purpose                                | Template value                |
+| -------------------- | -------------------------------------- | ----------------------------- |
+| `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `baguette-llm`                |
+| `AGENT_LLM_API_KEY`  | Required only for OpenAI               | Not required for Baguette LLM |
+| `AGENT_LLM_MODEL`    | LLM model identifier                   | `mini-croissant-1.0`          |
+| `AGENT_PORT`         | Host port for the agent API            | `8000`                        |
+| `DB_*`               | Database connection used for retrieval | See `.env.template`           |
+| `EMBEDDING_*`        | Query embedding configuration          | See `.env.template`           |
 
 `DB_SCHEMA` selects the PostgreSQL schema used for retrieval. It defaults to `public`;
 use the same value for schema initialization, ingestion, and the agent so RAG reads the
 knowledge base you populated.
 
-`AGENT_LLM_MODEL` is required by the settings class; `.env.template` provides a default.
-OpenAI is the only provider currently supported by the default client.
+`AGENT_LLM_MODEL` is required by the settings class; `.env.template` provides the
+`mini-croissant-1.0` default. OpenAI is the only supported provider for live answer
+generation, and `gpt-4.1-mini` is the recommended model.
 
 For the chat service's `CHAT_*` settings and development-only `DemoBackend`, see the
 [chat guide](chat/README.md).

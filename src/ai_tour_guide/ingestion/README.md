@@ -19,7 +19,7 @@ Return to the [project overview](../../../README.md).
 The Docker workflow is the recommended path:
 
 ```bash
-make init-db
+make db-init
 make ingest
 ```
 
@@ -31,10 +31,10 @@ make ingest SOURCE_FILES=data/another-source.json
 make ingest DEBUG=1
 ```
 
-`make init-db` creates the tables and enables pgvector. Like the Airflow DAG,
+`make db-init` creates the tables and enables pgvector. Like the Airflow DAG,
 `make ingest` skips a document whose `(source_url, version)` identity is already in the
 database. To replace an existing document and its chunks, run `make ingest FORCE=1`. Use
-`make reset-db` when you intentionally want to clear the selected application schema;
+`make db-reset` when you intentionally want to clear the selected application schema;
 the separate Metabase database is preserved.
 
 ## Document definitions
@@ -175,9 +175,9 @@ The PDF parsing flow is documented in
 | `INGESTION_TMP_FOLDER` | Debug artifact directory                 | `tmp`                    |
 
 `DB_SCHEMA` can isolate another knowledge base in the same PostgreSQL database, for
-example `DB_SCHEMA=evaluation make init-db`. `EMBEDDING_DIMENSIONS` must match the
+example `DB_SCHEMA=evaluation make db-init`. `EMBEDDING_DIMENSIONS` must match the
 selected model. Changing it after database initialisation requires recreating the
-schema, for example with `make reset-db`.
+schema, for example with `make db-reset`.
 
 The Docker images preload `EMBEDDING_MODEL_NAME` during their build. Rebuild the images
 after intentionally changing the model configuration.

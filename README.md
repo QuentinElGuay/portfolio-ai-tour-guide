@@ -137,7 +137,19 @@ cd portfolio-ai-tour-guide
 cp .env.template .env
 ```
 
-Set an OpenAI API key in `.env` to generate answers:
+The template defaults to the no-cost Brittany demo. It does not require an API key:
+
+```dotenv
+AGENT_LLM_PROVIDER=baguette-llm
+AGENT_LLM_API_KEY=
+AGENT_LLM_MODEL=mini-croissant-1.0
+```
+
+The demo uses the bundled golden dataset to answer a prepared set of Brittany questions.
+For an unsupported question or when its expected evidence is unavailable, it explains
+the limitation and suggests a random supported question to try.
+
+For live answer generation, switch to OpenAI and add your API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
@@ -150,23 +162,28 @@ configuration: `EVALUATION_OPENAI_JUDGE_API_KEY` and `EVALUATION_OPENAI_JUDGE_MO
 When these are absent, it reuses `AGENT_LLM_API_KEY` and `AGENT_LLM_MODEL`.
 
 > [!NOTE]
-> OpenAI is the only currently supported LLM provider at the moment but more might be
-> added in the future.
+> OpenAI is the only supported provider for live answer generation. We recommend
+> `gpt-4.1-mini` for this project. The bundled `baguette-llm` provider, with the
+> `mini-croissant-1.0` model, is a zero-cost deterministic alternative for the limited
+> Brittany demo.
 
 Initialize the database, ingest the bundled source definitions, and start the app:
 
 ```bash
-make init-db
+make db-init
 make ingest
 make app
 ```
 
-To initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
+To start and initialize the Metabase dashboard, first set `METABASE_ADMIN_EMAIL` and
 `METABASE_ADMIN_PASSWORD` in `.env`, then run:
 
 ```bash
-make dashboard-init
+make dashboard
 ```
+
+`make dashboard` also runs this initialization automatically. Use `make dashboard-init`
+when the dashboard is already running and only the Metabase setup needs to be rerun.
 
 To version the current Metabase configuration, questions, and dashboards for the Docker
 setup, run:
@@ -205,13 +222,13 @@ Open `http://localhost:7860` to use the chat. The agent API is available at
 `http://localhost:8000/docs`.
 
 The first ingestion or image build can download the configured embedding model. To
-recreate the application knowledge base, use `make reset-db`, then run `make ingest` to
+recreate the application knowledge base, use `make db-reset`, then run `make ingest` to
 populate the selected schema. The reset preserves the separate Metabase application
 database. Use `SCHEMA` to target another schema in the same PostgreSQL database, for
 example when isolating future evaluation data from local development data.
 
 > [!WARNING]
-> `make reset-db` removes all data in the selected application schema. To intentionally
+> `make db-reset` removes all data in the selected application schema. To intentionally
 > remove the entire PostgreSQL volume, including Metabase and its dashboards, run
 > `docker compose --profile dashboard down --volumes --remove-orphans` explicitly.
 
@@ -223,7 +240,7 @@ Run `make help` for every available shortcut.
 | ------------------------------------ | ---------------------------------------------------- |
 | `make stop`                          | Stop all Compose profiles and remove containers.     |
 | `make purge`                         | Stop everything and remove volumes.                  |
-| `make init-db`                       | Start PostgreSQL and initialise the pgvector schema. |
+| `make db-init`                       | Start PostgreSQL and initialise the pgvector schema. |
 | `make ingest`                        | Ingest documents defined in `source_files.json`.     |
 | `make ingest FORCE=1`                | Replace already ingested documents.                  |
 | `make airflow`                       | Start Airflow for parameterized Docker ingestion.    |

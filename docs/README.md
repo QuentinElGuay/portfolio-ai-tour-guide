@@ -1,8 +1,42 @@
 # "Baguette Voyages" tutorial
 
-This tutorial walks through ingestion, the Baguette Voyages chat app, evaluation, and
-monitoring. See the [project README](../README.md) for prerequisites and environment
-configuration.
+This tutorial guides you through document ingestion, the Baguette Voyages chat app,
+evaluation, and monitoring. See the [project README](../README.md) for prerequisites and
+environment configuration.
+
+## Before you begin
+
+Create a local environment file from the template:
+
+```bash
+cp .env.template .env
+```
+
+The template defaults to the no-cost Brittany demo and does not require an API key:
+
+```dotenv
+AGENT_LLM_PROVIDER=baguette-llm
+AGENT_LLM_API_KEY=
+AGENT_LLM_MODEL=mini-croissant-1.0
+```
+
+The demo can answer a prepared set of Brittany questions. For any other question, it
+explains that it is a limited demo and suggests a question it can answer.
+
+For live answer generation, switch to OpenAI and set your API key:
+
+```dotenv
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
+```
+
+OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
+the recommended model for this project.
+
+The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
+contains development defaults for these values; replace them before sharing the services
+or using them in production.
 
 ## Ingestion with Airflow
 
@@ -17,24 +51,26 @@ only after the Airflow API, metadata database, scheduler, and DAG processor are 
 It does not ingest documents by itself.
 
 Open the Airflow interface at [http://localhost:8080](http://localhost:8080) and sign in
-with `AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` from `.env`. The values below
-are development defaults from `.env.template`; change them before sharing an Airflow
-instance:
+with `AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` from `.env`. By default, the
+values from `.env.template` are:
 
 ```
 Username: admin
 Password: pa$$word123
 ```
 
+> > [!IMPORTANT]
+> > Do not use those values in production.
+
 ![Airflow sign in screen](tutorial/images/00_airflow_sign_in.png "Airflow sign in screen")
 
-Open the **DAGs** tab and click **Trigger** for the `ingest_documents` DAG.
+Open the **DAGs** tab and click **Trigger** next to the `ingest_documents` DAG.
 
 ![DAGs screen](tutorial/images/01_airflow_dags.png "Click on 'Trigger the DAG'")
 
-Copy the JSON array from `source_files.json` into the **Source files** field, then click
+Copy the JSON array from `source_files.json` into the **Source files** field and click
 **Trigger**. The DAG first initializes the application database, then runs one ingestion
-task per source file.
+task for each source file.
 
 By default, an already ingested document is skipped successfully. Select **Force
 re-ingestion** only when you intend to replace a document: it deletes the existing
@@ -42,19 +78,19 @@ document and its related chunks before inserting the replacement.
 
 ![Trigger DAG screen](tutorial/images/02_airflow_trigger_dag.png "Set the DAG parameters")
 
-Wait for the DAG run to finish. Ingestion duration depends on the number and size of the
-documents, and the first run may need to download the embedding model.
+Wait for the DAG run to finish. The ingestion time depends on the number and size of the
+documents. The first run may also need to download the embedding model.
 
 ![All the tasks are marked as success](tutorial/images/03_airflow_dag_run.png "Successful DAG")
 
 ## Ingestion with the command line
 
-Use the command line when you do not need Airflow's task orchestration or web interface.
-The Docker Compose shortcut initializes the application schema, then ingests every
+Use the command line when you do not need Airflow's orchestration or web interface. The
+Docker Compose shortcuts initialize the application schema and then ingest every
 document definition in `source_files.json`:
 
 ```bash
-make init-db
+make db-init
 make ingest
 ```
 
@@ -73,7 +109,7 @@ make ingest FORCE=1
 ```
 
 For a local Python workflow, install the project with `uv sync`, start and initialize
-the database with `make init-db`, then run the ingestion CLI directly:
+the database with `make db-init`, then run the ingestion CLI directly:
 
 ```bash
 uv run portfolio-ai-tour-guide-ingestion run source_files.json
@@ -94,32 +130,31 @@ make app
 The command starts the agent API and the Gradio chat interface. Open
 [http://localhost:7860](http://localhost:7860) in your browser.
 
-The API is available at [http://localhost:8000](http://localhost:8000), with interactive
-documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+![Chat app welcome screen](tutorial/images/04_chat_app_welcome.png "Baguette Voyages chat")
 
-The chat can answer which destinations are covered from the titles of the indexed
-guides. For detailed questions, ask about a destination covered by the guides—for
-example:
+The chat can list the destinations covered by the indexed guides. For detailed
+questions, ask about a destination covered by one of the guides—for example:
 
 ```text
 Which destinations do you cover?
-What are the main places to visit in Normandy?
+Where should I go to try the best French crepes?
 What should I see in Occitanie?
 ```
 
 The first question uses the indexed destination catalog. The detailed questions use
-retrieved passages and display their source titles and page numbers below the answer.
+retrieved passages and display the source titles and page numbers below each answer.
+
+![Chat app answer with sources](tutorial/images/05_chat_app_answers.png "Answers with sources")
+
 Use the Like and Dislike controls to record feedback about an answer.
 
-![Chat app welcome screen](tutorial/images/04_chat_app_welcome.png "Baguette Voyages chat")
-
-![Chat app answer with sources](tutorial/images/05_chat_app_answers.png "Answer with sources")
+![Positive feedback using the Like button](tutorial/images/06_chat_app_feedback.png "Positive feedback")
 
 ## Evaluation
 
-The evaluation workflow measures retrieval quality and answer quality against the
-repository's golden dataset. It loads the evaluation corpus into a separate `evaluation`
-schema, so it does not replace the public application corpus.
+The evaluation workflow measures retrieval and answer quality against the repository's
+golden dataset. It loads the evaluation corpus into a separate `evaluation` schema, so
+it does not replace the public application corpus.
 
 Run the retrieval evaluation first:
 
@@ -140,7 +175,7 @@ make evaluate-judge
 ```
 
 The judge requires an OpenAI API key. Set `EVALUATION_OPENAI_JUDGE_API_KEY` and
-`EVALUATION_OPENAI_JUDGE_MODEL` in `.env`; when they are absent, the workflow reuses the
+`EVALUATION_OPENAI_JUDGE_MODEL` in `.env`. If they are not set, the workflow reuses the
 agent's `AGENT_LLM_API_KEY` and `AGENT_LLM_MODEL`. To run the complete evaluation suite,
 use `make evaluate`.
 
@@ -150,30 +185,54 @@ described in the [project README](../README.md#evaluation).
 
 ## Monitoring
 
-The project includes a Metabase dashboard for inspecting persisted RAG requests, answer
+The project includes a Metabase dashboard for exploring persisted RAG requests, answer
 feedback, quality metrics, and model usage costs.
 
-Start PostgreSQL and Metabase:
+Start and initialize PostgreSQL and Metabase:
 
 ```bash
 make dashboard
 ```
 
-Create the initial Metabase administrator and register the application database:
+On the first run, the `metabase-database` service creates the Metabase application
+database and restores the bundled `fixtures/metabase/metabase.sql` fixture if the
+database is new or empty. Existing non-empty Metabase databases are preserved.
 
-```bash
-make dashboard-init
-```
+The `dashboard` target automatically initializes the Metabase instance after starting
+it. This creates the initial Metabase administrator and registers the project PostgreSQL
+databases as data sources.
 
 Open [http://localhost:3000](http://localhost:3000) and sign in with
-`METABASE_ADMIN_EMAIL` and `METABASE_ADMIN_PASSWORD` from `.env`. To create example
-operational traffic for the dashboards, run:
+`METABASE_ADMIN_EMAIL` and `METABASE_ADMIN_PASSWORD` from `.env`. By default, the values
+from `.env.template` are:
+
+```
+Email address: admin@example.com
+Password: pa$$word123
+```
+
+> > [!IMPORTANT]
+> > Do not use those values in production.
+
+The default `Operational Overview` dashboard displays request volume, error rate, and
+user feedback. The `Cost` tab provides charts for token usage and costs.
+
+![Operational Overview dashboard with operational-related charts](tutorial/images/07_dashboard_operational_overview.png "Operational Overview dashboard")
+
+Under `Our analytics`, you can find the `Evaluation dashboard`, which provides an
+overview of the `Search`, `RAG`, and `LLM Judge` evaluations.
+
+[Evaluation dashboard with search-related charts](tutorial/images/08_dashboard_evaluation.png "Search Evaluation dashboard.")
+
+### Traffic simulation
+
+To populate the dashboards with example operational traffic, run:
 
 ```bash
 make simulate-rag
 ```
 
-The simulated traffic is clearly marked as synthetic and is useful for exploring the
-dashboard before real chat requests and feedback have accumulated. To preserve the
-current dashboard configuration, run `make dashboard-export`; to restore the bundled
-configuration into an empty dashboard database, run `make dashboard-restore`.
+The simulated traffic is marked as synthetic and is useful for exploring the dashboard
+before real chat requests and feedback have accumulated. To save the current dashboard
+configuration, run `make dashboard-export`. To restore the bundled configuration into an
+empty dashboard database, run `make dashboard-restore`.

@@ -9,8 +9,12 @@ from pydantic import SecretStr
 from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.llm.clients import GenerationError, OpenAIClient, _parse_answer
 from ai_tour_guide.agent.llm.factory import create_llm_client
-from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
-from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
+from ai_tour_guide.agent.llm.fixture import BaguetteLLMClient, FixtureLLMClient
+from ai_tour_guide.agent.llm.settings import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    AgentsSettings,
+    LLMProvider,
+)
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 
 
@@ -200,6 +204,54 @@ def test_fixture_provider_does_not_require_an_api_key(tmp_path) -> None:
     )
 
     assert isinstance(client, FixtureLLMClient)
+
+
+def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
+    """Verify that the demo provider suggests a question outside its fixture."""
+    dataset_path = tmp_path / 'golden.jsonl'
+    dataset_path.write_text(
+        json.dumps(
+            {
+                'id': 1,
+                'category': 'Test',
+                'question': 'What can I do in Brittany?',
+                'expected': {
+                    'answerable': True,
+                    'reference_answer': 'Visit the coast.',
+                    'relevant_source': {
+                        'source_url': 'https://example.test/guide',
+                        'version': None,
+                        'section_path': ['Guide', 'Activities'],
+                    },
+                },
+            }
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+
+    result = asyncio.run(
+        BaguetteLLMClient(dataset_path).answer_question(
+            [{'role': Role.USER, 'content': 'User question:\nWhat is the weather?'}]
+        )
+    )
+
+    assert 'demo backend with limited knowledge of Brittany' in result.answer
+    assert 'What can I do in Brittany?' in result.answer
+    assert result.citations == ()
+
+
+def test_demo_provider_uses_the_bundled_dataset_without_an_api_key() -> None:
+    """Verify that the no-cost demo is usable without provider credentials."""
+    client = create_llm_client(
+        AgentsSettings(
+            llm_provider=LLMProvider.BAGUETTE_LLM,
+            model='mini-croissant-1.0',
+        )
+    )
+
+    assert isinstance(client, BaguetteLLMClient)
+    assert client.dataset_path == DEFAULT_BAGUETTE_LLM_DATASET_PATH
 
 
 @pytest.mark.parametrize(
