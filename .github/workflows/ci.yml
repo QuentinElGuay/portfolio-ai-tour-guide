@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -110,8 +111,33 @@ jobs:
         if: always()
         run: docker compose down --volumes --remove-orphans
 
-  airflow:
-    name: Airflow DAG checks
+  airflow-changes:
+    name: Detect Airflow changes
+    runs-on: ubuntu-latest
+    outputs:
+      airflow: ${{ steps.filter.outputs.airflow }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            airflow:
+              - 'airflow/**'
+              - 'docker-compose.yml'
+              - 'docker/airflow.Dockerfile'
+              - 'docker/base.Dockerfile'
+              - 'docker/ingestion.Dockerfile'
+              - 'src/ai_tour_guide/ingestion/**'
+              - 'src/ai_tour_guide/knowledge_base/**'
+              - '.env.template'
+              - 'pyproject.toml'
+              - 'uv.lock'
+
+  airflow-config:
+    name: Airflow configuration
     runs-on: ubuntu-latest
 
     steps:
@@ -122,6 +148,20 @@ jobs:
 
       - name: Validate Airflow Compose configuration
         run: docker compose --profile airflow config --quiet
+
+  airflow:
+    name: Airflow DAG integration
+    needs: airflow-changes
+    if: >-
+      github.event_name == 'push' ||
+      needs.airflow-changes.outputs.airflow == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Airflow Compose environment
+        run: cp .env.template .env
 
       - name: Start Airflow services
         run: >-
