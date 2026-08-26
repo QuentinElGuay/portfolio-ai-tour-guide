@@ -241,12 +241,14 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
     assert result.citations == ()
 
 
-def test_demo_provider_uses_the_bundled_dataset_without_an_api_key() -> None:
-    """Verify that the no-cost demo is usable without provider credentials."""
+def test_demo_provider_uses_the_bundled_dataset_without_an_api_key(tmp_path) -> None:
+    """Verify that the no-cost demo ignores fixture-only configuration."""
+    fixture_dataset_path = tmp_path / 'fixture-dataset.jsonl'
     client = create_llm_client(
         AgentsSettings(
             llm_provider=LLMProvider.BAGUETTE_LLM,
             model='mini-croissant-1.0',
+            fixture_dataset_path=fixture_dataset_path,
         )
     )
 

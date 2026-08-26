@@ -22,9 +22,7 @@ def create_llm_client(settings: AgentsSettings) -> LLMClient:
                 raise ValueError('A fixture dataset path must be provided.')
             return FixtureLLMClient(settings.fixture_dataset_path)
         case LLMProvider.BAGUETTE_LLM:
-            return BaguetteLLMClient(
-                settings.fixture_dataset_path or DEFAULT_BAGUETTE_LLM_DATASET_PATH
-            )
+            return BaguetteLLMClient(DEFAULT_BAGUETTE_LLM_DATASET_PATH)
 
 
 __all__ = ['create_llm_client']

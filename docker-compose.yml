@@ -163,6 +163,13 @@ services:
 
     entrypoint: ["/bin/true"]
 
+    # Compose needs this explicit edge when building through `up --build`; without it,
+    # older Bake integration can emit an empty target for the additional context.
+    depends_on:
+      ai-tour-guide-base:
+        condition: service_started
+        required: false
+
     restart: "no"
 
   airflow-database:

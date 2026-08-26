@@ -15,6 +15,7 @@ from ai_tour_guide.ingestion.config import ChunkingConfig
 
 from .connection import create_database_engine
 from .models import DocumentRow, EmbeddingModelRow, ModelFactory
+from .tables.public import embedding_models
 
 
 class DocumentAlreadyExistsError(RuntimeError):
@@ -41,7 +42,7 @@ def get_or_create_embedding_model(
     existing = session.scalar(statement)
     if existing is None:
         session.execute(
-            postgres_insert(EmbeddingModelRow.__table__)
+            postgres_insert(embedding_models)
             .values(
                 provider=metadata.provider,
                 model_name=metadata.model_name,

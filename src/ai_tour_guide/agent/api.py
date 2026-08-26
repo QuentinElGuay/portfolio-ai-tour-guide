@@ -125,7 +125,7 @@ def _ensure_knowledge_base_ready() -> None:
         if _last_health_failure != failure:
             logger.warning(
                 'Knowledge-base health check failed: the public schema contains no '
-                'documents. Run `make airflow`, `make ingest` or `make load-corpus DB_SCHEMA=public` '
+                'documents. Run `make airflow`, `make ingest` or `make load-corpus` '
                 'to ingest documents in the knowledge-base.'
             )
             _last_health_failure = failure
@@ -133,7 +133,7 @@ def _ensure_knowledge_base_ready() -> None:
             status_code=503,
             detail=(
                 'Knowledge-base health check failed: the public schema contains no '
-                'documents. Run `make airflow`, `make ingest` or `make load-corpus DB_SCHEMA=public` '
+                'documents. Run `make airflow`, `make ingest` or `make load-corpus` '
                 'to ingest documents in the knowledge-base.'
             ),
         )

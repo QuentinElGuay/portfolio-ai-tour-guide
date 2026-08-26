@@ -23,7 +23,7 @@ from .pdf_fixture import create_brittany_weekend_notes
 
 
 @pytest.fixture(scope='session', autouse=True)
-def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     """Generate and ingest the original local PDF before API smoke checks."""
     assert DatabaseSettings().schema_name == 'smoke'
     fixture_directory = tmp_path_factory.mktemp('smoke-pdf')
@@ -67,9 +67,6 @@ def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterato
         + '\n',
         encoding='utf-8',
     )
-    previous_dataset = os.environ.get('AGENT_LLM_FIXTURE_DATASET')
-    os.environ['AGENT_LLM_FIXTURE_DATASET'] = str(dataset_path)
-
     clear_knowledge_base(schema_name='smoke')
     settings = IngestionSettings(timeout=10)
     embedding_settings = EmbeddingSettings()
@@ -96,10 +93,17 @@ def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             embedding_batch_size=embedding_settings.batch_size,
             chunking_config=settings.chunking_config,
         )
-        yield
+        yield str(dataset_path)
     finally:
-        if previous_dataset is None:
-            os.environ.pop('AGENT_LLM_FIXTURE_DATASET', None)
-        else:
-            os.environ['AGENT_LLM_FIXTURE_DATASET'] = previous_dataset
         clear_knowledge_base(schema_name='smoke')
+
+
+@pytest.fixture(autouse=True)
+def configure_smoke_llm(
+    ingested_smoke_document: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use the smoke fixture model without leaking its settings to other tests."""
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'fixture')
+    monkeypatch.setenv('AGENT_LLM_API_KEY', '')
+    monkeypatch.setenv('AGENT_LLM_FIXTURE_DATASET', ingested_smoke_document)
