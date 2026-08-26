@@ -115,47 +115,12 @@ tracking, model pricing validation, and Metabase backup/restore support.
 
 ______________________________________________________________________
 
-## 🔄 Milestone 8 — Reproducibility and Delivery
+## ✅ Milestone 8 — Reproducibility and Delivery
 
-### [P0] Containerize and document the project
-
-- [x] Provide Dockerfiles, Docker Compose services, persistent database storage, and
-  startup health checks.
-- [x] Document setup, configuration, ingestion, usage, and limitations.
-- [x] Provide an end-to-end tutorial covering ingestion, the chat app, evaluation, and
-  monitoring.
-- [x] Provide a deterministic smoke-test command that ingests an original local PDF into
-  an isolated schema and checks health, grounded answers, citations, and refusals
-  through the API.
-- [x] Provide a no-cost, containerized Brittany demo backend that uses bundled fixture
-  data and explains its limited question coverage.
-- [x] Publish the latest evaluation evidence and reports in the documentation.
-- [x] Publish versioned application images to GitHub Container Registry when a release
-  tag is pushed; deployment remains intentionally out of scope.
-- [x] Add public application screenshots to the project documentation.
-
-**Acceptance criteria**
-
-- [x] A new user can run the application through Docker Compose.
-- [x] Services start in the required order and data persists across restarts.
-- [x] The complete ingestion and RAG path can be validated without an external LLM.
-- [x] A new user can run a limited Brittany demo without an OpenAI API key.
-
-### [P1] Add delivery automation and demo material
-
-- [x] Expand unit coverage for LLM output validation, fixture behavior, database engine
-  ownership/schema selection, retrieval strategies, and golden-dataset annotation.
-- [x] Run lockfile, lint, formatting, Markdown, type, unit, and fixture-backed smoke
-  checks on pull requests and pushes to the main branch.
-- [x] Publish immutable commit-SHA and release-tagged container images without deploying
-  them.
-- [x] Provide a deterministic, no-cost demo mode for scripted Brittany questions and a
-  friendly fallback for unsupported questions.
-
-**Acceptance criteria**
-
-- [x] A contributor can verify changes automatically before merge.
-- [x] A reviewer can understand the project outcome from the README and tutorial.
+**Delivered:** containerized application and Airflow-orchestrated ingestion services
+with persistent storage and health checks, a no-cost Brittany demo, deterministic smoke
+tests, CI validation and release-image publishing, current evaluation evidence, and
+complete README, tutorial, screenshot, and configuration documentation.
 
 ______________________________________________________________________
 
@@ -163,9 +128,9 @@ ______________________________________________________________________
 
 **Status:** 📦 Shipped
 
-The final submission has public screenshots and a tutorial. Delivery automation,
-evaluation evidence, and a deterministic smoke test are also available. A recorded demo
-is deferred until it adds value beyond the existing documentation.
+The final submission expands the service from Brittany-only content to multi-regional
+travel guides, with public screenshots and a tutorial. Delivery automation, evaluation
+evidence, and a deterministic smoke test are also available.
 
 ______________________________________________________________________
 

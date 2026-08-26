@@ -6,9 +6,6 @@ Bonjour! Baguette Voyages is a fictional French travel company powered by
 **Retrieval-Augmented Generation (RAG)**. Its travel assistant answers questions from
 indexed regional tourism guides.
 
-> [!IMPORTANT]
-> 🚧 This project is under **<ins>active development</ins>**.
-
 ## Table of contents
 
 - [Overview](#overview)
