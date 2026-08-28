@@ -4,7 +4,7 @@
 
 Salut! Je suis **Petit Guide**, your AI travel companion from **Baguette Voyages**, a fictional French travel company.
 My job is to help you prepare your visit in France by answering your questions using **Retrieval-Augmented Generation (RAG)**
-based on  regional tourism guides.
+based on regional tourism guides.
 
 ![Petit Guide, the mascot](docs/images/petit-guide.png)
 
