@@ -34,7 +34,9 @@ def test_agent_settings_reads_generic_values_from_environment(
 def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     """Verify that openai client sends messages and returns structured output."""
     response = SimpleNamespace(
-        output_text='{"answer": "A grounded answer.", "citations": []}'
+        output_text=(
+            '{"answer": "A grounded answer.", "citations": [], "emotion": "happy"}'
+        )
     )
     client = MagicMock()
     client.responses.create = AsyncMock(return_value=response)
@@ -52,6 +54,7 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     )
 
     assert result.answer == 'A grounded answer.'
+    assert result.emotion.value == 'happy'
     await_args = client.responses.create.await_args
     assert await_args is not None
     request = await_args.kwargs

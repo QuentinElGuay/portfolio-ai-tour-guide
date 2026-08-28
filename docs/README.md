@@ -143,6 +143,11 @@ The command starts the agent API and the Gradio chat interface. Open
 
 ![Chat app welcome screen](tutorial/04_chat_app_welcome.png "Baguette Voyages chat")
 
+Each chat session starts with a welcome from **Petit Guide**, followed by a second
+message containing example questions. Assistant messages are labelled **Petit Guide**
+and user messages are labelled **You**. The chat uses transparent message bubbles so the
+labels and avatars remain the primary visual distinction.
+
 The chat can list the destinations covered by the indexed guides. For detailed
 questions, ask about a destination covered by one of the guides—for example:
 

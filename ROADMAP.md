@@ -169,6 +169,14 @@ These improvements are useful but are not priorities for the final submission.
 - [ ] Evaluate query rewriting, reranking, and additional hybrid configurations; retain
   them only when they improve quality within the latency budget.
 
+### [P2] Conversation and agentic architecture
+
+- [ ] Separate `RAGResult` from conversation messages and agent execution state so the
+  assistant can support agentic actions, tool calls, and multi-step interactions rather
+  than only pure RAG answers. Use the new conversation/assistant-turn model as the
+  appropriate place to store answer emotion and other presentation metadata, while
+  keeping retrieval provenance attached to RAG results.
+
 ### [P2] Controlled LLM comparison
 
 - [ ] Compare at least two prompt or generation configurations using controlled

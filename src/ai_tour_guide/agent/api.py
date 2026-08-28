@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
-from ai_tour_guide.agent.rag.models import RAGResult, SourceReference
+from ai_tour_guide.agent.rag.models import Emotion, RAGResult, SourceReference
 from ai_tour_guide.agent.rag.persistence import (
     store_feedback,
     store_rag_result,
@@ -70,6 +70,7 @@ class AskResponse(BaseModel):
     request_id: UUID
     answer: str
     sources: list[SourceResponse]
+    emotion: Emotion = Emotion.NEUTRAL
 
 
 class FeedbackRequest(BaseModel):
@@ -170,7 +171,10 @@ async def ask(request: AskRequest) -> AskResponse:
         ) from exc
     sources = [SourceResponse.from_reference(source) for source in result.sources]
     return AskResponse(
-        request_id=result.request_id, answer=result.answer, sources=sources
+        request_id=result.request_id,
+        answer=result.answer,
+        sources=sources,
+        emotion=result.generated.emotion,
     )
 
 

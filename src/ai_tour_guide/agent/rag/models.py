@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import Emotion, Message
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import SearchMode
 from ai_tour_guide.knowledge_base.search.models import SearchResult
@@ -35,6 +35,7 @@ class LLMCitation:
 class GeneratedAnswer:
     answer: str
     citations: tuple[LLMCitation, ...] = ()
+    emotion: Emotion = Emotion.NEUTRAL
     llm_metadata: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -42,6 +43,7 @@ class GeneratedAnswer:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, 'citations', tuple(self.citations))
+        object.__setattr__(self, 'emotion', Emotion(self.emotion))
         object.__setattr__(self, 'llm_metadata', _freeze_mapping(self.llm_metadata))
 
 
@@ -247,6 +249,7 @@ class RAGResult:
             'generated': {
                 'answer': self.generated.answer,
                 'citations': _json_value(self.generated.citations),
+                'emotion': self.generated.emotion.value,
             },
             'search_results': [
                 _serialize_search_result(result)
@@ -271,6 +274,7 @@ __all__ = [
     'RAG_RESULT_SCHEMA_VERSION',
     'CitationInvalidReason',
     'CitationValidationResult',
+    'Emotion',
     'GeneratedAnswer',
     'InvalidCitation',
     'LLMCitation',
