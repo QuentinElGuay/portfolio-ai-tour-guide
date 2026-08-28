@@ -10,6 +10,11 @@ tmp
 tests
 docs
 evaluation
+!evaluation/
+evaluation/*
+!evaluation/datasets/
+evaluation/datasets/*
+!evaluation/datasets/golden_dataset.jsonl
 fixtures
 !fixtures/
 fixtures/*
