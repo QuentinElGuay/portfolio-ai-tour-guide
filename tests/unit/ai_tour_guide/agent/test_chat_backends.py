@@ -11,6 +11,7 @@ def test_demo_backend_returns_structured_fallback() -> None:
     result = asyncio.run(DemoBackend().ask([]))
     assert result['answer'] == NO_BACKEND_AVAILABLE_ANSWER
     assert result['sources'] == []
+    assert result['emotion'] == 'neutral'
 
 
 def test_demo_backend_feedback_is_a_noop() -> None:
@@ -26,6 +27,7 @@ def test_http_backend_returns_validated_api_payload(async_client: MagicMock) -> 
         'schema_version': 1,
         'answer': 'Visit.',
         'sources': [],
+        'emotion': 'happy',
     }
     client = AsyncMock()
     client.post.return_value = response

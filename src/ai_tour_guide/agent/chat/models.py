@@ -2,6 +2,15 @@ from enum import StrEnum
 from typing import TypedDict
 
 
+class Emotion(StrEnum):
+    """Emotions available for rendering alongside an assistant answer."""
+
+    CONFUSED = 'confused'
+    DISAPPOINTED = 'disappointed'
+    HAPPY = 'happy'
+    NEUTRAL = 'neutral'
+
+
 class Role(StrEnum):
     """Roles supported by the agent chat protocol."""
 
@@ -22,4 +31,4 @@ class ChatHistoryItem(TypedDict):
     content: object
 
 
-__all__ = ['ChatHistoryItem']
+__all__ = ['ChatHistoryItem', 'Emotion', 'Message', 'Role']

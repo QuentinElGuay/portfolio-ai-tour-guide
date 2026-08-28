@@ -65,6 +65,7 @@ def test_ask_command_prints_answer_and_compact_sources(
         'schema_version': 1,
         'request_id': str(answer_question.return_value.request_id),
         'answer': 'The coast is beautiful.',
+        'emotion': 'neutral',
         'sources': [
             {
                 'source_url': 'https://example.com/guide',

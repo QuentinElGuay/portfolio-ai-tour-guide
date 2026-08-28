@@ -91,6 +91,7 @@ class BaguetteLLMClient(FixtureLLMClient):
         return GeneratedAnswer(
             generated.answer,
             citations=generated.citations,
+            emotion=generated.emotion,
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),

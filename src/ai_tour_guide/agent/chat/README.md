@@ -2,7 +2,9 @@
 
 The Gradio chat is the user interface for the RAG agent. It does not retrieve documents
 or access an LLM provider directly. Instead, it sends each question to the agent's HTTP
-API and displays the grounded answer with its source pages.
+API and displays the grounded answer with its source pages. Each session starts with a
+welcome from **Petit Guide**, followed by example questions. Assistant and user messages
+are labelled **Petit Guide** and **You**, respectively.
 
 Return to the [project overview](../../../../README.md) or the
 [agent guide](../README.md).
@@ -81,10 +83,13 @@ The agent returns its answer and validated source references:
       "publication_date": "2026-01-01",
       "pages": [12, 13]
     }
-  ]
+  ],
+  "emotion": "neutral"
 }
 ```
 
 `HttpChatBackend` validates the schema version and passes this dictionary to Gradio.
 Gradio controls presentation; its default view renders the answer followed by each
-source title and its pages in parentheses.
+source title and its pages in parentheses. The API also returns a validated emotion
+(`happy`, `confused`, `disappointed`, or `neutral`) for future presentation use; inline
+emoticon rendering is currently disabled in the chat UI.

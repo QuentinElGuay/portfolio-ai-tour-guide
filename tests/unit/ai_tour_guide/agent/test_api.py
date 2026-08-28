@@ -200,6 +200,7 @@ def test_ask_http_boundary_normalizes_question_and_serializes_response(
         'request_id': str(result.request_id),
         'answer': 'The answer.',
         'sources': [],
+        'emotion': 'neutral',
     }
     answer_question.assert_awaited_once_with('Where?')
     store_rag_result.assert_called_once_with(result.request_id, result.to_dict())

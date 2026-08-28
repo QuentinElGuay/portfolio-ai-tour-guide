@@ -97,6 +97,7 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
                 'request_id': str(result.request_id),
                 'answer': result.answer,
                 'sources': [source.to_dict() for source in result.sources],
+                'emotion': result.generated.emotion.value,
             }
         )
     )

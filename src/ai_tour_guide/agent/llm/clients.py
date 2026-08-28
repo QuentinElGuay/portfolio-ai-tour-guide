@@ -5,7 +5,7 @@ from typing import Protocol
 
 from openai import APIError, AsyncOpenAI
 
-from ai_tour_guide.agent.chat.models import Message, Role
+from ai_tour_guide.agent.chat.models import Emotion, Message, Role
 from ai_tour_guide.agent.llm.rate_limit import AsyncRateLimiter
 from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
@@ -86,8 +86,12 @@ class OpenAIClient:
                                         'additionalProperties': False,
                                     },
                                 },
+                                'emotion': {
+                                    'type': 'string',
+                                    'enum': [emotion.value for emotion in Emotion],
+                                },
                             },
-                            'required': ['answer', 'citations'],
+                            'required': ['answer', 'citations', 'emotion'],
                             'additionalProperties': False,
                         },
                     },
@@ -102,7 +106,7 @@ class OpenAIClient:
         try:
             import json
 
-            answer, citations = _parse_answer(json.loads(content))
+            answer, citations, emotion = _parse_answer(json.loads(content))
         except (TypeError, ValueError, KeyError) as exc:
             raise GenerationError(
                 'OpenAI returned malformed structured output.'
@@ -112,6 +116,7 @@ class OpenAIClient:
         return GeneratedAnswer(
             answer=answer,
             citations=citations,
+            emotion=emotion,
             llm_metadata={
                 'provider': 'openai',
                 'model': self.model,
@@ -123,16 +128,23 @@ class OpenAIClient:
         )
 
 
-def _parse_answer(payload: object) -> tuple[str, tuple[LLMCitation, ...]]:
+def _parse_answer(
+    payload: object,
+) -> tuple[str, tuple[LLMCitation, ...], Emotion]:
     if not isinstance(payload, dict):
         raise TypeError('answer must be an object')
 
     answer = payload.get('answer')
     citations = payload.get('citations')
+    emotion = payload.get('emotion', Emotion.NEUTRAL)
     if not isinstance(answer, str) or not answer.strip():
         raise ValueError('answer must be a non-empty string')
     if not isinstance(citations, list):
         raise TypeError('citations must be a list')
+    try:
+        parsed_emotion = Emotion(emotion)
+    except ValueError as exc:
+        raise ValueError('emotion must be one of the supported values') from exc
 
     parsed_citations: list[LLMCitation] = []
     for citation in citations:
@@ -156,7 +168,7 @@ def _parse_answer(payload: object) -> tuple[str, tuple[LLMCitation, ...]]:
             raise TypeError('citation page_end must be an integer or null')
         parsed_citations.append(LLMCitation(source_url, version, page_start, page_end))
 
-    return answer, tuple(parsed_citations)
+    return answer, tuple(parsed_citations), parsed_emotion
 
 
 __all__ = [

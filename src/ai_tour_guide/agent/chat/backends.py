@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import httpx
 
-from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.chat.models import Emotion, Message
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
@@ -43,6 +43,10 @@ class ChatBackend(ABC):
             raise ValueError('answer must be a non-empty string')
         if not isinstance(sources, list):
             raise TypeError('sources must be a list')
+        try:
+            payload['emotion'] = Emotion(payload.get('emotion', Emotion.NEUTRAL)).value
+        except ValueError as exc:
+            raise ValueError('emotion must be one of the supported values') from exc
         return payload
 
 
@@ -55,6 +59,7 @@ class DemoBackend(ChatBackend):
                 'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
                 'answer': NO_BACKEND_AVAILABLE_ANSWER,
                 'sources': [],
+                'emotion': Emotion.NEUTRAL.value,
             }
         )
 

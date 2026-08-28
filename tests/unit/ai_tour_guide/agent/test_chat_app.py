@@ -5,7 +5,12 @@ import gradio as gr
 
 from ai_tour_guide.agent.chat.app import (
     CHAT_CSS,
+    EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
+    WELCOME_MESSAGE,
+    WELCOME_SUGGESTIONS,
+    _italicize_french_expressions,
+    _render_response,
     create_app,
     placeholder_request_id,
     select_feedback,
@@ -34,9 +39,31 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     )
 
     assert chatbot.elem_id == 'rag-chat'
+    assert chatbot.height == 'calc(100vh - 250px)'
+    assert chatbot.value[0]['role'] == 'assistant'
+    assert chatbot.value[0]['content'][0]['text'] == WELCOME_MESSAGE
+    assert chatbot.value[1]['content'][0]['text'] == WELCOME_SUGGESTIONS
+    avatar_images = chatbot.avatar_images
+    assert avatar_images is not None
+    user_avatar = avatar_images[0]
+    bot_avatar = avatar_images[1]
+    assert user_avatar is not None
+    assert bot_avatar is not None
+    assert user_avatar['path'].endswith('/user.png')
+    assert bot_avatar['path'].endswith('/bot.png')
     assert chatbot.feedback_options == ('Like', 'Dislike')
     assert '.message-buttons-left button[aria-label="Liked"]' in CHAT_CSS
     assert '.message-buttons-left button[aria-label="Disliked"]' in CHAT_CSS
+    assert '#rag-chat .avatar-container' in CHAT_CSS
+    assert 'height: 80px' in CHAT_CSS
+    assert 'max-height: none' in CHAT_CSS
+    assert '#rag-chat .panel-wrap' in CHAT_CSS
+    assert 'overflow-y: visible' in CHAT_CSS
+    assert '#rag-chat .bubble-wrap' in CHAT_CSS
+    assert 'height: 100%' in CHAT_CSS
+    assert '#rag-chat [role="log"]' in CHAT_CSS
+    assert 'content: "Petit Guide"' in CHAT_CSS
+    assert 'content: "You"' in CHAT_CSS
     assert FEEDBACK_ACKNOWLEDGEMENT == 'Thanks for your feedback!'
     dependencies = app.config.get('dependencies', [])
     assert any(
@@ -46,7 +73,8 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
         for dependency in dependencies
     )
     assert any(
-        dependency['api_name'] == '_submit_fn' and dependency['show_progress'] == 'full'
+        dependency['api_name'] == '_submit_fn'
+        and dependency['show_progress'] == 'minimal'
         for dependency in dependencies
     )
 
@@ -56,6 +84,31 @@ def test_placeholder_request_ids_are_unique_per_assistant_message() -> None:
     assert placeholder_request_id(1) == 'TODO: request_id:1'
     assert placeholder_request_id(2) == 'TODO: request_id:2'
     assert placeholder_request_id(1) != placeholder_request_id(2)
+
+
+def test_render_response_omits_the_neutral_emoticon() -> None:
+    """Verify that neutral answers do not render an emoticon."""
+    rendered = _render_response(
+        {'answer': 'The coast is beautiful.', 'sources': [], 'emotion': 'neutral'}
+    )
+
+    assert rendered == 'The coast is beautiful.'
+
+
+def test_render_response_adds_special_emoticon_after_answer() -> None:
+    """Verify that special emotions are currently disabled in the chat UI."""
+    rendered = _render_response(
+        {'answer': 'The coast is beautiful.', 'sources': [], 'emotion': 'happy'}
+    )
+
+    assert EMOTICONS_ENABLED is False
+    assert rendered == 'The coast is beautiful.'
+
+
+def test_italicize_french_expressions() -> None:
+    """Verify that approved French expressions are rendered in italics."""
+    assert _italicize_french_expressions('Voilà! En route!') == '*Voilà!* *En route!*'
+    assert _italicize_french_expressions('*Voilà!*') == '*Voilà!*'
 
 
 def test_update_feedback_values_preserves_previous_ratings() -> None:

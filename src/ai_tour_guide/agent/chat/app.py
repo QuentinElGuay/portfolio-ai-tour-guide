@@ -1,7 +1,10 @@
 import asyncio
+import base64
 import logging
 import os
+import re
 from collections.abc import Sequence
+from pathlib import Path
 
 import gradio as gr
 
@@ -11,12 +14,40 @@ from ai_tour_guide.agent.chat.backends import (
     HttpChatBackend,
     create_backend,
 )
-from ai_tour_guide.agent.chat.models import ChatHistoryItem, Message, Role
+from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
 from ai_tour_guide.agent.source_formatting import format_pages
 
 logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
+EMOTICONS_ENABLED = False
+WELCOME_MESSAGE = (
+    '_Salut!_ I’m **Petit Guide**, your AI travel companion from **Baguette Voyages**. '
+    'How can I help you plan your visit to France?'
+)
+WELCOME_SUGGESTIONS = (
+    '**You could ask:**\n\n'
+    '- Which destinations do you cover?\n'
+    '- What are the main places to visit in Normandy?\n'
+    '- What should I see in Occitanie?'
+)
+AVATAR_IMAGES = (
+    Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
+    Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
+)
+FRENCH_EXPRESSIONS = (
+    'Oh là là!',
+    'Voilà!',
+    'Bon appétit!',
+    'En route!',
+    'Touché!',
+    'Salut!',
+)
+EMOTICON_IMAGES = {
+    emotion: Path(__file__).parent / 'assets' / 'emoticons' / f'{emotion.value}.png'
+    for emotion in Emotion
+    if emotion is not Emotion.NEUTRAL
+}
 
 CHAT_CSS = """
 #rag-chat .message-buttons-left {
@@ -27,7 +58,69 @@ CHAT_CSS = """
 }
 
 #rag-chat {
-    max-height: calc(100vh - 250px);
+    max-height: none;
+    overflow-y: hidden !important;
+}
+
+/* Gradio autoscrolls bubble-wrap, so it is the sole scroll owner. */
+#rag-chat .panel-wrap {
+    overflow-y: visible !important;
+}
+
+#rag-chat [role="log"] {
+    overflow: visible !important;
+}
+
+#rag-chat .bubble-wrap {
+    height: 100% !important;
+    overflow-y: auto !important;
+}
+
+#rag-chat .message.bot .message-content {
+    background: transparent !important;
+    border-radius: 16px !important;
+}
+
+#rag-chat .message.bot::before,
+#rag-chat .message.user::before {
+    color: #334155;
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+#rag-chat .message.bot::before {
+    content: "Petit Guide";
+}
+
+#rag-chat .message.user::before {
+    content: "You";
+}
+
+#rag-chat .message.user .message-content {
+    background: transparent !important;
+    border-radius: 16px !important;
+}
+
+#rag-chat .message {
+    margin-bottom: 0.75rem;
+}
+
+#rag-chat .avatar-container,
+#rag-chat .avatar-container img {
+    height: 80px !important;
+    width: 80px !important;
+}
+
+#rag-chat img.chat-emoticon {
+    display: inline-block !important;
+    height: 30px !important;
+    max-height: 30px !important;
+    max-width: 30px !important;
+    object-fit: contain;
+    vertical-align: middle;
+    width: 30px !important;
 }
 
 #rag-chat .message-buttons-left::before {
@@ -203,18 +296,23 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         request_ids = gr.State({})
         feedback_values = gr.State([])
         textbox = gr.Textbox(
-            placeholder='Write a message...',
+            placeholder='Write a message and press enter to ask a question.',
             container=False,
             autofocus=True,
         )
         chatbot = gr.Chatbot(
             elem_id='rag-chat',
+            avatar_images=AVATAR_IMAGES,
             feedback_options=('Like', 'Dislike'),
             feedback_value=[],
-            height=400,
+            height='calc(100vh - 250px)',
+            value=[
+                {'role': 'assistant', 'content': WELCOME_MESSAGE},
+                {'role': 'assistant', 'content': WELCOME_SUGGESTIONS},
+            ],
             placeholder=(
-                '<h2>Explore France with Baguette Voyages</h2>'
-                '<p>Ask a question grounded in our regional travel guides.</p>'
+                '<h2>Prepare your trip to France with Petit Guide</h2>'
+                "<p>We'll answer your questions based on our famous travel guides.</p>"
             ),
         )
         gr.ChatInterface(
@@ -223,17 +321,12 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             additional_inputs=request_ids,
             additional_outputs=request_ids,
             textbox=textbox,
-            show_progress='full',
+            show_progress='minimal',
             title=os.getenv('CHAT_TITLE', 'Baguette Voyages'),
             description=(
-                'Ask questions about French destinations and receive answers grounded in '
-                'our regional travel guides.'
+                "We'll answer your questions based on our famous travel guides."
             ),
-            examples=[
-                ['Which destinations do you cover?'],
-                ['What are the main places to visit in Normandy?'],
-                ['What should I see in Occitanie?'],
-            ],
+            examples=[],
             cache_examples=False,
         )
         # Gradio exposes this runtime event, but its published type information omits it.
@@ -253,7 +346,16 @@ def _render_response(payload: dict[str, object]) -> str:
     answer = payload['answer']
     if not isinstance(answer, str):
         raise TypeError('The chat response has no answer.')
-    rendered = [answer]
+    rendered = [_italicize_french_expressions(answer)]
+    emotion = Emotion(payload.get('emotion', Emotion.NEUTRAL))
+    if EMOTICONS_ENABLED and emotion is not Emotion.NEUTRAL:
+        emoticon = base64.b64encode(EMOTICON_IMAGES[emotion].read_bytes()).decode(
+            'ascii'
+        )
+        rendered[0] += ' ' + (
+            f'<img class="chat-emoticon" src="data:image/png;base64,{emoticon}" '
+            f'alt="{emotion.value} emoticon" width="30" height="30">'
+        )
     sources = payload.get('sources', [])
     if not isinstance(sources, list):
         raise TypeError('The chat response has invalid sources.')
@@ -268,6 +370,17 @@ def _render_response(payload: dict[str, object]) -> str:
         suffix = f', {format_pages(pages)}' if pages else ''
         rendered.append(f'({source["title"]}{suffix})')
     return '\n'.join(rendered)
+
+
+def _italicize_french_expressions(answer: str) -> str:
+    """Italicize the approved French expressions used by the assistant."""
+    for expression in FRENCH_EXPRESSIONS:
+        answer = re.sub(
+            rf'(?<!\*){re.escape(expression)}(?!\*)',
+            f'*{expression}*',
+            answer,
+        )
+    return answer
 
 
 def main() -> None:
