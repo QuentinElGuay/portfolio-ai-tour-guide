@@ -34,6 +34,8 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     )
 
     assert chatbot.elem_id == 'rag-chat'
+    assert chatbot.avatar_images[0]['path'].endswith('/user.png')
+    assert chatbot.avatar_images[1]['path'].endswith('/bot.png')
     assert chatbot.feedback_options == ('Like', 'Dislike')
     assert '.message-buttons-left button[aria-label="Liked"]' in CHAT_CSS
     assert '.message-buttons-left button[aria-label="Disliked"]' in CHAT_CSS

@@ -2,11 +2,12 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
-Salut! Je suis **Petit Guide**, your AI travel companion from **Baguette Voyages**, a fictional French travel company.
-My job is to help you prepare your visit in France by answering your questions using **Retrieval-Augmented Generation (RAG)**
-based on regional tourism guides.
+Salut! Je suis **Petit Guide**, your AI travel companion from **Baguette Voyages**, a
+fictional French travel company. My job is to help you prepare your visit in France by
+answering your questions using **Retrieval-Augmented Generation (RAG)** based on
+regional tourism guides.
 
-![Petit Guide, the mascot](docs/images/petit-guide.png)
+![Petit Guide, the mascot](docs/images/output-onlinetools.png)
 
 ## Table of contents
 

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Sequence
+from pathlib import Path
 
 import gradio as gr
 
@@ -17,6 +18,10 @@ from ai_tour_guide.agent.source_formatting import format_pages
 logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
+AVATAR_IMAGES = (
+    Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
+    Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
+)
 
 CHAT_CSS = """
 #rag-chat .message-buttons-left {
@@ -209,6 +214,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         )
         chatbot = gr.Chatbot(
             elem_id='rag-chat',
+            avatar_images=AVATAR_IMAGES,
             feedback_options=('Like', 'Dislike'),
             feedback_value=[],
             height=400,
