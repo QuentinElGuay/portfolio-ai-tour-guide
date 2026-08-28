@@ -59,18 +59,20 @@ CHAT_CSS = """
 
 #rag-chat {
     max-height: none;
-}
-
-/* Gradio 6.22 provides scrolling on both wrappers; keep it only on bubble-wrap. */
-#rag-chat .panel-wrap {
     overflow-y: hidden !important;
 }
 
+/* Gradio autoscrolls bubble-wrap, so it is the sole scroll owner. */
+#rag-chat .panel-wrap {
+    overflow-y: visible !important;
+}
+
 #rag-chat [role="log"] {
-    overflow: hidden !important;
+    overflow: visible !important;
 }
 
 #rag-chat .bubble-wrap {
+    height: 100% !important;
     overflow-y: auto !important;
 }
 
@@ -304,7 +306,6 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             feedback_options=('Like', 'Dislike'),
             feedback_value=[],
             height='calc(100vh - 250px)',
-            layout='bubble',
             value=[
                 {'role': 'assistant', 'content': WELCOME_MESSAGE},
                 {'role': 'assistant', 'content': WELCOME_SUGGESTIONS},

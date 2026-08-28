@@ -39,7 +39,6 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     )
 
     assert chatbot.elem_id == 'rag-chat'
-    assert chatbot.layout == 'bubble'
     assert chatbot.height == 'calc(100vh - 250px)'
     assert chatbot.value[0]['role'] == 'assistant'
     assert chatbot.value[0]['content'][0]['text'] == WELCOME_MESSAGE
@@ -59,7 +58,9 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     assert 'height: 80px' in CHAT_CSS
     assert 'max-height: none' in CHAT_CSS
     assert '#rag-chat .panel-wrap' in CHAT_CSS
-    assert 'overflow-y: hidden' in CHAT_CSS
+    assert 'overflow-y: visible' in CHAT_CSS
+    assert '#rag-chat .bubble-wrap' in CHAT_CSS
+    assert 'height: 100%' in CHAT_CSS
     assert '#rag-chat [role="log"]' in CHAT_CSS
     assert 'content: "Petit Guide"' in CHAT_CSS
     assert 'content: "You"' in CHAT_CSS
