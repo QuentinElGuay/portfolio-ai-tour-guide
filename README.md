@@ -7,7 +7,7 @@ fictional French travel company. My job is to help you prepare your visit in Fra
 answering your questions using **Retrieval-Augmented Generation (RAG)** based on
 regional tourism guides.
 
-![Petit Guide, the mascot](docs/images/output-onlinetools.png)
+![Petit Guide, the mascot](docs/images/petit_guide.png)
 
 ## Table of contents
 
