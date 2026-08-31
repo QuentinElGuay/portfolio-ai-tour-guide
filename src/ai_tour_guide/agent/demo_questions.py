@@ -1,12 +1,16 @@
 """Question data used by the built-in demo experience."""
 
 import json
+from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
-DEFAULT_BAGUETTE_LLM_DATASET_PATH = Path('fixtures/demo_dataset.jsonl')
+DEFAULT_BAGUETTE_LLM_DATASET_PATH = files('ai_tour_guide.agent').joinpath(
+    'data/demo_dataset.jsonl'
+)
 
 
-def load_answerable_questions(dataset_path: Path) -> tuple[str, ...]:
+def load_answerable_questions(dataset_path: Path | Traversable) -> tuple[str, ...]:
     """Return the questions with prepared answers in a fixture dataset."""
     questions: list[str] = []
     try:

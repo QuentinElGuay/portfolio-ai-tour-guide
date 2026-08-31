@@ -4,7 +4,6 @@ FROM ai-tour-guide-base
 
 # Copy and install the application itself.
 COPY --chown=10001:10001 src ./src
-COPY --chown=10001:10001 fixtures/demo_dataset.jsonl ./fixtures/demo_dataset.jsonl
 
 RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=10001,gid=10001 \
     uv sync \

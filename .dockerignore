@@ -20,5 +20,6 @@ fixtures
 fixtures/*
 !fixtures/metabase/
 !fixtures/metabase/**
+!fixtures/demo_dataset.jsonl
 tools
 *.ipynb

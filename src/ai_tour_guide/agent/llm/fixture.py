@@ -5,6 +5,7 @@ import random
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 from ai_tour_guide.agent.chat.models import Message
@@ -47,7 +48,7 @@ class FixtureCase:
 class FixtureLLMClient:
     """Return golden answers only when their expected evidence was retrieved."""
 
-    def __init__(self, dataset_path: Path) -> None:
+    def __init__(self, dataset_path: Path | Traversable) -> None:
         self.dataset_path = dataset_path
         self._cases = _load_cases(dataset_path)
 
