@@ -31,6 +31,14 @@ def test_agent_settings_reads_generic_values_from_environment(
     assert settings.model == 'test-model'
 
 
+def test_agent_settings_uses_demo_question_distance_defaults() -> None:
+    """Verify that demo question matching thresholds have the documented defaults."""
+    settings = AgentsSettings(model='test-model')
+
+    assert settings.close_question_distance == 0.25
+    assert settings.similar_question_distance == 0.50
+
+
 def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     """Verify that openai client sends messages and returns structured output."""
     response = SimpleNamespace(
@@ -241,6 +249,82 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
 
     assert 'demo backend with limited knowledge of Brittany' in result.answer
     assert 'What can I do in Brittany?' in result.answer
+    assert result.citations == ()
+
+
+def test_demo_provider_accepts_a_question_within_the_distance_margin(tmp_path) -> None:
+    """Verify that a minor question variation resolves to a prepared answer."""
+    dataset_path = tmp_path / 'golden.jsonl'
+    dataset_path.write_text(
+        json.dumps(
+            {
+                'id': 1,
+                'category': 'Test',
+                'question': 'What can I do in Brittany?',
+                'expected': {
+                    'answerable': True,
+                    'reference_answer': 'Visit the coast.',
+                    'relevant_source': {
+                        'source_url': 'https://example.test/guide',
+                        'version': None,
+                        'section_path': ['Guide', 'Activities'],
+                    },
+                },
+            }
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+    messages: list[Message] = [
+        {
+            'role': Role.USER,
+            'content': (
+                'Retrieved context:\n\nSource: Guide\n'
+                'URL: https://example.test/guide\nVersion: null\n'
+                'Pages: 4\nSection: Guide > Activities > Outdoor\n\n'
+                'Context\n\nUser question:\nWhat can I do in Brittany'
+            ),
+        }
+    ]
+
+    result = asyncio.run(BaguetteLLMClient(dataset_path).answer_question(messages))
+
+    assert result.answer == 'Visit the coast.'
+    assert result.citations[0].page_start == 4
+
+
+def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> None:
+    """Verify that a somewhat similar question gets a targeted suggestion."""
+    dataset_path = tmp_path / 'golden.jsonl'
+    dataset_path.write_text(
+        json.dumps(
+            {
+                'id': 1,
+                'category': 'Test',
+                'question': 'What can I do in Brittany?',
+                'expected': {
+                    'answerable': True,
+                    'reference_answer': 'Visit the coast.',
+                },
+            }
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+
+    result = asyncio.run(
+        BaguetteLLMClient(dataset_path).answer_question(
+            [
+                {
+                    'role': Role.USER,
+                    'content': 'User question:\nWhat activities can I do in Brittany?',
+                }
+            ]
+        )
+    )
+
+    assert 'do not have a prepared answer' in result.answer
+    assert 'Did you mean: “What can I do in Brittany?”' in result.answer
     assert result.citations == ()
 
 

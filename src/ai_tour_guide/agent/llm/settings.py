@@ -6,9 +6,11 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ai_tour_guide.agent.demo_questions import DEFAULT_BAGUETTE_LLM_DATASET_PATH
 from ai_tour_guide.agent.llm.rate_limit import DEFAULT_REQUESTS_PER_SECOND
 
-DEFAULT_BAGUETTE_LLM_DATASET_PATH = Path('evaluation/datasets/golden_dataset.jsonl')
+DEFAULT_CLOSE_QUESTION_DISTANCE = 0.25
+DEFAULT_SIMILAR_QUESTION_DISTANCE = 0.50
 
 
 class LLMProvider(StrEnum):
@@ -52,6 +54,26 @@ class AgentsSettings(BaseSettings):
         validation_alias='AGENT_LLM_FIXTURE_DATASET',
         description='Golden dataset used by the deterministic fixture LLM',
     )
+    close_question_distance: float = Field(
+        default=DEFAULT_CLOSE_QUESTION_DISTANCE,
+        ge=0,
+        le=1,
+        validation_alias='AGENT_CLOSE_QUESTION_DISTANCE',
+        description='Maximum normalized distance for an exact demo answer',
+    )
+    similar_question_distance: float = Field(
+        default=DEFAULT_SIMILAR_QUESTION_DISTANCE,
+        ge=0,
+        le=1,
+        validation_alias='AGENT_SIMILAR_QUESTION_DISTANCE',
+        description='Maximum normalized distance for a demo question suggestion',
+    )
 
 
-__all__ = ['DEFAULT_BAGUETTE_LLM_DATASET_PATH', 'AgentsSettings', 'LLMProvider']
+__all__ = [
+    'DEFAULT_BAGUETTE_LLM_DATASET_PATH',
+    'DEFAULT_CLOSE_QUESTION_DISTANCE',
+    'DEFAULT_SIMILAR_QUESTION_DISTANCE',
+    'AgentsSettings',
+    'LLMProvider',
+]

@@ -8,12 +8,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.demo_questions import load_answerable_questions
 from ai_tour_guide.agent.llm.clients import GenerationError
+from ai_tour_guide.agent.llm.settings import (
+    DEFAULT_CLOSE_QUESTION_DISTANCE,
+    DEFAULT_SIMILAR_QUESTION_DISTANCE,
+)
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.domain.sections import slugify_section_path
 
 _QUESTION_MARKER = 'User question:\n'
+_DEMO_LIMITATION_MESSAGE = (
+    'This is a demo backend with limited knowledge of Brittany, so I do not have a '
+    'prepared answer for that question.'
+)
 _CONTEXT_PATTERN = re.compile(
     r'^Source: .*?\n'
     r'URL: (?P<source_url>.+)\n'
@@ -46,6 +55,15 @@ class FixtureLLMClient:
         """Return the golden answer and a page derived from supplied context."""
         question = _question_from_messages(messages)
         case = self._cases.get(question)
+        return self._answer_case(messages, question, case)
+
+    def _answer_case(
+        self,
+        messages: Sequence[Message],
+        question: str,
+        case: FixtureCase | None,
+    ) -> GeneratedAnswer:
+        """Return the answer for a known fixture question."""
         if case is None:
             raise GenerationError(f'No fixture answer is configured for {question!r}.')
         if not case.answerable:
@@ -71,8 +89,16 @@ class FixtureLLMClient:
 class BaguetteLLMClient(FixtureLLMClient):
     """A friendly, zero-cost Brittany demo backed by golden-dataset answers."""
 
-    def __init__(self, dataset_path: Path) -> None:
+    def __init__(
+        self,
+        dataset_path: Path,
+        *,
+        close_question_distance: float = DEFAULT_CLOSE_QUESTION_DISTANCE,
+        similar_question_distance: float = DEFAULT_SIMILAR_QUESTION_DISTANCE,
+    ) -> None:
         super().__init__(dataset_path)
+        self.close_question_distance = close_question_distance
+        self.similar_question_distance = similar_question_distance
         self._answerable_questions = tuple(
             question for question, case in self._cases.items() if case.answerable
         )
@@ -80,23 +106,48 @@ class BaguetteLLMClient(FixtureLLMClient):
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
         """Return a prepared answer or suggest a question the demo can answer."""
         question = _question_from_messages(messages)
-        case = self._cases.get(question)
-        if (
-            case is None
-            or not case.answerable
-            or _matching_context(messages, case) is None
-        ):
+        exact_case = self._cases.get(question)
+        if exact_case is not None and exact_case.answerable:
+            matched_question = question
+        else:
+            matched_question = _closest_question(
+                question,
+                self._answerable_questions,
+                max_distance=self.close_question_distance,
+            )
+        if matched_question is not None:
+            case = self._cases[matched_question]
+            if case.answerable and _matching_context(messages, case) is not None:
+                generated = self._answer_case(messages, matched_question, case)
+                return GeneratedAnswer(
+                    generated.answer,
+                    citations=generated.citations,
+                    emotion=generated.emotion,
+                    llm_metadata={
+                        'provider': 'baguette-llm',
+                        'dataset': str(self.dataset_path),
+                    },
+                    raw_provider_response=generated.raw_provider_response,
+                )
+        if exact_case is not None:
             return self._fallback_answer()
-        generated = await super().answer_question(messages)
+
+        somewhat_similar_question = _closest_question(
+            question,
+            self._answerable_questions,
+            max_distance=self.similar_question_distance,
+        )
+        if somewhat_similar_question is not None:
+            return self._did_you_mean_answer(somewhat_similar_question)
+        return self._fallback_answer()
+
+    def _did_you_mean_answer(self, suggestion: str) -> GeneratedAnswer:
         return GeneratedAnswer(
-            generated.answer,
-            citations=generated.citations,
-            emotion=generated.emotion,
+            f'{_DEMO_LIMITATION_MESSAGE}\n\nDid you mean: “{suggestion}”?',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),
             },
-            raw_provider_response=generated.raw_provider_response,
         )
 
     def _fallback_answer(self) -> GeneratedAnswer:
@@ -106,8 +157,7 @@ class BaguetteLLMClient(FixtureLLMClient):
             )
         suggestion = random.choice(self._answerable_questions)
         return GeneratedAnswer(
-            'This is a demo backend with limited knowledge of Brittany, so I do not '
-            f'have a prepared answer for that question. Try asking: “{suggestion}”',
+            f'{_DEMO_LIMITATION_MESSAGE}\n\nTry asking: “{suggestion}”',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),
@@ -163,6 +213,46 @@ def _question_from_messages(messages: Sequence[Message]) -> str:
     raise GenerationError('Fixture prompt does not contain a user question.')
 
 
+def _closest_question(
+    question: str,
+    candidates: Sequence[str],
+    *,
+    max_distance: float,
+) -> str | None:
+    """Return the closest prepared question when it is within the allowed margin."""
+    if not candidates:
+        return None
+    closest = min(
+        candidates,
+        key=lambda candidate: _normalized_question_distance(question, candidate),
+    )
+    if _normalized_question_distance(question, closest) <= max_distance:
+        return closest
+    return None
+
+
+def _normalized_question_distance(first: str, second: str) -> float:
+    """Compute the Levenshtein distance between two questions as a ratio."""
+    first = ' '.join(first.casefold().split())
+    second = ' '.join(second.casefold().split())
+    if not first and not second:
+        return 0.0
+
+    previous = list(range(len(second) + 1))
+    for first_index, first_character in enumerate(first, start=1):
+        current = [first_index]
+        for second_index, second_character in enumerate(second, start=1):
+            current.append(
+                min(
+                    current[-1] + 1,
+                    previous[second_index] + 1,
+                    previous[second_index - 1] + (first_character != second_character),
+                )
+            )
+        previous = current
+    return previous[-1] / max(len(first), len(second))
+
+
 def _matching_context(
     messages: Sequence[Message], case: FixtureCase
 ) -> tuple[str, str | None, tuple[int, ...]] | None:
@@ -193,4 +283,8 @@ def _context_descriptions(messages: Sequence[Message]) -> tuple[str, ...]:
     )
 
 
-__all__ = ['BaguetteLLMClient', 'FixtureLLMClient']
+__all__ = [
+    'BaguetteLLMClient',
+    'FixtureLLMClient',
+    'load_answerable_questions',
+]

@@ -98,7 +98,9 @@ def build_messages(
     """Build the grounded chat messages sent to the configured backend."""
     context = build_llm_context(contexts)
     return (
-        Message(role=Role.USER, content=build_system_prompt(known_destination_titles)),
+        Message(
+            role=Role.SYSTEM, content=build_system_prompt(known_destination_titles)
+        ),
         Message(
             role=Role.USER,
             content=f'Retrieved context:\n\n{context}\n\nUser question:\n{question}',

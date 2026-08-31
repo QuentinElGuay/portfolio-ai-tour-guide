@@ -5,6 +5,7 @@ import gradio as gr
 
 from ai_tour_guide.agent.chat.app import (
     CHAT_CSS,
+    DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
     WELCOME_MESSAGE,
@@ -19,6 +20,10 @@ from ai_tour_guide.agent.chat.app import (
 )
 from ai_tour_guide.agent.chat.backends import DemoBackend
 from ai_tour_guide.agent.chat.models import ChatHistoryItem
+from ai_tour_guide.agent.demo_questions import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    load_answerable_questions,
+)
 
 
 def _like_data(index: object, liked: object) -> gr.LikeData:
@@ -76,6 +81,30 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
         dependency['api_name'] == '_submit_fn'
         and dependency['show_progress'] == 'minimal'
         for dependency in dependencies
+    )
+
+
+def test_create_app_explains_demo_limitations(monkeypatch) -> None:
+    """Verify that demo mode is disclosed in the initial welcome message."""
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'baguette-llm')
+
+    app = create_app(DemoBackend())
+    chatbot = next(
+        component
+        for component in app.blocks.values()
+        if isinstance(component, gr.Chatbot)
+    )
+
+    welcome = chatbot.value[0]['content'][0]['text']
+    assert welcome == DEMO_WELCOME_MESSAGE
+    assert 'visit to Brittany' in welcome
+    suggestions = chatbot.value[1]['content'][0]['text']
+    answerable_questions = load_answerable_questions(DEFAULT_BAGUETTE_LLM_DATASET_PATH)
+    suggested_questions = suggestions.splitlines()[2:]
+    assert len(suggested_questions) == 3
+    assert all(
+        question.removeprefix('- ') in answerable_questions
+        for question in suggested_questions
     )
 
 

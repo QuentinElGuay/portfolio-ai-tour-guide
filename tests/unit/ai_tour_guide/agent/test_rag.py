@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+from ai_tour_guide.agent.chat.models import Role
 from ai_tour_guide.agent.rag.models import (
     CitationValidationResult,
     GeneratedAnswer,
@@ -11,6 +12,7 @@ from ai_tour_guide.agent.rag.models import (
 )
 from ai_tour_guide.agent.rag.pipeline import answer_question, answer_question_async
 from ai_tour_guide.agent.rag.prompting import (
+    build_messages,
     build_system_prompt,
     is_destination_catalog_question,
 )
@@ -190,6 +192,13 @@ def test_system_prompt_includes_current_destination_catalog() -> None:
     assert '- Guide to Normandy' in prompt
     assert '- Guide to Occitanie' in prompt
     assert 'Do not provide any destination\ndetails from the catalog alone.' in prompt
+
+
+def test_build_messages_sends_instructions_as_a_system_message() -> None:
+    """Verify that provider instructions use the system role."""
+    messages = build_messages('Where?', ())
+
+    assert messages[0]['role'] is Role.SYSTEM
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.create_llm_client', return_value=None)

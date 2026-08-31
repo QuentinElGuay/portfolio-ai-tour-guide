@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import os
+import random
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -15,12 +16,18 @@ from ai_tour_guide.agent.chat.backends import (
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
+from ai_tour_guide.agent.demo_questions import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    load_answerable_questions,
+)
 from ai_tour_guide.agent.source_formatting import format_pages
 
 logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
 EMOTICONS_ENABLED = False
+
+# Welcome messages and suggested questions shown when a chat session starts.
 WELCOME_MESSAGE = (
     '_Salut!_ I’m **Petit Guide**, your AI travel companion from **Baguette Voyages**. '
     'How can I help you plan your visit to France?'
@@ -31,6 +38,14 @@ WELCOME_SUGGESTIONS = (
     '- What are the main places to visit in Normandy?\n'
     '- What should I see in Occitanie?'
 )
+DEMO_WELCOME_NOTICE = (
+    '\n\n> **Demo mode:** This is a limited experience with prepared Brittany questions. '
+    'It accepts modest spelling and punctuation variations.'
+)
+DEMO_WELCOME_MESSAGE = (
+    WELCOME_MESSAGE.replace('France', 'Brittany') + DEMO_WELCOME_NOTICE
+)
+DEMO_SUGGESTION_COUNT = 3
 AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
     Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
@@ -230,6 +245,12 @@ async def submit_feedback(
 def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
+    demo_mode = os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm'
+    welcome_message = WELCOME_MESSAGE
+    welcome_suggestions = WELCOME_SUGGESTIONS
+    if demo_mode:
+        welcome_message = DEMO_WELCOME_MESSAGE
+        welcome_suggestions = build_demo_welcome_suggestions()
 
     async def respond(
         message: str,
@@ -307,8 +328,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             feedback_value=[],
             height='calc(100vh - 250px)',
             value=[
-                {'role': 'assistant', 'content': WELCOME_MESSAGE},
-                {'role': 'assistant', 'content': WELCOME_SUGGESTIONS},
+                {'role': 'assistant', 'content': welcome_message},
+                {'role': 'assistant', 'content': welcome_suggestions},
             ],
             placeholder=(
                 '<h2>Prepare your trip to France with Petit Guide</h2>'
@@ -339,6 +360,15 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         )
 
     return app
+
+
+def build_demo_welcome_suggestions() -> str:
+    """Build random suggestions from the demo's answerable questions."""
+    questions = load_answerable_questions(DEFAULT_BAGUETTE_LLM_DATASET_PATH)
+    suggestions = random.sample(questions, min(DEMO_SUGGESTION_COUNT, len(questions)))
+    return '**You could ask:**\n\n' + '\n'.join(
+        f'- {question}' for question in suggestions
+    )
 
 
 def _render_response(payload: dict[str, object]) -> str:
