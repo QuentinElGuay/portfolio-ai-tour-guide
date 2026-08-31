@@ -12,15 +12,16 @@ regional tourism guides.
 ## Table of contents
 
 - [Overview](#overview)
-- [Architecture](#architecture)
 - [Question scope](#question-scope)
-- [Documentation](#documentation)
-- [Data source](#data-source)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
 - [Common commands](#common-commands)
 - [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
+- [Documentation](#documentation)
+- [Data source](#data-source)
 - [Roadmap](#roadmap)
 - [Capstone success criteria](#capstone-success-criteria)
 - [Contributing](#contributing)
@@ -28,13 +29,14 @@ regional tourism guides.
 
 ## Overview
 
-Created as a capstone project for
+Created as a capstone project for the
 [LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) by
 [DataTalks.Club](https://datatalks.club), this project turns French regional tourism
-guides into a question-answering experience that helps travellers plan their trips. It
-processes the guides into searchable passages, uses **vector embeddings** and
-**PostgreSQL with pgvector** to retrieve relevant context, then asks an LLM to generate
-an answer based on that context.
+guides into a question-answering experience that helps travellers plan their trips.
+
+![Chat app answer with sources](docs/tutorial/05_chat_app_answers.png "Answers with sources")
+
+### Project goals
 
 The project is designed as a focused portfolio demonstration of the full RAG workflow:
 
@@ -49,23 +51,6 @@ The project also focuses on the practices that make RAG applications reliable:
 - Validating citations
 - Evaluating retrieval and answer quality
 - Adding guardrails for unsupported or overly specific questions
-
-## Architecture
-
-The ingestion pipeline indexes regional tourism guides in PostgreSQL with pgvector. The
-chat interface sends questions to the agent API, which retrieves context and calls an
-LLM API to generate an answer.
-
-```mermaid
-flowchart LR
-    PDF[Regional tourism guides] --> Ingestion[Ingestion pipeline]
-    Ingestion --> KB[(PostgreSQL + pgvector)]
-    User --> Chat[Chat]
-    Chat --> Agent[Agent API]
-    Agent <--> KB
-    Agent <--> LLM[LLM API]
-    Agent --> Chat
-```
 
 ## Question scope
 
@@ -99,27 +84,36 @@ Unsupported questions include:
 > English is the only supported language. This keeps the demonstration lightweight and
 > suitable for a smaller model.
 
-## Documentation
+## Architecture
 
-- [Ingestion guide](src/ai_tour_guide/ingestion/README.md): document definitions,
-  pipeline stages, artifacts, and ingestion configuration.
-- [Agent guide](src/ai_tour_guide/agent/README.md): RAG flow, CLI, HTTP API, and agent
-  configuration.
-- [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
-  integration.
-- [Make command reference](docs/commands.md): every project command, its options, and
-  its operational cautions.
-- [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
-  and monitoring.
-- [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
-  monitoring.
+The project is divided into two workflows. The ingestion workflow processes the guides
+into searchable passages (_chunks_), creates vector embeddings, and stores them in
+PostgreSQL with pgvector. The RAG workflow retrieves the chunks most likely to provide
+relevant context, then passes them to a generic LLM provided by a commercial third-party
+provider to generate an answer. The chat interface sends questions to the agent API,
+which coordinates retrieval and answer generation.
 
-## Data source
+```mermaid
+flowchart LR
+    PDF[Regional tourism guides] --> Ingestion[Ingestion pipeline]
+    Ingestion --> KB[(PostgreSQL + pgvector)]
+    User --> Chat[Chat]
+    Chat --> Agent[Agent API]
+    Agent <--> KB
+    Agent <--> LLM[LLM API]
+    Agent --> Chat
+```
 
-The project indexes the freely available French regional guides listed in
-[`source_files.json`](source_files.json), published by
-[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
-are not redistributed in this repository.
+## Tech stack
+
+- **Language:** Python 3.14
+- **Agent API:** FastAPI and Uvicorn
+- **Chat interface:** Gradio
+- **Embeddings:** FastEmbed
+- **Storage and retrieval:** PostgreSQL with pgvector
+- **Containerization:** Docker Compose
+- **Workflow orchestration:** Apache Airflow
+- **Monitoring and evaluation:** Metabase
 
 ## Prerequisites
 
@@ -281,6 +275,28 @@ refused none of them, producing 95.2% refusal accuracy overall. The optional
 `gpt-4.1-mini` judge rated 97.1% of the 105 answers correct. These are current baseline
 results; prompt/model comparisons and broader robustness evaluations are deferred to
 follow-up work.
+
+## Documentation
+
+- [Ingestion guide](src/ai_tour_guide/ingestion/README.md): document definitions,
+  pipeline stages, artifacts, and ingestion configuration.
+- [Agent guide](src/ai_tour_guide/agent/README.md): RAG flow, CLI, HTTP API, and agent
+  configuration.
+- [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
+  integration.
+- [Make command reference](docs/commands.md): every project command, its options, and
+  its operational cautions.
+- [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
+  and monitoring.
+- [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
+  monitoring.
+
+## Data source
+
+The project indexes the freely available French regional guides listed in
+[`source_files.json`](source_files.json), published by
+[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
+are not redistributed in this repository.
 
 ## Roadmap
 
