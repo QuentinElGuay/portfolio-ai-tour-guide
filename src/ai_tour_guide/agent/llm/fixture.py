@@ -8,14 +8,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_tour_guide.agent.chat.models import Message
+from ai_tour_guide.agent.demo_questions import load_answerable_questions
 from ai_tour_guide.agent.llm.clients import GenerationError
+from ai_tour_guide.agent.llm.settings import (
+    DEFAULT_CLOSE_QUESTION_DISTANCE,
+    DEFAULT_SIMILAR_QUESTION_DISTANCE,
+)
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
 from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.domain.sections import slugify_section_path
 
 _QUESTION_MARKER = 'User question:\n'
-_CLOSE_QUESTION_DISTANCE = 0.15
-_SIMILAR_QUESTION_DISTANCE = 0.40
+_DEMO_LIMITATION_MESSAGE = (
+    'This is a demo backend with limited knowledge of Brittany, so I do not have a '
+    'prepared answer for that question.'
+)
 _CONTEXT_PATTERN = re.compile(
     r'^Source: .*?\n'
     r'URL: (?P<source_url>.+)\n'
@@ -82,8 +89,16 @@ class FixtureLLMClient:
 class BaguetteLLMClient(FixtureLLMClient):
     """A friendly, zero-cost Brittany demo backed by golden-dataset answers."""
 
-    def __init__(self, dataset_path: Path) -> None:
+    def __init__(
+        self,
+        dataset_path: Path,
+        *,
+        close_question_distance: float = DEFAULT_CLOSE_QUESTION_DISTANCE,
+        similar_question_distance: float = DEFAULT_SIMILAR_QUESTION_DISTANCE,
+    ) -> None:
         super().__init__(dataset_path)
+        self.close_question_distance = close_question_distance
+        self.similar_question_distance = similar_question_distance
         self._answerable_questions = tuple(
             question for question, case in self._cases.items() if case.answerable
         )
@@ -98,7 +113,7 @@ class BaguetteLLMClient(FixtureLLMClient):
             matched_question = _closest_question(
                 question,
                 self._answerable_questions,
-                max_distance=_CLOSE_QUESTION_DISTANCE,
+                max_distance=self.close_question_distance,
             )
         if matched_question is not None:
             case = self._cases[matched_question]
@@ -120,7 +135,7 @@ class BaguetteLLMClient(FixtureLLMClient):
         somewhat_similar_question = _closest_question(
             question,
             self._answerable_questions,
-            max_distance=_SIMILAR_QUESTION_DISTANCE,
+            max_distance=self.similar_question_distance,
         )
         if somewhat_similar_question is not None:
             return self._did_you_mean_answer(somewhat_similar_question)
@@ -128,8 +143,7 @@ class BaguetteLLMClient(FixtureLLMClient):
 
     def _did_you_mean_answer(self, suggestion: str) -> GeneratedAnswer:
         return GeneratedAnswer(
-            'This is a demo backend with limited knowledge of Brittany, so I do not '
-            f'have a prepared answer for that question. Did you mean: “{suggestion}”?',
+            f'{_DEMO_LIMITATION_MESSAGE}\n\nDid you mean: “{suggestion}”?',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),
@@ -143,8 +157,7 @@ class BaguetteLLMClient(FixtureLLMClient):
             )
         suggestion = random.choice(self._answerable_questions)
         return GeneratedAnswer(
-            'This is a demo backend with limited knowledge of Brittany, so I do not '
-            f'have a prepared answer for that question. Try asking: “{suggestion}”',
+            f'{_DEMO_LIMITATION_MESSAGE}\n\nTry asking: “{suggestion}”',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),
@@ -190,15 +203,6 @@ def _load_cases(dataset_path: Path) -> dict[str, FixtureCase]:
             )
         cases[question] = case
     return cases
-
-
-def load_answerable_questions(dataset_path: Path) -> tuple[str, ...]:
-    """Return the questions with prepared answers in a fixture dataset."""
-    return tuple(
-        question
-        for question, case in _load_cases(dataset_path).items()
-        if case.answerable
-    )
 
 
 def _question_from_messages(messages: Sequence[Message]) -> str:

@@ -16,8 +16,10 @@ from ai_tour_guide.agent.chat.backends import (
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
-from ai_tour_guide.agent.llm.fixture import load_answerable_questions
-from ai_tour_guide.agent.llm.settings import DEFAULT_BAGUETTE_LLM_DATASET_PATH
+from ai_tour_guide.agent.demo_questions import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    load_answerable_questions,
+)
 from ai_tour_guide.agent.source_formatting import format_pages
 
 logger = logging.getLogger(__name__)

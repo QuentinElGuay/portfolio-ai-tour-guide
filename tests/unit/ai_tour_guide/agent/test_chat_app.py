@@ -20,8 +20,10 @@ from ai_tour_guide.agent.chat.app import (
 )
 from ai_tour_guide.agent.chat.backends import DemoBackend
 from ai_tour_guide.agent.chat.models import ChatHistoryItem
-from ai_tour_guide.agent.llm.fixture import load_answerable_questions
-from ai_tour_guide.agent.llm.settings import DEFAULT_BAGUETTE_LLM_DATASET_PATH
+from ai_tour_guide.agent.demo_questions import (
+    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
+    load_answerable_questions,
+)
 
 
 def _like_data(index: object, liked: object) -> gr.LikeData:

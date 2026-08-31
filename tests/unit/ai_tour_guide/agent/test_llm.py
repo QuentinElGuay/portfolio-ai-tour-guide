@@ -31,6 +31,14 @@ def test_agent_settings_reads_generic_values_from_environment(
     assert settings.model == 'test-model'
 
 
+def test_agent_settings_uses_demo_question_distance_defaults() -> None:
+    """Verify that demo question matching thresholds have the documented defaults."""
+    settings = AgentsSettings(model='test-model')
+
+    assert settings.close_question_distance == 0.25
+    assert settings.similar_question_distance == 0.50
+
+
 def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     """Verify that openai client sends messages and returns structured output."""
     response = SimpleNamespace(
