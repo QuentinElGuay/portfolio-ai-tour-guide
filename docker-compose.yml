@@ -317,7 +317,7 @@ services:
     user: "50000:0"
     hostname: airflow-scheduler
     group_add:
-      - "${DOCKER_GID:?DOCKER_GID is required}"
+      - "${DOCKER_GID:-0}"
 
     environment:
       <<: *airflow-environment

@@ -143,8 +143,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Airflow Compose environment
-        run: cp .env.template .env
+      - name: Configure Airflow environment
+        run: |
+          cp .env.template .env
+          echo "DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)" >> "$GITHUB_ENV"
 
       - name: Validate Airflow Compose configuration
         run: docker compose --profile airflow config --quiet
@@ -160,8 +162,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Airflow Compose environment
-        run: cp .env.template .env
+      - name: Configure Airflow environment
+        run: |
+          cp .env.template .env
+          echo "DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)" >> "$GITHUB_ENV"
 
       - name: Start Airflow services
         run: >-

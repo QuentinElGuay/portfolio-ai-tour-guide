@@ -171,6 +171,16 @@ the database, web server, scheduler, and DAG processor to become healthy. Then o
 <http://localhost:8080> and trigger the `ingest_documents` DAG. See the
 [tutorial](README.md#ingestion-with-airflow) for the workflow.
 
+Before running raw Airflow Compose commands, export the Docker socket's group ID:
+
+```bash
+export DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)"
+docker compose --profile airflow up --build -d --wait \
+  database airflow-webserver airflow-scheduler airflow-dag-processor
+```
+
+`make airflow` detects this value automatically.
+
 ### `make annotate-dataset`
 
 Interactively fill answers and source pages in the golden dataset.

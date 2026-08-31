@@ -206,6 +206,17 @@ Start the optional Airflow profile:
 make airflow
 ```
 
+> [!NOTE]
+> `make airflow` detects the `DOCKER GID` value automatically. If you prefer running
+> Airflow through a direct Docker Compose command, you need to first export the Docker
+> socket's group ID (or set it in your `.env` file):
+>
+> ```bash
+> export DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)"
+> docker compose --profile airflow up --build -d --wait \
+>   database airflow-webserver airflow-scheduler airflow-dag-processor
+> ```
+
 `make airflow` returns only after Airflow is ready: its API health check confirms the
 metadata database, scheduler, and DAG processor are healthy. Open the Airflow UI at
 [http://localhost:8080](http://localhost:8080), then sign in with

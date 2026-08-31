@@ -26,27 +26,14 @@ ASK_VERBOSE_FLAG = $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 
 DB_SCHEMA = $(SCHEMA)
-export DB_SCHEMA DOCKER_GID
+export DB_SCHEMA
 
-.PHONY: airflow annotate-dataset app ask cli-chat configure-docker-gid dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
+.PHONY: airflow annotate-dataset app ask cli-chat dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
 
-airflow: configure-docker-gid ## Start Airflow and its host-Docker ingestion orchestration.
-	$(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile airflow up --build -d --wait \
-		database airflow-webserver airflow-scheduler airflow-dag-processor
-
-configure-docker-gid: ## Store the host Docker socket group ID in .env.
-	@test -f .env || (echo ".env not found; copy .env.template first." >&2; exit 1)
+airflow: ## Start Airflow and its host-Docker ingestion orchestration.
 	@case "$(DOCKER_GID)" in *[!0-9]*|'') echo "Could not determine the Docker socket group ID from $(DOCKER_SOCKET)." >&2; exit 1;; esac
-	@set -eu; \
-	temporary_file=$$(mktemp .env.docker-gid.XXXXXX); \
-	trap 'rm -f "$$temporary_file"' EXIT; \
-	awk -v docker_gid="$(DOCKER_GID)" '\
-		BEGIN { found = 0 } \
-		/^DOCKER_GID=/ { print "DOCKER_GID=" docker_gid; found = 1; next } \
-		{ print } \
-		END { if (!found) print "DOCKER_GID=" docker_gid }' .env > "$$temporary_file"; \
-	mv "$$temporary_file" .env; \
-	echo "Set DOCKER_GID=$(DOCKER_GID) in .env"
+	DOCKER_GID="$(DOCKER_GID)" $(COMPOSE) $(COMPOSE_DEBUG_FLAG) --profile airflow up --build -d --wait \
+		database airflow-webserver airflow-scheduler airflow-dag-processor
 
 annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
@@ -189,7 +176,6 @@ help: ## Show the available commands.
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
 	@echo "  make cli-chat                        Start the interactive terminal chat"
-	@echo "  make configure-docker-gid            Store the Docker socket group ID in .env"
 	@echo "  make dashboard                       Start and initialize PostgreSQL and Metabase"
 	@echo "  make dashboard DEBUG=1               Start dashboard with Docker Compose diagnostics"
 	@echo "  make dashboard-export                Export the dashboard application database"
