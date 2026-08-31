@@ -49,7 +49,9 @@ make ingest
 The template defaults to the no-cost `baguette-llm` provider with the
 `mini-croissant-1.0` model. It still needs the database and embedding settings used for
 retrieval. The demo is limited to prepared Brittany questions and suggests a supported
-question when it cannot answer.
+question when it cannot answer. It also accepts modest spelling or punctuation
+variations. A somewhat similar question receives a targeted `Did you mean...?`
+suggestion; an unrelated question receives a random supported-question suggestion.
 
 To use live answer generation, switch to OpenAI and add your API key:
 
