@@ -157,7 +157,7 @@ AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
 > [!NOTE]
-> `OpenAI` is the only supported provider for live answer generation, and `gpt-4.1-mini` is
+> `OpenAI` is currently the only supported provider for live answer generation, and `gpt-4.1-mini` is
 > the recommended model.
 
 Open [http://localhost:7860](http://localhost:7860) to use the
