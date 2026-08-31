@@ -17,12 +17,13 @@ Return to the [project overview](../../../README.md).
 ## Request flow
 
 1. The agent receives a question through the CLI or `POST /ask`.
-2. It reads the titles of indexed documents as its live destination catalog. Only a
-   question asking which destinations or guides are available may be answered from this
-   catalog alone.
-3. For every other question, it retrieves the most relevant chunks from PostgreSQL using
-   vector search by default.
-4. It builds a prompt containing the catalog, retrieved context, and question.
+2. For live OpenAI requests, a bounded LangGraph workflow decides whether the question
+   is conversational or about the agent itself. Only those questions may be answered
+   without a source lookup.
+3. For every factual tourism question, the workflow calls `search_knowledge_base` with a
+   model-selected query. Search mode remains hybrid with five results; the workflow may
+   reformulate and search once more.
+4. It builds a prompt containing the retrieved context and question.
 5. The configured `LLMClient` generates an answer and document/page citations.
 6. The agent validates citations against the retrieved provenance, then returns only
    validated source references to user interfaces.
@@ -30,7 +31,8 @@ Return to the [project overview](../../../README.md).
 OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
 the recommended model. The bundled `baguette-llm` provider, using the
 `mini-croissant-1.0` model, is a no-cost deterministic Brittany demo; it is not a
-general-purpose LLM.
+general-purpose LLM. It retains its deterministic matching behavior and does not use the
+LangGraph workflow.
 
 The `baguette-llm` provider does not require an API key. OpenAI requires an API key;
 without one, the service raises a configuration error before querying the knowledge

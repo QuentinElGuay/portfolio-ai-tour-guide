@@ -1,26 +1,16 @@
-"""Direct OpenAI client implementing the agent chat backend protocol."""
+"""OpenAI implementation of the language-model client."""
 
+import json
 from collections.abc import Sequence
-from typing import Protocol
 
 from openai import APIError, AsyncOpenAI
+from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 
 from ai_tour_guide.agent.chat.models import Emotion, Message, Role
+from ai_tour_guide.agent.llm.clients import GenerationError
 from ai_tour_guide.agent.llm.rate_limit import AsyncRateLimiter
-from ai_tour_guide.agent.llm.settings import AgentsSettings, LLMProvider
+from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
-
-
-class GenerationError(RuntimeError):
-    """An expected provider or structured-output failure."""
-
-
-class LLMClient(Protocol):
-    """Generate a reply from a complete conversation."""
-
-    async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
-        """Return a structured answer for ``messages``."""
-        ...
 
 
 def create_openai_client(settings: AgentsSettings) -> AsyncOpenAI:
@@ -104,8 +94,6 @@ class OpenAIClient:
         if not isinstance(content, str) or not content.strip():
             raise GenerationError('OpenAI returned an empty response.')
         try:
-            import json
-
             answer, citations, emotion = _parse_answer(json.loads(content))
         except (TypeError, ValueError, KeyError) as exc:
             raise GenerationError(
@@ -126,6 +114,73 @@ class OpenAIClient:
             },
             raw_provider_response=response,
         )
+
+    async def choose_search_query(
+        self,
+        question: str,
+        *,
+        previous_queries: Sequence[str],
+        has_context: bool,
+    ) -> str | None:
+        """Ask the model whether to call the sole knowledge-base search tool."""
+        await self._rate_limiter.acquire()
+        try:
+            response = await self._client.responses.create(
+                model=self.model,
+                input=[
+                    {
+                        'role': 'system',
+                        'content': (
+                            'You are a source-grounded travel assistant. Call '
+                            '`search_knowledge_base` for every factual tourism question. '
+                            'Do not call it only for conversational or meta questions about '
+                            'the assistant and its capabilities. Never answer tourism facts '
+                            'from model knowledge. If a previous search was insufficient, you '
+                            'may call the tool once more with a reformulated query. '
+                            f'Previous queries: {list(previous_queries)!r}. '
+                            f'Retrieved context available: {has_context}.'
+                        ),
+                    },
+                    {'role': 'user', 'content': question},
+                ],
+                tools=[
+                    {
+                        'type': 'function',
+                        'name': 'search_knowledge_base',
+                        'description': 'Search the project tourism knowledge base.',
+                        'parameters': {
+                            'type': 'object',
+                            'properties': {
+                                'query': {
+                                    'type': 'string',
+                                    'description': 'A focused search query for the knowledge base.',
+                                }
+                            },
+                            'required': ['query'],
+                            'additionalProperties': False,
+                        },
+                        'strict': True,
+                    }
+                ],
+                parallel_tool_calls=False,
+            )
+        except APIError as exc:
+            raise GenerationError(f'OpenAI request failed: {exc}') from exc
+        for item in response.output:
+            if not isinstance(item, ResponseFunctionToolCall):
+                continue
+            if item.name != 'search_knowledge_base':
+                continue
+            try:
+                query = json.loads(item.arguments)['query']
+            except (KeyError, TypeError, ValueError) as exc:
+                raise GenerationError(
+                    'OpenAI returned an invalid search tool call.'
+                ) from exc
+            if isinstance(query, str) and query.strip():
+                return query.strip()
+            raise GenerationError('OpenAI returned an empty search query.')
+        return None
 
 
 def _parse_answer(
@@ -172,9 +227,6 @@ def _parse_answer(
 
 
 __all__ = [
-    'GenerationError',
-    'LLMClient',
-    'LLMProvider',
     'OpenAIClient',
     'create_openai_client',
 ]

@@ -250,10 +250,15 @@ async def submit_feedback(
 def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
-    demo_mode = os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm'
+    exact_mode = os.getenv('AGENT_EXACT_MODE', 'false').lower() in {
+        '1',
+        'true',
+        'yes',
+        'on',
+    }
     welcome_message = WELCOME_MESSAGE
     welcome_suggestions = WELCOME_SUGGESTIONS
-    if demo_mode:
+    if not exact_mode:
         welcome_message = DEMO_WELCOME_MESSAGE
         welcome_suggestions = build_demo_welcome_suggestions()
 

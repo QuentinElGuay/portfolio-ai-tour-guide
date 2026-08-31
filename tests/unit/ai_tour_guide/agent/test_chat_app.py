@@ -8,8 +8,6 @@ from ai_tour_guide.agent.chat.app import (
     DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
-    WELCOME_MESSAGE,
-    WELCOME_SUGGESTIONS,
     _italicize_french_expressions,
     _render_response,
     create_app,
@@ -47,8 +45,8 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     assert app.config['title'] == 'Baguette Voyages'
     assert chatbot.height == 'calc(100vh - 250px)'
     assert chatbot.value[0]['role'] == 'assistant'
-    assert chatbot.value[0]['content'][0]['text'] == WELCOME_MESSAGE
-    assert chatbot.value[1]['content'][0]['text'] == WELCOME_SUGGESTIONS
+    assert chatbot.value[0]['content'][0]['text'] == DEMO_WELCOME_MESSAGE
+    assert chatbot.value[1]['content'][0]['text'].startswith('**You could ask:**')
     avatar_images = chatbot.avatar_images
     assert avatar_images is not None
     user_avatar = avatar_images[0]
@@ -90,7 +88,7 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
 
 def test_create_app_explains_demo_limitations(monkeypatch) -> None:
     """Verify that demo mode is disclosed in the initial welcome message."""
-    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'baguette-llm')
+    monkeypatch.setenv('AGENT_EXACT_MODE', 'false')
 
     app = create_app(DemoBackend())
     chatbot = next(

@@ -65,37 +65,29 @@ def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
-@patch('ai_tour_guide.agent.rag.pipeline.build_messages')
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context')
-@patch('ai_tour_guide.agent.rag.pipeline.list_known_destination_titles')
+@patch('ai_tour_guide.agent.rag.agent_workflow.retrieve_context')
 def test_answer_question_retrieves_context_and_returns_sources(
-    list_known_destination_titles: MagicMock,
     retrieve_context: MagicMock,
-    build_messages: MagicMock,
     validate_citations: MagicMock,
 ) -> None:
     """Verify that answering a question retrieves context, sends it to the LLM, and preserves its sources."""
-    list_known_destination_titles.return_value = ('Guide to Normandy',)
     context = MagicMock()
     retrieve_context.return_value = (context,)
-    build_messages.return_value = ({'role': 'user', 'content': 'Question'},)
     source = SourceReference(
         'https://example.test/guide', None, 'Guide', None, None, None, (3,)
     )
     validate_citations.return_value = CitationValidationResult((source,), ())
     client = MagicMock()
+    client.choose_search_query = AsyncMock(side_effect=('Question', None))
     client.answer_question = AsyncMock(return_value=GeneratedAnswer('Answer.'))
 
     result = asyncio.run(answer_question_async('Question', llm_client=client))
 
     retrieve_context.assert_called_once()
     assert retrieve_context.call_args.kwargs['search_mode'].value == 'hybrid'
-    build_messages.assert_called_once_with(
-        'Question',
-        (context,),
-        known_destination_titles=('Guide to Normandy',),
-    )
-    client.answer_question.assert_awaited_once_with(build_messages.return_value)
+    assert retrieve_context.call_args.args[0] == 'Question'
+    assert retrieve_context.call_args.kwargs['k'] == 5
+    client.answer_question.assert_awaited_once()
     assert result.answer == 'Answer.'
     assert isinstance(result.request_id, UUID)
     assert result.contexts == (context,)
@@ -117,16 +109,13 @@ def test_answer_question_assigns_and_propagates_request_id(
     assert result is expected
 
 
-@patch(
-    'ai_tour_guide.agent.rag.pipeline.list_known_destination_titles', return_value=()
-)
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context', return_value=())
+@patch('ai_tour_guide.agent.rag.agent_workflow.retrieve_context', return_value=())
 def test_answer_question_handles_empty_retrieval(
     retrieve_context: MagicMock,
-    list_known_destination_titles: MagicMock,
 ) -> None:
     """Verify that an unanswered retrieval returns the insufficient-context response without sources."""
     client = MagicMock()
+    client.choose_search_query = AsyncMock(side_effect=('Question', None))
     client.answer_question = AsyncMock()
 
     result = asyncio.run(answer_question_async('Question', llm_client=client))
@@ -136,27 +125,22 @@ def test_answer_question_handles_empty_retrieval(
     assert result.sources == ()
     client.answer_question.assert_not_awaited()
     retrieve_context.assert_called_once()
-    list_known_destination_titles.assert_called_once()
 
 
 @patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
-@patch('ai_tour_guide.agent.rag.pipeline.build_messages')
-@patch('ai_tour_guide.agent.rag.pipeline.retrieve_context')
-@patch('ai_tour_guide.agent.rag.pipeline.list_known_destination_titles')
-def test_answer_question_answers_catalog_questions_without_retrieval(
-    list_known_destination_titles: MagicMock,
+@patch('ai_tour_guide.agent.rag.agent_workflow.retrieve_context')
+def test_answer_question_retrieves_context_for_destination_questions(
     retrieve_context: MagicMock,
-    build_messages: MagicMock,
     validate_citations: MagicMock,
 ) -> None:
-    """Verify that available-destination questions use only the document catalog."""
-    list_known_destination_titles.return_value = (
-        'Guide to Normandy',
-        'Guide to Occitanie',
-    )
-    build_messages.return_value = ({'role': 'user', 'content': 'Question'},)
+    """Verify that factual destination questions use retrieved source context."""
+    context = MagicMock()
+    retrieve_context.return_value = (context,)
     validate_citations.return_value = CitationValidationResult((), ())
     client = MagicMock()
+    client.choose_search_query = AsyncMock(
+        side_effect=('Which destinations do you cover?', None)
+    )
     client.answer_question = AsyncMock(
         return_value=GeneratedAnswer('We cover Normandy.')
     )
@@ -165,15 +149,10 @@ def test_answer_question_answers_catalog_questions_without_retrieval(
         answer_question_async('Which destinations do you cover?', llm_client=client)
     )
 
-    retrieve_context.assert_not_called()
-    build_messages.assert_called_once_with(
-        'Which destinations do you cover?',
-        (),
-        known_destination_titles=('Guide to Normandy', 'Guide to Occitanie'),
-    )
-    client.answer_question.assert_awaited_once_with(build_messages.return_value)
+    retrieve_context.assert_called_once()
+    client.answer_question.assert_awaited_once()
     assert result.answer == 'We cover Normandy.'
-    assert result.contexts == ()
+    assert result.contexts == (context,)
     assert result.sources == ()
 
 

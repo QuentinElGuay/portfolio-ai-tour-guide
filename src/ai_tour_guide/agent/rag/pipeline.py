@@ -14,19 +14,15 @@ from ai_tour_guide.agent.llm.clients import (
 )
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
+from ai_tour_guide.agent.rag.agent_workflow import run_agent_workflow
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGError, RAGResult
-from ai_tour_guide.agent.rag.prompting import (
-    build_messages,
-    is_destination_catalog_question,
-)
+from ai_tour_guide.agent.rag.prompting import build_messages
 from ai_tour_guide.agent.rag.sources import validate_citations
 from ai_tour_guide.agent.responses import (
     GENERATION_ERROR_ANSWER,
     INSUFFICIENT_CONTEXT_ANSWER,
     RETRIEVAL_ERROR_ANSWER,
 )
-from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
-from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
@@ -62,28 +58,54 @@ async def answer_question_async(
     selected_request_id = request_id or uuid4()
     selected_mode = SearchMode(mode)
 
+    return await _answer_with_agent(
+        question,
+        mode=selected_mode,
+        k=k,
+        llm_client=llm_client,
+        engine=engine,
+        strategy=strategy,
+        request_id=selected_request_id,
+        started=started,
+    )
+
+
+async def _answer_with_agent(
+    question: str,
+    *,
+    mode: SearchMode,
+    k: int,
+    llm_client: LLMClient,
+    engine: Engine | None,
+    strategy: SearchStrategy | None,
+    request_id: UUID,
+    started: float,
+) -> RAGResult:
+    """Adapt the bounded LangGraph state to the stable RAG result contract."""
     retrieval_started = perf_counter()
-
     try:
-        known_destination_titles = list_known_destination_titles(engine)
-        contexts = (
-            ()
-            if is_destination_catalog_question(question)
-            else retrieve_context(
-                question,
-                search_mode=selected_mode,
-                k=k,
-                engine=engine,
-                strategy=strategy,
-            )
+        state = await run_agent_workflow(
+            question, llm_client, engine=engine, strategy=strategy
         )
-    except (OSError, SQLAlchemyError) as exc:
-        retrieval_latency = _elapsed_ms(retrieval_started)
-
+    except (GenerationError, OSError, SQLAlchemyError) as exc:
         return RAGResult(
             question=question,
-            request_id=selected_request_id,
-            mode=selected_mode,
+            request_id=request_id,
+            mode=mode,
+            k=k,
+            messages=(),
+            generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
+            error=_error('agent', exc),
+            total_latency_ms=_elapsed_ms(started),
+        )
+    retrieval_latency = _elapsed_ms(retrieval_started)
+    contexts = state['contexts']
+    if 'retrieval_error' in state:
+        exc = state['retrieval_error']
+        return RAGResult(
+            question=question,
+            request_id=request_id,
+            mode=mode,
             k=k,
             messages=(),
             generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
@@ -91,79 +113,59 @@ async def answer_question_async(
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
         )
-
-    retrieval_latency = _elapsed_ms(retrieval_started)
-
-    if not contexts and not is_destination_catalog_question(question):
+    generated = state.get('generated')
+    if not contexts and isinstance(generated, GeneratedAnswer):
         return RAGResult(
             question=question,
-            request_id=selected_request_id,
-            mode=selected_mode,
+            request_id=request_id,
+            mode=mode,
+            k=k,
+            messages=state.get('messages', ()),
+            generated=generated,
+            retrieval_latency_ms=retrieval_latency,
+            total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
+            llm_metadata=generated.llm_metadata,
+            raw_provider_response=generated.raw_provider_response,
+        )
+    if not contexts:
+        return RAGResult(
+            question=question,
+            request_id=request_id,
+            mode=mode,
             k=k,
             messages=(),
             generated=GeneratedAnswer(INSUFFICIENT_CONTEXT_ANSWER),
             contexts=(),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
         )
-
-    messages = build_messages(
-        question,
-        contexts,
-        known_destination_titles=known_destination_titles,
-    )
-
-    generation_started = perf_counter()
-
-    try:
-        generated = await llm_client.answer_question(messages)
-    except GenerationError as exc:
-        generation_latency = _elapsed_ms(generation_started)
-
+    if not isinstance(generated, GeneratedAnswer):
         return RAGResult(
             question=question,
-            request_id=selected_request_id,
-            mode=selected_mode,
+            request_id=request_id,
+            mode=mode,
             k=k,
-            messages=messages,
+            messages=(),
             generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
-            contexts=contexts,
-            error=_error('generation', exc),
-            retrieval_latency_ms=retrieval_latency,
-            generation_latency_ms=generation_latency,
             total_latency_ms=_elapsed_ms(started),
         )
-
-    generation_latency = _elapsed_ms(generation_started)
-
-    validation = validate_citations(
-        generated.citations,
-        contexts,
-    )
-
-    sources = (
-        ()
-        if generated.answer.strip() == INSUFFICIENT_CONTEXT_ANSWER
-        else validation.references
-    )
-
+    validation = validate_citations(generated.citations, contexts)
     return RAGResult(
         question=question,
-        request_id=selected_request_id,
-        mode=selected_mode,
+        request_id=request_id,
+        mode=mode,
         k=k,
-        messages=messages,
+        messages=build_messages(question, contexts),
         generated=generated,
         contexts=contexts,
-        sources=sources,
+        sources=validation.references,
         invalid_citations=validation.invalid_citations,
         citation_section_paths=validation.matched_section_paths,
         retrieval_latency_ms=retrieval_latency,
-        generation_latency_ms=generation_latency,
         total_latency_ms=_elapsed_ms(started),
-        retrieval_metadata={
-            'mode': selected_mode.value,
-        },
+        retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
         llm_metadata=generated.llm_metadata,
         raw_provider_response=generated.raw_provider_response,
     )

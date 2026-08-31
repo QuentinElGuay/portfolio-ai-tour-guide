@@ -1,4 +1,4 @@
-"""Deterministic test-only LLM backed by golden-dataset answers."""
+"""Deterministic fixture-backed language-model clients."""
 
 import json
 import random
@@ -44,68 +44,52 @@ class FixtureCase:
     section_path: tuple[str, ...] | None
 
 
-class FixtureLLMClient:
-    """Return golden answers only when their expected evidence was retrieved."""
+class DemoLLMClient:
+    """Return deterministic answers from a golden dataset.
 
-    def __init__(self, dataset_path: Path) -> None:
-        self.dataset_path = dataset_path
-        self._cases = _load_cases(dataset_path)
-
-    async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
-        """Return the golden answer and a page derived from supplied context."""
-        question = _question_from_messages(messages)
-        case = self._cases.get(question)
-        return self._answer_case(messages, question, case)
-
-    def _answer_case(
-        self,
-        messages: Sequence[Message],
-        question: str,
-        case: FixtureCase | None,
-    ) -> GeneratedAnswer:
-        """Return the answer for a known fixture question."""
-        if case is None:
-            raise GenerationError(f'No fixture answer is configured for {question!r}.')
-        if not case.answerable:
-            return GeneratedAnswer(
-                INSUFFICIENT_CONTEXT_ANSWER,
-                llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
-            )
-
-        context = _matching_context(messages, case)
-        if context is None:
-            raise GenerationError(
-                f'Expected fixture evidence was not retrieved for {question!r}; '
-                f'available contexts: {_context_descriptions(messages)!r}.'
-            )
-        source_url, version, pages = context
-        return GeneratedAnswer(
-            case.answer or '',
-            citations=(LLMCitation(source_url, version, pages[0], pages[0]),),
-            llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
-        )
-
-
-class BaguetteLLMClient(FixtureLLMClient):
-    """A friendly, zero-cost Brittany demo backed by golden-dataset answers."""
+    ``exact_mode=False`` enables the friendly distance-based suggestions used
+    by the public Brittany demo.
+    """
 
     def __init__(
         self,
         dataset_path: Path,
         *,
+        exact_mode: bool = True,
         close_question_distance: float = DEFAULT_CLOSE_QUESTION_DISTANCE,
         similar_question_distance: float = DEFAULT_SIMILAR_QUESTION_DISTANCE,
     ) -> None:
-        super().__init__(dataset_path)
+        self.dataset_path = dataset_path
+        self.exact_mode = exact_mode
         self.close_question_distance = close_question_distance
         self.similar_question_distance = similar_question_distance
+        self._cases = _load_cases(dataset_path)
         self._answerable_questions = tuple(
             question for question, case in self._cases.items() if case.answerable
         )
 
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
-        """Return a prepared answer or suggest a question the demo can answer."""
+        """Return the golden answer and a page derived from supplied context."""
         question = _question_from_messages(messages)
+        if not self.exact_mode:
+            return self._answer_demo_question(messages, question)
+        return self._answer_case(messages, question, self._cases.get(question))
+
+    async def choose_search_query(
+        self,
+        question: str,
+        *,
+        previous_queries: Sequence[str],
+        has_context: bool,
+    ) -> str | None:
+        """Use the original question once, preserving deterministic fixture retrieval."""
+        del has_context
+        return None if previous_queries else question
+
+    def _answer_demo_question(
+        self, messages: Sequence[Message], question: str
+    ) -> GeneratedAnswer:
+        """Return a prepared demo answer or a useful question suggestion."""
         exact_case = self._cases.get(question)
         if exact_case is not None and exact_case.answerable:
             matched_question = question
@@ -140,6 +124,34 @@ class BaguetteLLMClient(FixtureLLMClient):
         if somewhat_similar_question is not None:
             return self._did_you_mean_answer(somewhat_similar_question)
         return self._fallback_answer()
+
+    def _answer_case(
+        self,
+        messages: Sequence[Message],
+        question: str,
+        case: FixtureCase | None,
+    ) -> GeneratedAnswer:
+        """Return the answer for a known fixture question."""
+        if case is None:
+            raise GenerationError(f'No fixture answer is configured for {question!r}.')
+        if not case.answerable:
+            return GeneratedAnswer(
+                INSUFFICIENT_CONTEXT_ANSWER,
+                llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
+            )
+
+        context = _matching_context(messages, case)
+        if context is None:
+            raise GenerationError(
+                f'Expected fixture evidence was not retrieved for {question!r}; '
+                f'available contexts: {_context_descriptions(messages)!r}.'
+            )
+        source_url, version, pages = context
+        return GeneratedAnswer(
+            case.answer or '',
+            citations=(LLMCitation(source_url, version, pages[0], pages[0]),),
+            llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
+        )
 
     def _did_you_mean_answer(self, suggestion: str) -> GeneratedAnswer:
         return GeneratedAnswer(
@@ -284,7 +296,6 @@ def _context_descriptions(messages: Sequence[Message]) -> tuple[str, ...]:
 
 
 __all__ = [
-    'BaguetteLLMClient',
-    'FixtureLLMClient',
+    'DemoLLMClient',
     'load_answerable_questions',
 ]

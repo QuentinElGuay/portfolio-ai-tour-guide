@@ -54,6 +54,11 @@ class AgentsSettings(BaseSettings):
         validation_alias='AGENT_LLM_FIXTURE_DATASET',
         description='Golden dataset used by the deterministic fixture LLM',
     )
+    exact_mode: bool = Field(
+        default=False,
+        validation_alias='AGENT_EXACT_MODE',
+        description='Require exact demo questions instead of fuzzy matching',
+    )
     close_question_distance: float = Field(
         default=DEFAULT_CLOSE_QUESTION_DISTANCE,
         ge=0,

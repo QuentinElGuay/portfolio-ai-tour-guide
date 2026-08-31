@@ -1,13 +1,20 @@
 """Direct language-model clients used by the agent."""
 
-from ai_tour_guide.agent.llm.clients import LLMClient, OpenAIClient
+from ai_tour_guide.agent.llm.clients import (
+    AgentLLMClient,
+    GenerationError,
+    LLMClient,
+    OpenAIClient,
+)
+from ai_tour_guide.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.agent.llm.factory import create_llm_client
-from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
 from ai_tour_guide.agent.llm.settings import AgentsSettings
 
 __all__ = [
+    'AgentLLMClient',
     'AgentsSettings',
-    'FixtureLLMClient',
+    'DemoLLMClient',
+    'GenerationError',
     'LLMClient',
     'OpenAIClient',
     'create_llm_client',

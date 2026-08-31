@@ -8,8 +8,8 @@ from pydantic import SecretStr
 
 from ai_tour_guide.agent.chat.models import Message, Role
 from ai_tour_guide.agent.llm.clients import GenerationError, OpenAIClient, _parse_answer
+from ai_tour_guide.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.agent.llm.factory import create_llm_client
-from ai_tour_guide.agent.llm.fixture import BaguetteLLMClient, FixtureLLMClient
 from ai_tour_guide.agent.llm.settings import (
     DEFAULT_BAGUETTE_LLM_DATASET_PATH,
     AgentsSettings,
@@ -133,7 +133,7 @@ def test_fixture_client_returns_a_golden_answer_with_context_derived_citation(
         }
     ]
 
-    result = asyncio.run(FixtureLLMClient(dataset_path).answer_question(messages))
+    result = asyncio.run(DemoLLMClient(dataset_path).answer_question(messages))
 
     assert result.answer == 'There.'
     assert result.citations[0].page_start == 4
@@ -160,7 +160,7 @@ def test_fixture_client_refuses_an_unsupported_golden_question(tmp_path) -> None
     )
 
     result = asyncio.run(
-        FixtureLLMClient(dataset_path).answer_question(
+        DemoLLMClient(dataset_path).answer_question(
             [{'role': Role.USER, 'content': 'User question:\nUnsupported?'}]
         )
     )
@@ -195,7 +195,7 @@ def test_fixture_client_fails_when_expected_evidence_is_not_retrieved(tmp_path) 
 
     with pytest.raises(GenerationError, match='Expected fixture evidence'):
         asyncio.run(
-            FixtureLLMClient(dataset_path).answer_question(
+            DemoLLMClient(dataset_path).answer_question(
                 [{'role': Role.USER, 'content': 'User question:\nWhere?'}]
             )
         )
@@ -214,7 +214,7 @@ def test_fixture_provider_does_not_require_an_api_key(tmp_path) -> None:
         )
     )
 
-    assert isinstance(client, FixtureLLMClient)
+    assert isinstance(client, DemoLLMClient)
 
 
 def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
@@ -242,7 +242,7 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
     )
 
     result = asyncio.run(
-        BaguetteLLMClient(dataset_path).answer_question(
+        DemoLLMClient(dataset_path, exact_mode=False).answer_question(
             [{'role': Role.USER, 'content': 'User question:\nWhat is the weather?'}]
         )
     )
@@ -287,7 +287,9 @@ def test_demo_provider_accepts_a_question_within_the_distance_margin(tmp_path) -
         }
     ]
 
-    result = asyncio.run(BaguetteLLMClient(dataset_path).answer_question(messages))
+    result = asyncio.run(
+        DemoLLMClient(dataset_path, exact_mode=False).answer_question(messages)
+    )
 
     assert result.answer == 'Visit the coast.'
     assert result.citations[0].page_start == 4
@@ -313,7 +315,7 @@ def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> 
     )
 
     result = asyncio.run(
-        BaguetteLLMClient(dataset_path).answer_question(
+        DemoLLMClient(dataset_path, exact_mode=False).answer_question(
             [
                 {
                     'role': Role.USER,
@@ -339,7 +341,8 @@ def test_demo_provider_uses_the_bundled_dataset_without_an_api_key(tmp_path) -> 
         )
     )
 
-    assert isinstance(client, BaguetteLLMClient)
+    assert isinstance(client, DemoLLMClient)
+    assert not client.exact_mode
     assert client.dataset_path == DEFAULT_BAGUETTE_LLM_DATASET_PATH
 
 
