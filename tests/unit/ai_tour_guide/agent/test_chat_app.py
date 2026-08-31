@@ -44,6 +44,7 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     )
 
     assert chatbot.elem_id == 'rag-chat'
+    assert app.config['title'] == 'Baguette Voyages'
     assert chatbot.height == 'calc(100vh - 250px)'
     assert chatbot.value[0]['role'] == 'assistant'
     assert chatbot.value[0]['content'][0]['text'] == WELCOME_MESSAGE

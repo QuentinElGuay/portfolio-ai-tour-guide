@@ -36,9 +36,14 @@ annotate-dataset: ## Interactively annotate golden-dataset answers and source pa
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
 app: ## Start the agent API and Gradio chat interface.
-	@if ! $(COMPOSE) --profile app up --build -d --wait; then \
+	@if ! $(COMPOSE) --profile app up --build -d --wait database agent; then \
 		echo "Agent startup failed. Recent agent diagnostics:" >&2; \
-		$(COMPOSE) --profile app logs --tail=2 agent >&2 || true; \
+		$(COMPOSE) --profile app logs --tail=20 agent >&2 || true; \
+		exit 1; \
+	fi
+	@if ! $(COMPOSE) --profile app up -d --wait chat; then \
+		echo "Chat startup failed. Recent chat diagnostics:" >&2; \
+		$(COMPOSE) --profile app logs --tail=20 chat >&2 || true; \
 		exit 1; \
 	fi
 ask: ## Answer a QUESTION using retrieved context and optional K.
@@ -114,13 +119,13 @@ db-validate-schema:
 	@case "$(SCHEMA)" in *[!a-z0-9_]*|[0-9]*|'') echo "SCHEMA must be a lowercase PostgreSQL identifier" >&2; exit 1;; esac
 
 evaluate: ## Run all evaluation metrics.
-	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, rag, judge, or all" >&2; exit 1;; esac
+	@case "$(EVALUATION)" in search|retrieval|rag|judge|all) ;; *) echo "EVALUATION must be search, retrieval, rag, judge, or all" >&2; exit 1;; esac
 	$(DATABASE_UP)
 	$(MAKE) load-corpus CORPUS_ROOT="$(CORPUS_ROOT)" SCHEMA=evaluation
 	@if [ "$(EVALUATION)" = search ] || [ "$(EVALUATION)" = retrieval ] || [ "$(EVALUATION)" = all ]; then \
 		uv run python -m evaluation.search.run --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
-	@if [ "$(EVALUATION)" = rag ]; then \
+	@if [ "$(EVALUATION)" = rag ] || [ "$(EVALUATION)" = all ]; then \
 		uv run python -m evaluation.rag.run rag --corpus "$(CORPUS_ROOT)" --dataset evaluation/datasets --k "$(K)"; \
 	fi
 	@if [ "$(EVALUATION)" = judge ] || [ "$(EVALUATION)" = all ]; then \

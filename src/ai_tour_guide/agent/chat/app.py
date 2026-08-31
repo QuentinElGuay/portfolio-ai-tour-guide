@@ -313,7 +313,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             updated_feedback_values,
         )
 
-    with gr.Blocks() as app:
+    with gr.Blocks(title='Baguette Voyages') as app:
         request_ids = gr.State({})
         feedback_values = gr.State([])
         textbox = gr.Textbox(
