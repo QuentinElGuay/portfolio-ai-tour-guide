@@ -63,7 +63,8 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     assert '#rag-chat .avatar-container' in CHAT_CSS
     assert 'height: 80px' in CHAT_CSS
     assert '#rag-chat .message.bot' in CHAT_CSS
-    assert 'margin-left: 0.5rem' in CHAT_CSS
+    assert 'margin-left: 0.5rem !important' in CHAT_CSS
+    assert 'padding: 0.25rem 0.5rem !important' in CHAT_CSS
     assert 'max-height: none' in CHAT_CSS
     assert '#rag-chat .panel-wrap' in CHAT_CSS
     assert 'overflow-y: visible' in CHAT_CSS

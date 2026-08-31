@@ -57,7 +57,7 @@ app: ## Start the agent API and Gradio chat interface.
 		$(COMPOSE) --profile app logs --tail=20 agent >&2 || true; \
 		exit 1; \
 	fi
-	@if ! $(COMPOSE) --profile app up -d --wait chat; then \
+	@if ! $(COMPOSE) --profile app up -d --wait --no-build chat; then \
 		echo "Chat startup failed. Recent chat diagnostics:" >&2; \
 		$(COMPOSE) --profile app logs --tail=20 chat >&2 || true; \
 		exit 1; \
