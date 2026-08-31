@@ -144,8 +144,9 @@ AGENT_LLM_PROVIDER=baguette-llm
 AGENT_LLM_MODEL=mini-croissant-1.0
 ```
 
-The demo recognizes [prepared Brittany questions](fixtures/demo_dataset.jsonl) and modest spelling or punctuation
-variations. It suggests a supported question when it cannot answer.
+The demo recognizes [prepared Brittany questions](fixtures/demo_dataset.jsonl) and
+modest spelling or punctuation variations. It suggests a supported question when it
+cannot answer.
 
 The demo does not use an API key. To use a live LLM, replace those settings and add your
 OpenAI API key:
@@ -157,12 +158,12 @@ AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
 > [!NOTE]
-> `OpenAI` is currently the only supported provider for live answer generation, and `gpt-4.1-mini` is
-> the recommended model.
+> `OpenAI` is currently the only supported provider for live answer generation, and
+> `gpt-4.1-mini` is the recommended model.
 
-Open [http://localhost:7860](http://localhost:7860) to use the
-chat. The API is available at [http://localhost:8000](http://localhost:8000), with
-interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+Open [http://localhost:7860](http://localhost:7860) to use the chat. The API is
+available at [http://localhost:8000](http://localhost:8000), with interactive
+documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 For detailed setup, demo limitations, Airflow ingestion, evaluation, and dashboard
 monitoring, follow the [tutorial](docs/README.md).
