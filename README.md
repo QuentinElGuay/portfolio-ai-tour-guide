@@ -144,7 +144,7 @@ AGENT_LLM_PROVIDER=baguette-llm
 AGENT_LLM_MODEL=mini-croissant-1.0
 ```
 
-The demo recognizes prepared Brittany questions and modest spelling or punctuation
+The demo recognizes [prepared Brittany questions](fixtures/demo_dataset.jsonl) and modest spelling or punctuation
 variations. It suggests a supported question when it cannot answer.
 
 The demo does not use an API key. To use a live LLM, replace those settings and add your
