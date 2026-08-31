@@ -191,6 +191,15 @@ reference. The [tutorial](docs/README.md),
 
 ## Airflow ingestion
 
+> [!WARNING]
+> Airflow 3 requires a 4-core machine type in GitHub Codespaces. On smaller machines,
+> use the command-line workflow instead:
+>
+> ```bash
+> make db-init
+> make ingest
+> ```
+
 Start the optional Airflow profile:
 
 ```bash

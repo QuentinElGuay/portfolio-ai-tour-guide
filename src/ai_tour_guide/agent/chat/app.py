@@ -96,6 +96,10 @@ CHAT_CSS = """
     border-radius: 16px !important;
 }
 
+#rag-chat .message.bot {
+    margin-left: 0.5rem;
+}
+
 #rag-chat .message.bot::before,
 #rag-chat .message.user::before {
     color: #334155;

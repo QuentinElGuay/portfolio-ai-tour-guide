@@ -51,6 +51,15 @@ or using them in production.
 
 ## Ingestion with Airflow
 
+> [!WARNING]
+> Airflow 3 requires a 4-core machine type in GitHub Codespaces. On smaller machines,
+> use the command-line workflow instead:
+>
+> ```bash
+> make db-init
+> make ingest
+> ```
+
 Start the Airflow environment:
 
 ```bash
