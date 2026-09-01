@@ -134,6 +134,64 @@ evidence, and a deterministic smoke test are also available.
 
 ______________________________________________________________________
 
+## ⏳ Milestone 9 — Explicitly Agentic Travel Assistant
+
+**Goal:** make the agent boundary explicit by separating UI navigation, conversation
+state, and turn-level agent reasoning, then implement a bounded, inspectable tool loop.
+
+### [P0] Separate responsibilities
+
+- [ ] Keep guided buttons and labels as a chat-UI/navigation concern rather than the
+  primary routing mechanism of the RAG agent.
+- [ ] Keep session history, follow-up resolution, and thread checkpointing in a separate
+  conversation layer.
+- [ ] Define the travel-agent graph as the owner of one turn's planning, tool use,
+  evidence evaluation, answer generation, and stopping decision.
+- [ ] Replace `ChatBackend.ask(messages, option_id=...)` with an input that accepts the
+  submitted question and optional guided-navigation ID.
+- [ ] Remove app-side message construction and history normalization from the Gradio
+  layer; retain only UI rendering and event adaptation there.
+
+### [P0] Add an explicit bounded tool loop
+
+- [ ] Extract retrieval into a typed `search_tourism_knowledge_base` tool returning
+  passages, source identity, pages, and relevance metadata.
+- [ ] Replace the mostly one-pass graph with explicit `plan -> tool -> evaluate`
+  transitions.
+- [ ] Let the agent select bounded actions: `search_knowledge_base`,
+  `reformulate_search`, `answer_from_context`, or `refuse`.
+- [ ] Add an evidence-evaluation node that checks whether retrieved context is
+  sufficient before generation.
+- [ ] Add bounded retry/reformulation for insufficient evidence, followed by refusal
+  when the retry budget is exhausted.
+- [ ] Keep citation validation as a mandatory post-generation safety boundary.
+- [ ] Enforce limits on tool names, tool-call count, retrieval scope, and unsupported
+  claims.
+
+### [P1] Make agent behavior inspectable
+
+- [ ] Define typed graph state for the question, intent, planned actions, tool calls,
+  evidence, retry count, answer, citations, and final status.
+- [ ] Record structured action metadata, without exposing private chain-of-thought, for
+  CLI verbose output, API diagnostics, evaluation, and monitoring.
+- [ ] Update the README and architecture diagrams to document the bounded agent loop and
+  the separation between conversation orchestration and agent reasoning.
+- [ ] Add tests for action routing, tool execution, evidence sufficiency, retry limits,
+  refusal, citation validation, and trace output.
+
+______________________________________________________________________
+
+## ⏳ Release v1.3.0 — Bounded agentic RAG
+
+**Status:** ⏳ Planned
+
+This release will deliver a clearly separated, source-grounded travel agent with an
+explicit retrieval tool, bounded planning and retry behavior, citation validation, and
+observable execution traces. The Gradio chat remains a client of the conversation API,
+while LangGraph owns the stateful turn-level agent workflow.
+
+______________________________________________________________________
+
 ## Follow-up work after v1.0.0
 
 These improvements are useful but are not priorities for the final submission.
