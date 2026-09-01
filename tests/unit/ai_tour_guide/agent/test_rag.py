@@ -5,6 +5,7 @@ from uuid import UUID
 import pytest
 
 from ai_tour_guide.agent.chat.models import Role
+from ai_tour_guide.agent.rag.agent_workflow import build_agent_graph
 from ai_tour_guide.agent.rag.models import (
     CitationValidationResult,
     GeneratedAnswer,
@@ -189,6 +190,13 @@ def test_answer_question_requires_llm_configuration(
         answer_question('Question')
 
     create_llm_client.assert_called_once()
+
+
+def test_agent_workflow_does_not_inherit_a_parent_checkpointer() -> None:
+    """Keep runtime retrieval objects out of conversation checkpoint writes."""
+    graph = build_agent_graph(MagicMock(), engine=None, strategy=None)
+
+    assert graph.checkpointer is False
 
 
 def test_build_context_preserves_source_identity_and_pages() -> None:

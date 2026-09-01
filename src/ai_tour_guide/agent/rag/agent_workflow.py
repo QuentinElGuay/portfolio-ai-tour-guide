@@ -103,7 +103,10 @@ def build_agent_graph(
     graph.add_conditional_edges('search', route_after_search)
     graph.add_edge('generate', END)
     graph.add_edge('insufficient', END)
-    return graph.compile()
+    # RetrievedContext contains ORM objects and is intentionally runtime-only.
+    # This graph can run inside the checkpointed conversation graph, so it must not
+    # inherit that checkpointer.
+    return graph.compile(checkpointer=False)
 
 
 async def run_agent_workflow(

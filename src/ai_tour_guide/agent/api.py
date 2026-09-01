@@ -5,12 +5,12 @@ from datetime import date
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from ai_tour_guide.agent.chat.models import Role
 from ai_tour_guide.agent.conversation import (
     ConversationState,
     build_conversation_graph,
@@ -154,22 +154,29 @@ async def _answer_question(question: str, session_id: str) -> RAGResult:
     client = create_llm_client(AgentsSettings())
     if client is None:
         raise RuntimeError('No LLM client is configured.')
+    result: RAGResult | None = None
+
+    def retain_result(value: RAGResult) -> None:
+        nonlocal result
+        result = value
+
     graph = build_conversation_graph(
         client,
         engine=None,
         strategy=None,
         checkpointer=_conversation_checkpointer,
+        on_result=retain_result,
     )
-    conversation_input: ConversationState = {
-        'question': question,
-        'messages': [{'role': Role.USER, 'content': question}],
-        'resolved_question': question,
-    }
-    state = await graph.ainvoke(
+    conversation_input = ConversationState(
+        messages=[HumanMessage(content=question)],
+    )
+    await graph.ainvoke(
         conversation_input,
         config={'configurable': {'thread_id': session_id}},
     )
-    return state['result']
+    if result is None:
+        raise RuntimeError('The conversation graph did not return a result.')
+    return result
 
 
 @app.get('/health')
