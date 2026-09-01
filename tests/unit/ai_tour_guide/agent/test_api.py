@@ -127,7 +127,9 @@ def test_ask_returns_the_answer_and_sources(
             pages=[4, 5],
         )
     ]
-    answer_question.assert_awaited_once_with('Where?')
+    assert answer_question.await_args is not None
+    assert answer_question.await_args.args[0] == 'Where?'
+    assert isinstance(answer_question.await_args.args[1], str)
     store_rag_result.assert_called_once_with(
         answer_question.return_value.request_id,
         answer_question.return_value.to_dict(),
@@ -202,7 +204,10 @@ def test_ask_http_boundary_normalizes_question_and_serializes_response(
         'sources': [],
         'emotion': 'neutral',
     }
-    answer_question.assert_awaited_once_with('Where?')
+
+    assert answer_question.await_args is not None
+    assert answer_question.await_args.args[0] == 'Where?'
+    assert isinstance(answer_question.await_args.args[1], str)
     store_rag_result.assert_called_once_with(result.request_id, result.to_dict())
 
 

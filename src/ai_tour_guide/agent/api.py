@@ -2,13 +2,19 @@
 
 import logging
 from datetime import date
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, field_validator
+from langgraph.checkpoint.memory import MemorySaver
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_tour_guide.agent.chat.models import Role
+from ai_tour_guide.agent.conversation import (
+    ConversationState,
+    build_conversation_graph,
+)
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import AgentsSettings
 from ai_tour_guide.agent.rag.models import Emotion, RAGResult, SourceReference
@@ -16,7 +22,6 @@ from ai_tour_guide.agent.rag.persistence import (
     store_feedback,
     store_rag_result,
 )
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
@@ -28,6 +33,7 @@ class AskRequest(BaseModel):
     """Question submitted to the tour-guide agent."""
 
     question: str
+    session_id: str = Field(default_factory=lambda: str(uuid4()))
 
     @field_validator('question')
     @classmethod
@@ -96,6 +102,7 @@ class FeedbackResponse(BaseModel):
 
 app = FastAPI(title='Baguette Voyages Agent')
 _last_health_failure: str | None = None
+_conversation_checkpointer = MemorySaver()
 
 
 def _ensure_knowledge_base_ready() -> None:
@@ -142,12 +149,27 @@ def _ensure_knowledge_base_ready() -> None:
     _last_health_failure = None
 
 
-async def _answer_question(question: str) -> RAGResult:
-    """Create the configured client and run the asynchronous RAG pipeline."""
+async def _answer_question(question: str, session_id: str) -> RAGResult:
+    """Run the session-scoped conversation graph."""
     client = create_llm_client(AgentsSettings())
     if client is None:
         raise RuntimeError('No LLM client is configured.')
-    return await answer_question_async(question, llm_client=client)
+    graph = build_conversation_graph(
+        client,
+        engine=None,
+        strategy=None,
+        checkpointer=_conversation_checkpointer,
+    )
+    conversation_input: ConversationState = {
+        'question': question,
+        'messages': [{'role': Role.USER, 'content': question}],
+        'resolved_question': question,
+    }
+    state = await graph.ainvoke(
+        conversation_input,
+        config={'configurable': {'thread_id': session_id}},
+    )
+    return state['result']
 
 
 @app.get('/health')
@@ -160,7 +182,7 @@ async def health() -> dict[str, str]:
 @app.post('/ask', response_model=AskResponse)
 async def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result = await _answer_question(request.question)
+    result = await _answer_question(request.question, request.session_id)
     try:
         store_rag_result(result.request_id, result.to_dict())
     except SQLAlchemyError as exc:

@@ -1,6 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from uuid import uuid4
 
 import httpx
 
@@ -74,6 +75,7 @@ class HttpChatBackend(ChatBackend):
     def __init__(self, api_url: str, timeout_seconds: float = 60.0) -> None:
         self.api_url = api_url
         self.timeout = httpx.Timeout(timeout_seconds)
+        self.session_id = str(uuid4())
 
     async def check_ready(self) -> None:
         """Verify that the API and its configured knowledge base are ready."""
@@ -107,7 +109,10 @@ class HttpChatBackend(ChatBackend):
             raise RuntimeError('The conversation does not contain a user question.')
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(self.api_url, json={'question': question})
+                response = await client.post(
+                    self.api_url,
+                    json={'question': question, 'session_id': self.session_id},
+                )
                 response.raise_for_status()
         except httpx.ConnectError as exc:
             raise RuntimeError('Unable to connect to the chat API.') from exc

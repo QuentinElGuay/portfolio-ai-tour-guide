@@ -154,7 +154,7 @@ OpenAI API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
-AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_API_KEY=your-super-secret-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
