@@ -6,7 +6,6 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ai_tour_guide.agent.demo_questions import DEFAULT_BAGUETTE_LLM_DATASET_PATH
 from ai_tour_guide.agent.llm.rate_limit import DEFAULT_REQUESTS_PER_SECOND
 
 DEFAULT_CLOSE_QUESTION_DISTANCE = 0.25
@@ -17,7 +16,6 @@ class LLMProvider(StrEnum):
     """Supported LLM providers."""
 
     OPENAI = 'openai'
-    FIXTURE = 'fixture'
     BAGUETTE_LLM = 'baguette-llm'
 
 
@@ -49,15 +47,10 @@ class AgentsSettings(BaseSettings):
         gt=0,
         validation_alias='AGENT_LLM_REQUESTS_PER_SECOND',
     )
-    fixture_dataset_path: Path | None = Field(
+    demo_dataset_path: Path | None = Field(
         default=None,
-        validation_alias='AGENT_LLM_FIXTURE_DATASET',
-        description='Golden dataset used by the deterministic fixture LLM',
-    )
-    exact_mode: bool = Field(
-        default=False,
-        validation_alias='AGENT_EXACT_MODE',
-        description='Require exact demo questions instead of fuzzy matching',
+        validation_alias='AGENT_LLM_DEMO_DATASET',
+        description='Standalone response dataset used by demo or test runs',
     )
     close_question_distance: float = Field(
         default=DEFAULT_CLOSE_QUESTION_DISTANCE,
@@ -76,7 +69,6 @@ class AgentsSettings(BaseSettings):
 
 
 __all__ = [
-    'DEFAULT_BAGUETTE_LLM_DATASET_PATH',
     'DEFAULT_CLOSE_QUESTION_DISTANCE',
     'DEFAULT_SIMILAR_QUESTION_DISTANCE',
     'AgentsSettings',

@@ -1,4 +1,4 @@
-"""Deterministic fixture-backed language-model clients."""
+"""Deterministic client for the bundled application demo."""
 
 import json
 import random
@@ -8,14 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_tour_guide.agent.chat.models import Message
-from ai_tour_guide.agent.demo_questions import load_answerable_questions
+from ai_tour_guide.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
 from ai_tour_guide.agent.llm.clients import GenerationError
 from ai_tour_guide.agent.llm.settings import (
     DEFAULT_CLOSE_QUESTION_DISTANCE,
     DEFAULT_SIMILAR_QUESTION_DISTANCE,
 )
 from ai_tour_guide.agent.rag.models import GeneratedAnswer, LLMCitation
-from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.domain.sections import slugify_section_path
 
 _QUESTION_MARKER = 'User question:\n'
@@ -34,46 +33,40 @@ _CONTEXT_PATTERN = re.compile(
 
 
 @dataclass(frozen=True, slots=True)
-class FixtureCase:
-    """The golden-dataset information needed by the fixture client."""
+class DemoCase:
+    """One prepared answer in the standalone demo dataset."""
 
-    answerable: bool
     answer: str | None
     source_url: str | None
     version: str | None
     section_path: tuple[str, ...] | None
+    pages: tuple[int, ...]
 
 
 class DemoLLMClient:
-    """Return deterministic answers from a golden dataset.
-
-    ``exact_mode=False`` enables the friendly distance-based suggestions used
-    by the public Brittany demo.
-    """
+    """Return deterministic answers from the bundled demo dataset."""
 
     def __init__(
         self,
-        dataset_path: Path,
+        dataset_path: Path = DEFAULT_DEMO_DATASET_PATH,
         *,
-        exact_mode: bool = True,
         close_question_distance: float = DEFAULT_CLOSE_QUESTION_DISTANCE,
         similar_question_distance: float = DEFAULT_SIMILAR_QUESTION_DISTANCE,
     ) -> None:
         self.dataset_path = dataset_path
-        self.exact_mode = exact_mode
         self.close_question_distance = close_question_distance
         self.similar_question_distance = similar_question_distance
         self._cases = _load_cases(dataset_path)
         self._answerable_questions = tuple(
-            question for question, case in self._cases.items() if case.answerable
+            question
+            for question, case in self._cases.items()
+            if case.answer is not None
         )
 
     async def answer_question(self, messages: Sequence[Message]) -> GeneratedAnswer:
-        """Return the golden answer and a page derived from supplied context."""
+        """Return a prepared demo answer, suggestion, or generic fallback."""
         question = _question_from_messages(messages)
-        if not self.exact_mode:
-            return self._answer_demo_question(messages, question)
-        return self._answer_case(messages, question, self._cases.get(question))
+        return self._answer_demo_question(messages, question)
 
     async def choose_search_query(
         self,
@@ -82,7 +75,7 @@ class DemoLLMClient:
         previous_queries: Sequence[str],
         has_context: bool,
     ) -> str | None:
-        """Use the original question once, preserving deterministic fixture retrieval."""
+        """Use the original question once for deterministic demo retrieval."""
         del has_context
         return None if previous_queries else question
 
@@ -91,7 +84,7 @@ class DemoLLMClient:
     ) -> GeneratedAnswer:
         """Return a prepared demo answer or a useful question suggestion."""
         exact_case = self._cases.get(question)
-        if exact_case is not None and exact_case.answerable:
+        if exact_case is not None and exact_case.answer is not None:
             matched_question = question
         else:
             matched_question = _closest_question(
@@ -101,7 +94,10 @@ class DemoLLMClient:
             )
         if matched_question is not None:
             case = self._cases[matched_question]
-            if case.answerable and _matching_context(messages, case) is not None:
+            if (
+                case.answer is not None
+                and _matching_context(messages, case) is not None
+            ):
                 generated = self._answer_case(messages, matched_question, case)
                 return GeneratedAnswer(
                     generated.answer,
@@ -129,28 +125,26 @@ class DemoLLMClient:
         self,
         messages: Sequence[Message],
         question: str,
-        case: FixtureCase | None,
+        case: DemoCase | None,
     ) -> GeneratedAnswer:
-        """Return the answer for a known fixture question."""
+        """Return the answer for a known demo question."""
         if case is None:
-            raise GenerationError(f'No fixture answer is configured for {question!r}.')
-        if not case.answerable:
-            return GeneratedAnswer(
-                INSUFFICIENT_CONTEXT_ANSWER,
-                llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
-            )
+            return self._fallback_answer()
 
         context = _matching_context(messages, case)
         if context is None:
             raise GenerationError(
-                f'Expected fixture evidence was not retrieved for {question!r}; '
+                f'Expected demo evidence was not retrieved for {question!r}; '
                 f'available contexts: {_context_descriptions(messages)!r}.'
             )
         source_url, version, pages = context
         return GeneratedAnswer(
             case.answer or '',
             citations=(LLMCitation(source_url, version, pages[0], pages[0]),),
-            llm_metadata={'provider': 'fixture', 'dataset': str(self.dataset_path)},
+            llm_metadata={
+                'provider': 'baguette-llm',
+                'dataset': str(self.dataset_path),
+            },
         )
 
     def _did_you_mean_answer(self, suggestion: str) -> GeneratedAnswer:
@@ -165,7 +159,7 @@ class DemoLLMClient:
     def _fallback_answer(self) -> GeneratedAnswer:
         if not self._answerable_questions:
             raise GenerationError(
-                'The demo fixture does not contain answerable questions.'
+                'The demo dataset does not contain prepared questions.'
             )
         suggestion = random.choice(self._answerable_questions)
         return GeneratedAnswer(
@@ -177,41 +171,44 @@ class DemoLLMClient:
         )
 
 
-def _load_cases(dataset_path: Path) -> dict[str, FixtureCase]:
-    """Load the golden dataset without importing evaluation-only code at runtime."""
+def _load_cases(dataset_path: Path) -> dict[str, DemoCase]:
+    """Load and validate the standalone demo JSONL schema."""
     try:
         lines = dataset_path.read_text(encoding='utf-8').splitlines()
     except OSError as exc:
-        raise ValueError(f'Unable to read fixture dataset {dataset_path}.') from exc
+        raise ValueError(f'Unable to read demo dataset {dataset_path}.') from exc
 
-    cases: dict[str, FixtureCase] = {}
+    cases: dict[str, DemoCase] = {}
     for line_number, line in enumerate(lines, start=1):
         if not line.strip():
             continue
         try:
             row = json.loads(line)
-            expected = row['expected']
-            answerable = expected['answerable']
-            source = expected.get('relevant_source')
             question = row['question']
-            if not isinstance(question, str) or not isinstance(answerable, bool):
-                raise TypeError('question and answerable must be correctly typed')
-            case = FixtureCase(
-                answerable=answerable,
-                answer=expected['reference_answer'],
+            answer = row['answer']
+            source = row.get('source')
+            if not isinstance(question, str) or (
+                answer is not None and not isinstance(answer, str)
+            ):
+                raise TypeError('question and answer must be correctly typed')
+            if source is not None and not isinstance(source, dict):
+                raise TypeError('source must be an object or null')
+            case = DemoCase(
+                answer=answer,
                 source_url=source['source_url'] if source else None,
-                version=source['version'] if source else None,
+                version=source.get('version') if source else None,
                 section_path=(
                     slugify_section_path(source['section_path']) if source else None
                 ),
+                pages=tuple(source.get('pages', ())) if source else (),
             )
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
             raise ValueError(
-                f'Invalid fixture dataset row at {dataset_path}:{line_number}.'
+                f'Invalid demo dataset row at {dataset_path}:{line_number}.'
             ) from exc
         if question in cases:
             raise ValueError(
-                f'Duplicate fixture question at {dataset_path}:{line_number}.'
+                f'Duplicate demo question at {dataset_path}:{line_number}.'
             )
         cases[question] = case
     return cases
@@ -266,7 +263,7 @@ def _normalized_question_distance(first: str, second: str) -> float:
 
 
 def _matching_context(
-    messages: Sequence[Message], case: FixtureCase
+    messages: Sequence[Message], case: DemoCase
 ) -> tuple[str, str | None, tuple[int, ...]] | None:
     if case.source_url is None or case.section_path is None:
         return None
@@ -287,7 +284,7 @@ def _matching_context(
 
 
 def _context_descriptions(messages: Sequence[Message]) -> tuple[str, ...]:
-    """Return concise prompt provenance to make fixture failures actionable."""
+    """Return concise prompt provenance to make demo failures actionable."""
     content = '\n'.join(message['content'] for message in messages)
     return tuple(
         f'{match["source_url"]} | {match["section"]}'
@@ -296,6 +293,6 @@ def _context_descriptions(messages: Sequence[Message]) -> tuple[str, ...]:
 
 
 __all__ = [
+    'DemoCase',
     'DemoLLMClient',
-    'load_answerable_questions',
 ]

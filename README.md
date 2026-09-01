@@ -144,7 +144,8 @@ AGENT_LLM_PROVIDER=baguette-llm
 AGENT_LLM_MODEL=mini-croissant-1.0
 ```
 
-The demo recognizes [prepared Brittany questions](fixtures/demo_dataset.jsonl) and
+The demo recognizes
+[prepared Brittany questions](src/ai_tour_guide/agent/data/demo_dataset.jsonl) and
 modest spelling or punctuation variations. It suggests a supported question when it
 cannot answer.
 

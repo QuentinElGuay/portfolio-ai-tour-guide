@@ -1,4 +1,4 @@
-"""Deterministic end-to-end RAG checks using the fixture LLM provider."""
+"""Deterministic end-to-end RAG checks using the demo LLM provider."""
 
 from fastapi.testclient import TestClient
 

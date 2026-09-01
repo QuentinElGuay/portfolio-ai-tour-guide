@@ -3,18 +3,16 @@
 import json
 from pathlib import Path
 
-DEFAULT_BAGUETTE_LLM_DATASET_PATH = (
-    Path(__file__).parent / 'data' / 'demo_dataset.jsonl'
-)
+DEFAULT_DEMO_DATASET_PATH = Path(__file__).parent / 'data' / 'demo_dataset.jsonl'
 
 
-def load_answerable_questions(dataset_path: Path) -> tuple[str, ...]:
-    """Return the questions with prepared answers in a fixture dataset."""
+def load_demo_questions(dataset_path: Path) -> tuple[str, ...]:
+    """Return questions with prepared answers from a demo dataset."""
     questions: list[str] = []
     try:
         lines = dataset_path.read_text(encoding='utf-8').splitlines()
     except OSError as exc:
-        raise ValueError(f'Unable to read fixture dataset {dataset_path}.') from exc
+        raise ValueError(f'Unable to read demo dataset {dataset_path}.') from exc
 
     for line_number, line in enumerate(lines, start=1):
         if not line.strip():
@@ -22,19 +20,21 @@ def load_answerable_questions(dataset_path: Path) -> tuple[str, ...]:
         try:
             row = json.loads(line)
             question = row['question']
-            answerable = row['expected']['answerable']
-            if not isinstance(question, str) or not isinstance(answerable, bool):
-                raise TypeError('question and answerable must be correctly typed')
+            answer = row['answer']
+            if not isinstance(question, str) or (
+                answer is not None and not isinstance(answer, str)
+            ):
+                raise TypeError('question and answer must be correctly typed')
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
             raise ValueError(
-                f'Invalid fixture dataset row at {dataset_path}:{line_number}.'
+                f'Invalid demo dataset row at {dataset_path}:{line_number}.'
             ) from exc
-        if answerable:
+        if answer is not None:
             questions.append(question)
     return tuple(questions)
 
 
 __all__ = [
-    'DEFAULT_BAGUETTE_LLM_DATASET_PATH',
-    'load_answerable_questions',
+    'DEFAULT_DEMO_DATASET_PATH',
+    'load_demo_questions',
 ]

@@ -7,15 +7,14 @@ import pytest
 from pydantic import SecretStr
 
 from ai_tour_guide.agent.chat.models import Message, Role
+from ai_tour_guide.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
 from ai_tour_guide.agent.llm.clients import GenerationError, OpenAIClient, _parse_answer
 from ai_tour_guide.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.agent.llm.factory import create_llm_client
 from ai_tour_guide.agent.llm.settings import (
-    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
     AgentsSettings,
     LLMProvider,
 )
-from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 
 
 def test_agent_settings_reads_generic_values_from_environment(
@@ -96,25 +95,21 @@ def test_llm_client_requires_api_key() -> None:
         create_llm_client(settings)
 
 
-def test_fixture_client_returns_a_golden_answer_with_context_derived_citation(
+def test_demo_client_returns_an_answer_with_context_derived_citation(
     tmp_path,
 ) -> None:
-    """Verify that fixture answers cite the matching context's first page."""
-    dataset_path = tmp_path / 'golden.jsonl'
+    """Verify that demo answers cite the matching context's first page."""
+    dataset_path = tmp_path / 'demo.jsonl'
     dataset_path.write_text(
         json.dumps(
             {
-                'id': 1,
-                'category': 'Test',
                 'question': 'Where?',
-                'expected': {
-                    'answerable': True,
-                    'reference_answer': 'There.',
-                    'relevant_source': {
-                        'source_url': 'https://example.test/guide',
-                        'version': None,
-                        'section_path': ['Guide', 'Places'],
-                    },
+                'answer': 'There.',
+                'source': {
+                    'source_url': 'https://example.test/guide',
+                    'version': None,
+                    'section_path': ['Guide', 'Places'],
+                    'pages': [],
                 },
             }
         )
@@ -140,19 +135,27 @@ def test_fixture_client_returns_a_golden_answer_with_context_derived_citation(
     assert result.citations[0].page_end == 4
 
 
-def test_fixture_client_refuses_an_unsupported_golden_question(tmp_path) -> None:
-    """Verify that unsupported fixture questions return the fallback response."""
-    dataset_path = tmp_path / 'golden.jsonl'
+def test_demo_client_uses_fallback_for_an_unprepared_question(tmp_path) -> None:
+    """Verify that an unprepared demo question returns the fallback response."""
+    dataset_path = tmp_path / 'demo.jsonl'
     dataset_path.write_text(
         json.dumps(
             {
-                'id': 1,
-                'category': 'Test',
                 'question': 'Unsupported?',
-                'expected': {
-                    'answerable': False,
-                    'reference_answer': None,
-                },
+                'answer': None,
+                'source': None,
+            }
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+    dataset_path.write_text(
+        dataset_path.read_text(encoding='utf-8')
+        + json.dumps(
+            {
+                'question': 'A prepared question?',
+                'answer': 'A prepared answer.',
+                'source': None,
             }
         )
         + '\n',
@@ -165,75 +168,25 @@ def test_fixture_client_refuses_an_unsupported_golden_question(tmp_path) -> None
         )
     )
 
-    assert result.answer == INSUFFICIENT_CONTEXT_ANSWER
+    assert 'demo backend with limited knowledge' in result.answer
     assert result.citations == ()
 
 
-def test_fixture_client_fails_when_expected_evidence_is_not_retrieved(tmp_path) -> None:
-    """Verify that fixture answers require their expected source section."""
-    dataset_path = tmp_path / 'golden.jsonl'
+def test_demo_client_falls_back_when_prepared_evidence_is_not_retrieved(
+    tmp_path,
+) -> None:
+    """Verify that prepared answers are not returned without matching context."""
+    dataset_path = tmp_path / 'demo.jsonl'
     dataset_path.write_text(
         json.dumps(
             {
-                'id': 1,
-                'category': 'Test',
                 'question': 'Where?',
-                'expected': {
-                    'answerable': True,
-                    'reference_answer': 'There.',
-                    'relevant_source': {
-                        'source_url': 'https://example.test/guide',
-                        'version': None,
-                        'section_path': ['Guide', 'Places'],
-                    },
-                },
-            }
-        )
-        + '\n',
-        encoding='utf-8',
-    )
-
-    with pytest.raises(GenerationError, match='Expected fixture evidence'):
-        asyncio.run(
-            DemoLLMClient(dataset_path).answer_question(
-                [{'role': Role.USER, 'content': 'User question:\nWhere?'}]
-            )
-        )
-
-
-def test_fixture_provider_does_not_require_an_api_key(tmp_path) -> None:
-    """Verify that the deterministic fixture provider can run without an API key."""
-    dataset_path = tmp_path / 'golden.jsonl'
-    dataset_path.write_text('', encoding='utf-8')
-
-    client = create_llm_client(
-        AgentsSettings(
-            llm_provider=LLMProvider.FIXTURE,
-            model='fixture',
-            fixture_dataset_path=dataset_path,
-        )
-    )
-
-    assert isinstance(client, DemoLLMClient)
-
-
-def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
-    """Verify that the demo provider suggests a question outside its fixture."""
-    dataset_path = tmp_path / 'golden.jsonl'
-    dataset_path.write_text(
-        json.dumps(
-            {
-                'id': 1,
-                'category': 'Test',
-                'question': 'What can I do in Brittany?',
-                'expected': {
-                    'answerable': True,
-                    'reference_answer': 'Visit the coast.',
-                    'relevant_source': {
-                        'source_url': 'https://example.test/guide',
-                        'version': None,
-                        'section_path': ['Guide', 'Activities'],
-                    },
+                'answer': 'There.',
+                'source': {
+                    'source_url': 'https://example.test/guide',
+                    'version': None,
+                    'section_path': ['Guide', 'Places'],
+                    'pages': [],
                 },
             }
         )
@@ -242,7 +195,52 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
     )
 
     result = asyncio.run(
-        DemoLLMClient(dataset_path, exact_mode=False).answer_question(
+        DemoLLMClient(dataset_path).answer_question(
+            [{'role': Role.USER, 'content': 'User question:\nWhere?'}]
+        )
+    )
+
+    assert 'demo backend with limited knowledge' in result.answer
+
+
+def test_demo_provider_does_not_require_an_api_key(tmp_path) -> None:
+    """Verify that the deterministic demo provider can run without an API key."""
+    dataset_path = tmp_path / 'demo.jsonl'
+    dataset_path.write_text('', encoding='utf-8')
+
+    client = create_llm_client(
+        AgentsSettings(
+            llm_provider=LLMProvider.BAGUETTE_LLM,
+            model='demo',
+            demo_dataset_path=dataset_path,
+        )
+    )
+
+    assert isinstance(client, DemoLLMClient)
+
+
+def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
+    """Verify that the demo provider suggests a prepared question."""
+    dataset_path = tmp_path / 'demo.jsonl'
+    dataset_path.write_text(
+        json.dumps(
+            {
+                'question': 'What can I do in Brittany?',
+                'answer': 'Visit the coast.',
+                'source': {
+                    'source_url': 'https://example.test/guide',
+                    'version': None,
+                    'section_path': ['Guide', 'Activities'],
+                    'pages': [],
+                },
+            }
+        )
+        + '\n',
+        encoding='utf-8',
+    )
+
+    result = asyncio.run(
+        DemoLLMClient(dataset_path).answer_question(
             [{'role': Role.USER, 'content': 'User question:\nWhat is the weather?'}]
         )
     )
@@ -254,21 +252,17 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
 
 def test_demo_provider_accepts_a_question_within_the_distance_margin(tmp_path) -> None:
     """Verify that a minor question variation resolves to a prepared answer."""
-    dataset_path = tmp_path / 'golden.jsonl'
+    dataset_path = tmp_path / 'demo.jsonl'
     dataset_path.write_text(
         json.dumps(
             {
-                'id': 1,
-                'category': 'Test',
                 'question': 'What can I do in Brittany?',
-                'expected': {
-                    'answerable': True,
-                    'reference_answer': 'Visit the coast.',
-                    'relevant_source': {
-                        'source_url': 'https://example.test/guide',
-                        'version': None,
-                        'section_path': ['Guide', 'Activities'],
-                    },
+                'answer': 'Visit the coast.',
+                'source': {
+                    'source_url': 'https://example.test/guide',
+                    'version': None,
+                    'section_path': ['Guide', 'Activities'],
+                    'pages': [],
                 },
             }
         )
@@ -287,9 +281,7 @@ def test_demo_provider_accepts_a_question_within_the_distance_margin(tmp_path) -
         }
     ]
 
-    result = asyncio.run(
-        DemoLLMClient(dataset_path, exact_mode=False).answer_question(messages)
-    )
+    result = asyncio.run(DemoLLMClient(dataset_path).answer_question(messages))
 
     assert result.answer == 'Visit the coast.'
     assert result.citations[0].page_start == 4
@@ -297,17 +289,13 @@ def test_demo_provider_accepts_a_question_within_the_distance_margin(tmp_path) -
 
 def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> None:
     """Verify that a somewhat similar question gets a targeted suggestion."""
-    dataset_path = tmp_path / 'golden.jsonl'
+    dataset_path = tmp_path / 'demo.jsonl'
     dataset_path.write_text(
         json.dumps(
             {
-                'id': 1,
-                'category': 'Test',
                 'question': 'What can I do in Brittany?',
-                'expected': {
-                    'answerable': True,
-                    'reference_answer': 'Visit the coast.',
-                },
+                'answer': 'Visit the coast.',
+                'source': None,
             }
         )
         + '\n',
@@ -315,7 +303,7 @@ def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> 
     )
 
     result = asyncio.run(
-        DemoLLMClient(dataset_path, exact_mode=False).answer_question(
+        DemoLLMClient(dataset_path).answer_question(
             [
                 {
                     'role': Role.USER,
@@ -331,19 +319,16 @@ def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> 
 
 
 def test_demo_provider_uses_the_bundled_dataset_without_an_api_key(tmp_path) -> None:
-    """Verify that the no-cost demo ignores fixture-only configuration."""
-    fixture_dataset_path = tmp_path / 'fixture-dataset.jsonl'
+    """Verify that the no-cost demo uses its bundled dataset by default."""
     client = create_llm_client(
         AgentsSettings(
             llm_provider=LLMProvider.BAGUETTE_LLM,
             model='mini-croissant-1.0',
-            fixture_dataset_path=fixture_dataset_path,
         )
     )
 
     assert isinstance(client, DemoLLMClient)
-    assert not client.exact_mode
-    assert client.dataset_path == DEFAULT_BAGUETTE_LLM_DATASET_PATH
+    assert client.dataset_path == DEFAULT_DEMO_DATASET_PATH
 
 
 @pytest.mark.parametrize(

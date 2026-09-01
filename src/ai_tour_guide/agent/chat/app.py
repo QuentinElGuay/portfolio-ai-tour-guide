@@ -17,8 +17,8 @@ from ai_tour_guide.agent.chat.backends import (
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
 from ai_tour_guide.agent.demo_questions import (
-    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
-    load_answerable_questions,
+    DEFAULT_DEMO_DATASET_PATH,
+    load_demo_questions,
 )
 from ai_tour_guide.agent.source_formatting import format_pages
 
@@ -250,15 +250,9 @@ async def submit_feedback(
 def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
-    exact_mode = os.getenv('AGENT_EXACT_MODE', 'false').lower() in {
-        '1',
-        'true',
-        'yes',
-        'on',
-    }
     welcome_message = WELCOME_MESSAGE
     welcome_suggestions = WELCOME_SUGGESTIONS
-    if not exact_mode:
+    if isinstance(selected_backend, DemoBackend):
         welcome_message = DEMO_WELCOME_MESSAGE
         welcome_suggestions = build_demo_welcome_suggestions()
 
@@ -374,7 +368,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
 
 def build_demo_welcome_suggestions() -> str:
     """Build random suggestions from the demo's answerable questions."""
-    questions = load_answerable_questions(DEFAULT_BAGUETTE_LLM_DATASET_PATH)
+    questions = load_demo_questions(DEFAULT_DEMO_DATASET_PATH)
     suggestions = random.sample(questions, min(DEMO_SUGGESTION_COUNT, len(questions)))
     return '**You could ask:**\n\n' + '\n'.join(
         f'- {question}' for question in suggestions

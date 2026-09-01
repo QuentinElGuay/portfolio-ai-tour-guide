@@ -19,8 +19,8 @@ from ai_tour_guide.agent.chat.app import (
 from ai_tour_guide.agent.chat.backends import DemoBackend
 from ai_tour_guide.agent.chat.models import ChatHistoryItem
 from ai_tour_guide.agent.demo_questions import (
-    DEFAULT_BAGUETTE_LLM_DATASET_PATH,
-    load_answerable_questions,
+    DEFAULT_DEMO_DATASET_PATH,
+    load_demo_questions,
 )
 
 
@@ -88,8 +88,6 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
 
 def test_create_app_explains_demo_limitations(monkeypatch) -> None:
     """Verify that demo mode is disclosed in the initial welcome message."""
-    monkeypatch.setenv('AGENT_EXACT_MODE', 'false')
-
     app = create_app(DemoBackend())
     chatbot = next(
         component
@@ -101,7 +99,7 @@ def test_create_app_explains_demo_limitations(monkeypatch) -> None:
     assert welcome == DEMO_WELCOME_MESSAGE
     assert 'visit to Brittany' in welcome
     suggestions = chatbot.value[1]['content'][0]['text']
-    answerable_questions = load_answerable_questions(DEFAULT_BAGUETTE_LLM_DATASET_PATH)
+    answerable_questions = load_demo_questions(DEFAULT_DEMO_DATASET_PATH)
     suggested_questions = suggestions.splitlines()[2:]
     assert len(suggested_questions) == 3
     assert all(
