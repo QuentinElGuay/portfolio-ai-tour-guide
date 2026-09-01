@@ -12,6 +12,7 @@ K ?= 5
 JUDGE_PROVIDER ?= openai
 ANNOTATOR_ARGS ?=
 SIMULATE_ARGS ?=
+CHAT_GRAPH ?= docs/diagrams/chat-graph.mmd
 CORPUS_ROOT ?= fixtures/corpus
 EVALUATION ?= all
 DASHBOARD_BACKUP ?= fixtures/metabase/metabase.sql
@@ -28,7 +29,7 @@ DATABASE_UP = $(COMPOSE) $(COMPOSE_DEBUG_FLAG) up -d --wait database
 DB_SCHEMA = $(SCHEMA)
 export DB_SCHEMA
 
-.PHONY: airflow annotate-dataset app ask cli-chat dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
+.PHONY: airflow annotate-dataset app ask chat-graph cli-chat dashboard dashboard-export dashboard-init dashboard-restore db-init db-reset db-reset-schema db-validate-schema evaluate evaluate-all evaluate-judge evaluate-rag evaluate-search export-corpus export-csv help ingest load-corpus purge simulate-rag smoke-test stop text_search validate-dashboard-backup vector_search
 
 airflow: ## Start Airflow and its host-Docker ingestion orchestration.
 	@case "$(DOCKER_GID)" in *[!0-9]*|'') echo "Could not determine the Docker socket group ID from $(DOCKER_SOCKET)." >&2; exit 1;; esac
@@ -53,6 +54,9 @@ ask: ## Answer a QUESTION using retrieved context and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
 	$(COMPOSE) --profile agent run --rm -T agent \
 		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
+
+chat-graph: ## Export the chat workflow as Mermaid (CHAT_GRAPH=path/to/file.mmd).
+	uv run python tools/export_chat_graph.py --output "$(CHAT_GRAPH)"
 
 cli-chat: ## Start the interactive terminal chat after the agent is ready.
 	$(COMPOSE) --profile agent up -d --wait agent

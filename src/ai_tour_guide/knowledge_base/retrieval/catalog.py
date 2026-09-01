@@ -9,7 +9,7 @@ from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 def list_known_destination_titles(engine: Engine | None = None) -> tuple[str, ...]:
     """Return indexed guide titles in a stable order for the assistant catalog."""
-    statement = select(DocumentRow.title).order_by(DocumentRow.title)
+    statement = select(DocumentRow.destination).order_by(DocumentRow.destination)
 
     with database_engine(engine) as db_engine, Session(db_engine) as session:
         return tuple(session.scalars(statement).all())

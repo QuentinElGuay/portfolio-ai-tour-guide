@@ -2,7 +2,6 @@ import asyncio
 import base64
 import logging
 import os
-import random
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,15 +9,16 @@ from pathlib import Path
 import gradio as gr
 
 from ai_tour_guide.agent.chat.backends import (
+    STARTER_QUESTIONS,
     ChatBackend,
     DemoBackend,
     HttpChatBackend,
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
-from ai_tour_guide.agent.demo_questions import (
-    DEFAULT_DEMO_DATASET_PATH,
-    load_demo_questions,
+from ai_tour_guide.agent.identity import (
+    BACK_TO_MAIN_MENU_QUESTION,
+    IDENTITY_QUESTIONS,
 )
 from ai_tour_guide.agent.source_formatting import format_pages
 
@@ -27,17 +27,24 @@ logger = logging.getLogger(__name__)
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
 EMOTICONS_ENABLED = False
 
-# Welcome messages and suggested questions shown when a chat session starts.
+# Welcome messages and starter questions shown when a chat session starts.
 WELCOME_MESSAGE = (
     '_Salut!_ I’m **Petit Guide**, your AI travel companion from **Baguette Voyages**. '
-    'How can I help you plan your visit to France?'
+    'Select a suggested question or ask directly about our destinations to prepare your trip to France.'
 )
-WELCOME_SUGGESTIONS = (
-    '**You could ask:**\n\n'
-    '- Which destinations do you cover?\n'
-    '- What are the main places to visit in Normandy?\n'
-    '- What should I see in Occitanie?'
-)
+
+
+def suggested_options(question: str) -> tuple[str, ...]:
+    """Return the next identity prompts, or restore the main menu."""
+    if question in IDENTITY_QUESTIONS:
+        return tuple(item for item in IDENTITY_QUESTIONS if item != question) + (
+            BACK_TO_MAIN_MENU_QUESTION,
+        )
+    if question == BACK_TO_MAIN_MENU_QUESTION:
+        return STARTER_QUESTIONS
+    return ()
+
+
 DEMO_WELCOME_NOTICE = (
     '\n\n> **Demo mode:** This is a limited experience with prepared Brittany questions. '
     'It accepts modest spelling and punctuation variations.'
@@ -45,7 +52,6 @@ DEMO_WELCOME_NOTICE = (
 DEMO_WELCOME_MESSAGE = (
     WELCOME_MESSAGE.replace('France', 'Brittany') + DEMO_WELCOME_NOTICE
 )
-DEMO_SUGGESTION_COUNT = 3
 AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
     Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
@@ -251,16 +257,14 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
     welcome_message = WELCOME_MESSAGE
-    welcome_suggestions = WELCOME_SUGGESTIONS
     if isinstance(selected_backend, DemoBackend):
         welcome_message = DEMO_WELCOME_MESSAGE
-        welcome_suggestions = build_demo_welcome_suggestions()
 
     async def respond(
         message: str,
         history: list[ChatHistoryItem],
         request_ids: dict[int, str],
-    ) -> tuple[str, dict[int, str]]:
+    ) -> tuple[str | dict[str, object], dict[int, str]]:
         logger.info('chat question received: question=%r', message)
         messages = normalize_history(history)
         messages.append({'role': Role.USER, 'content': message})
@@ -282,8 +286,14 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
 
         updated_request_ids = dict(request_ids)
         updated_request_ids[assistant_message_index] = request_id
+        options = suggested_options(message)
         return (
-            reply,
+            {
+                'content': reply,
+                'options': [{'label': item, 'value': item} for item in options],
+            }
+            if options
+            else reply,
             updated_request_ids,
         )
 
@@ -332,8 +342,14 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             feedback_value=[],
             height='calc(100vh - 250px)',
             value=[
-                {'role': 'assistant', 'content': welcome_message},
-                {'role': 'assistant', 'content': welcome_suggestions},
+                {
+                    'role': 'assistant',
+                    'content': welcome_message,
+                    'options': [
+                        {'label': question, 'value': question}
+                        for question in STARTER_QUESTIONS
+                    ],
+                },
             ],
             placeholder=(
                 '<h2>Prepare your trip to France with Petit Guide</h2>'
@@ -364,15 +380,6 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         )
 
     return app
-
-
-def build_demo_welcome_suggestions() -> str:
-    """Build random suggestions from the demo's answerable questions."""
-    questions = load_demo_questions(DEFAULT_DEMO_DATASET_PATH)
-    suggestions = random.sample(questions, min(DEMO_SUGGESTION_COUNT, len(questions)))
-    return '**You could ask:**\n\n' + '\n'.join(
-        f'- {question}' for question in suggestions
-    )
 
 
 def _render_response(payload: dict[str, object]) -> str:

@@ -176,6 +176,7 @@ documents = Table(
     Column('collection', Text),
     Column('version', Text),
     Column('title', Text, nullable=False),
+    Column('destination', Text, nullable=False),
     Column('source_url', Text, nullable=False),
     Column('publisher', Text),
     Column('publication_date', Date),

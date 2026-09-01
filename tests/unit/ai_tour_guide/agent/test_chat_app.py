@@ -8,6 +8,7 @@ from ai_tour_guide.agent.chat.app import (
     DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
+    STARTER_QUESTIONS,
     _italicize_french_expressions,
     _render_response,
     create_app,
@@ -18,10 +19,6 @@ from ai_tour_guide.agent.chat.app import (
 )
 from ai_tour_guide.agent.chat.backends import DemoBackend
 from ai_tour_guide.agent.chat.models import ChatHistoryItem
-from ai_tour_guide.agent.demo_questions import (
-    DEFAULT_DEMO_DATASET_PATH,
-    load_demo_questions,
-)
 
 
 def _like_data(index: object, liked: object) -> gr.LikeData:
@@ -46,7 +43,7 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     assert chatbot.height == 'calc(100vh - 250px)'
     assert chatbot.value[0]['role'] == 'assistant'
     assert chatbot.value[0]['content'][0]['text'] == DEMO_WELCOME_MESSAGE
-    assert chatbot.value[1]['content'][0]['text'].startswith('**You could ask:**')
+    assert len(chatbot.value) == 1
     avatar_images = chatbot.avatar_images
     assert avatar_images is not None
     user_avatar = avatar_images[0]
@@ -86,7 +83,7 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     )
 
 
-def test_create_app_explains_demo_limitations(monkeypatch) -> None:
+def test_create_app_explains_demo_limitations() -> None:
     """Verify that demo mode is disclosed in the initial welcome message."""
     app = create_app(DemoBackend())
     chatbot = next(
@@ -97,15 +94,10 @@ def test_create_app_explains_demo_limitations(monkeypatch) -> None:
 
     welcome = chatbot.value[0]['content'][0]['text']
     assert welcome == DEMO_WELCOME_MESSAGE
-    assert 'visit to Brittany' in welcome
-    suggestions = chatbot.value[1]['content'][0]['text']
-    answerable_questions = load_demo_questions(DEFAULT_DEMO_DATASET_PATH)
-    suggested_questions = suggestions.splitlines()[2:]
-    assert len(suggested_questions) == 3
-    assert all(
-        question.removeprefix('- ') in answerable_questions
-        for question in suggested_questions
-    )
+    assert 'trip to Brittany' in welcome
+    assert chatbot.value[0]['options'] == [
+        {'label': question, 'value': question} for question in STARTER_QUESTIONS
+    ]
 
 
 def test_placeholder_request_ids_are_unique_per_assistant_message() -> None:

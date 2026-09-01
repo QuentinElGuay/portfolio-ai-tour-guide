@@ -29,9 +29,10 @@ def build_conversation_graph(
     checkpointer: MemorySaver,
     on_result: Callable[[RAGResult], None],
 ):
-    """Build a session-memory graph that invokes the RAG graph as a sub-graph."""
+    """Build the checkpointed graph used to answer one conversation turn."""
 
     async def answer_with_rag(state: ConversationState) -> dict[str, object]:
+        """Resolve the current turn, run RAG, and append the assistant answer."""
         question = _resolve_question(state['messages'])
         result = await answer_question_async(
             question,
@@ -50,6 +51,7 @@ def build_conversation_graph(
 
 
 def _resolve_question(messages: list[BaseMessage]) -> str:
+    """Return the latest question, adding the prior question for follow-ups."""
     questions = (
         message.content
         for message in reversed(messages)
@@ -68,6 +70,7 @@ def _resolve_question(messages: list[BaseMessage]) -> str:
 
 
 def _is_follow_up(question: str) -> bool:
+    """Return whether a question contains a pronoun suggesting prior context."""
     words = set(question.casefold().replace('?', ' ').split())
     return bool(words & {'there', 'it', 'that', 'this', 'they', 'them', 'those'})
 

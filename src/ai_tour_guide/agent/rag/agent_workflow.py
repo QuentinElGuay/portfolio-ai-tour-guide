@@ -7,9 +7,15 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.chat.models import Message, Role
+from ai_tour_guide.agent.identity import IDENTITY_ANSWERS, PETIT_GUIDE_IDENTITY
 from ai_tour_guide.agent.llm.clients import AgentLLMClient
 from ai_tour_guide.agent.rag.models import GeneratedAnswer
-from ai_tour_guide.agent.rag.prompting import build_messages
+from ai_tour_guide.agent.rag.prompting import (
+    build_catalog_messages,
+    build_messages,
+    is_destination_catalog_question,
+)
+from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE
@@ -27,6 +33,7 @@ class AgentState(TypedDict):
     messages: NotRequired[tuple[Message, ...]]
     generated: NotRequired[GeneratedAnswer]
     retrieval_error: NotRequired[Exception]
+    identity_answer: NotRequired[str]
 
 
 def build_agent_graph(
@@ -44,6 +51,15 @@ def build_agent_graph(
             has_context=bool(state['contexts']),
         )
         return {'next_query': query}
+
+    def identify(state: AgentState) -> dict[str, object]:
+        return {'identity_answer': IDENTITY_ANSWERS.get(state['question'], '')}
+
+    def route_identity(state: AgentState) -> Literal['identity', 'decide']:
+        return 'identity' if state['question'] in IDENTITY_ANSWERS else 'decide'
+
+    def answer_identity(state: AgentState) -> dict[str, object]:
+        return {'generated': GeneratedAnswer(state['identity_answer'])}
 
     def route_after_decision(
         state: AgentState,
@@ -94,11 +110,15 @@ def build_agent_graph(
         return {}
 
     graph = StateGraph(AgentState)
+    graph.add_node('identify', identify)
+    graph.add_node('identity', answer_identity)
     graph.add_node('decide', decide)
     graph.add_node('search', search)
     graph.add_node('generate', generate)
     graph.add_node('insufficient', insufficient)
-    graph.add_edge(START, 'decide')
+    graph.add_edge(START, 'identify')
+    graph.add_conditional_edges('identify', route_identity)
+    graph.add_edge('identity', END)
     graph.add_conditional_edges('decide', route_after_decision)
     graph.add_conditional_edges('search', route_after_search)
     graph.add_edge('generate', END)
@@ -117,6 +137,18 @@ async def run_agent_workflow(
     strategy: SearchStrategy | None = None,
 ) -> AgentState:
     """Run the bounded graph and return its complete execution state."""
+    if is_destination_catalog_question(question):
+        titles = list_known_destination_titles(engine)
+        messages = build_catalog_messages(question, titles)
+        return {
+            'question': question,
+            'queries': [],
+            'contexts': (),
+            'next_query': None,
+            'messages': messages,
+            'generated': await llm_client.answer_question(messages),
+        }
+
     graph = build_agent_graph(llm_client, engine=engine, strategy=strategy)
     return cast(
         AgentState,
@@ -131,10 +163,11 @@ def _build_meta_messages(question: str) -> tuple[Message, ...]:
         Message(
             role=Role.SYSTEM,
             content=(
-                'You are Baguette Voyages’ assistant. Answer only conversational or '
-                'meta questions about the assistant and its capabilities. Do not answer '
-                'tourism facts without retrieved source context. Return structured JSON '
-                'with `answer`, `citations`, and `emotion`; citations must be empty.'
+                f'{PETIT_GUIDE_IDENTITY} Answer '
+                'only conversational or meta questions about the assistant and its '
+                'capabilities. Do not answer tourism facts without retrieved source '
+                'context. Return structured JSON with `answer`, `citations`, and '
+                '`emotion`; citations must be empty.'
             ),
         ),
         Message(role=Role.USER, content=question),

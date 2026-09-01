@@ -1,0 +1,28 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	identify(identify)
+	identity(identity)
+	decide(decide)
+	search(search)
+	generate(generate)
+	insufficient(insufficient)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> identify;
+	decide -.-> generate;
+	decide -.-> insufficient;
+	decide -.-> search;
+	identify -.-> decide;
+	identify -.-> identity;
+	search -.-> decide;
+	search -.-> insufficient;
+	generate --> __end__;
+	identity --> __end__;
+	insufficient --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

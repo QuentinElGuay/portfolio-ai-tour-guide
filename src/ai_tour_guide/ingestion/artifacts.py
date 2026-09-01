@@ -43,6 +43,7 @@ def _validate_envelope(data: Mapping[str, Any], *, artifact_type: str) -> None:
 def _ingestion_document_to_dict(document: IngestionDocument) -> dict[str, Any]:
     return {
         'title': document.title,
+        'destination': document.destination,
         'source_url': document.source_url,
         'source_path': str(document.source_path) if document.source_path else None,
         'collection': document.collection,
@@ -196,6 +197,7 @@ def _document_record_from_dict(data: Mapping[str, Any]) -> DocumentRecord:
             _require_mapping(data.get('metadata'), field_name='metadata')
         ),
         source_checksum=str(data['source_checksum']),
+        destination=str(data.get('destination', '')),
         collection=data.get('collection'),
         version=data.get('version'),
     )

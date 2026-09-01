@@ -52,6 +52,7 @@ class DocumentRow(Base):
     collection: Mapped[str | None]
     version: Mapped[str | None]
     title: Mapped[str]
+    destination: Mapped[str]
     source_url: Mapped[str]
     publisher: Mapped[str | None]
     publication_date: Mapped[date | None]
@@ -134,6 +135,7 @@ class ModelFactory:
             collection=document.collection,
             version=document.version,
             title=metadata.title,
+            destination=document.destination,
             source_url=metadata.source_url,
             publisher=metadata.publisher,
             publication_date=metadata.publication_date,

@@ -44,5 +44,6 @@ class DocumentRecord:
 
     metadata: DocumentMetadata
     source_checksum: str
+    destination: str
     collection: str | None = None
     version: str | None = None

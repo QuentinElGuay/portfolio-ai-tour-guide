@@ -50,6 +50,15 @@ def initialize_database(
             schema_translate_map={None: schema_name}
         )
         public_metadata.create_all(bind=schema_connection, checkfirst=True)
+        connection.execute(
+            text('ALTER TABLE documents ADD COLUMN IF NOT EXISTS destination TEXT')
+        )
+        connection.execute(
+            text('UPDATE documents SET destination = title WHERE destination IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE documents ALTER COLUMN destination SET NOT NULL')
+        )
         _migrate_llm_usage_events(connection)
         for table in public_metadata.tables.values():
             for index in table.indexes:

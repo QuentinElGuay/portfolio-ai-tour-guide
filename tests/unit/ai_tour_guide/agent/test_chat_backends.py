@@ -1,8 +1,13 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from ai_tour_guide.agent.chat.backends import DemoBackend, HttpChatBackend
-from ai_tour_guide.agent.chat.models import Message, Role
+from ai_tour_guide.agent.chat.backends import (
+    DESTINATION_CATALOG_QUESTION,
+    TELL_ME_ABOUT_YOU_QUESTION,
+    DemoBackend,
+    HttpChatBackend,
+)
+from ai_tour_guide.agent.chat.models import Emotion, Message, Role
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 
@@ -12,6 +17,27 @@ def test_demo_backend_returns_structured_fallback() -> None:
     assert result['answer'] == NO_BACKEND_AVAILABLE_ANSWER
     assert result['sources'] == []
     assert result['emotion'] == 'neutral'
+
+
+def test_demo_backend_answers_starter_questions() -> None:
+    """Verify that starter questions have deterministic demo answers."""
+    backend = DemoBackend()
+
+    identity = asyncio.run(
+        backend.ask([{'role': Role.USER, 'content': TELL_ME_ABOUT_YOU_QUESTION}])
+    )
+    destinations = asyncio.run(
+        backend.ask([{'role': Role.USER, 'content': DESTINATION_CATALOG_QUESTION}])
+    )
+
+    assert 'Petit Guide' in identity['answer']
+    assert 'Baguette Voyages' in identity['answer']
+    assert (
+        destinations['answer']
+        == 'This demo covers a handful of questions about the beautiful region of Brittany.'
+    )
+    assert identity['sources'] == destinations['sources'] == []
+    assert identity['emotion'] == destinations['emotion'] == Emotion.NEUTRAL.value
 
 
 def test_demo_backend_feedback_is_a_noop() -> None:

@@ -42,6 +42,17 @@ details from the catalog alone. For every other question, use only retrieved con
 if none is supplied, return the insufficient-context response.
 """
 
+CATALOG_SYSTEM_PROMPT = """You are Baguette Voyages' concise, reliable travel
+assistant. Answer the user's question using only this current catalog of indexed
+destination guides:
+
+{known_destinations}
+
+List the available destinations without adding destination details. Do not cite sources.
+Return the answer as structured JSON with an `answer`, `citations`, and `emotion` field.
+Choose exactly one emotion: `happy`, `disappointed`, `confused`, or `neutral`.
+"""
+
 CATALOG_SUBJECT_PATTERN = re.compile(
     r'\b(?:destination|destinations|region|regions|guide|guides|area|areas)\b',
     re.IGNORECASE,
@@ -65,6 +76,22 @@ def build_system_prompt(known_destination_titles: Sequence[str]) -> str:
     catalog = '\n'.join(f'- {title}' for title in known_destination_titles)
     return SYSTEM_PROMPT.format(
         known_destinations=catalog or '- No destinations are currently indexed.'
+    )
+
+
+def build_catalog_messages(
+    question: str, known_destination_titles: Sequence[str]
+) -> tuple[Message, ...]:
+    """Build messages that answer a catalog-only question without retrieval."""
+    catalog = '\n'.join(f'- {title}' for title in known_destination_titles)
+    return (
+        Message(
+            role=Role.SYSTEM,
+            content=CATALOG_SYSTEM_PROMPT.format(
+                known_destinations=catalog or '- No destinations are currently indexed.'
+            ),
+        ),
+        Message(role=Role.USER, content=question),
     )
 
 
@@ -109,7 +136,9 @@ def build_messages(
 
 
 __all__ = [
+    'CATALOG_SYSTEM_PROMPT',
     'SYSTEM_PROMPT',
+    'build_catalog_messages',
     'build_llm_context',
     'build_messages',
     'build_system_prompt',

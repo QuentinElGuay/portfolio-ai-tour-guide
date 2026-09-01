@@ -5,7 +5,10 @@ from uuid import UUID
 import pytest
 
 from ai_tour_guide.agent.chat.models import Role
-from ai_tour_guide.agent.rag.agent_workflow import build_agent_graph
+from ai_tour_guide.agent.rag.agent_workflow import (
+    _build_meta_messages,
+    build_agent_graph,
+)
 from ai_tour_guide.agent.rag.models import (
     CitationValidationResult,
     GeneratedAnswer,
@@ -128,33 +131,41 @@ def test_answer_question_handles_empty_retrieval(
     retrieve_context.assert_called_once()
 
 
-@patch('ai_tour_guide.agent.rag.pipeline.validate_citations')
+@patch('ai_tour_guide.agent.rag.agent_workflow.list_known_destination_titles')
 @patch('ai_tour_guide.agent.rag.agent_workflow.retrieve_context')
-def test_answer_question_retrieves_context_for_destination_questions(
+def test_answer_question_reads_destination_catalog_without_rag(
     retrieve_context: MagicMock,
-    validate_citations: MagicMock,
+    list_known_destination_titles: MagicMock,
 ) -> None:
-    """Verify that factual destination questions use retrieved source context."""
-    context = MagicMock()
-    retrieve_context.return_value = (context,)
-    validate_citations.return_value = CitationValidationResult((), ())
+    """Verify that catalog questions read indexed titles without retrieval."""
+    list_known_destination_titles.return_value = ('Guide to Normandy',)
     client = MagicMock()
-    client.choose_search_query = AsyncMock(
-        side_effect=('Which destinations do you cover?', None)
-    )
+    client.choose_search_query = AsyncMock()
     client.answer_question = AsyncMock(
         return_value=GeneratedAnswer('We cover Normandy.')
     )
 
     result = asyncio.run(
-        answer_question_async('Which destinations do you cover?', llm_client=client)
+        answer_question_async('What destinations are covered?', llm_client=client)
     )
 
-    retrieve_context.assert_called_once()
+    retrieve_context.assert_not_called()
+    list_known_destination_titles.assert_called_once_with(None)
+    client.choose_search_query.assert_not_awaited()
     client.answer_question.assert_awaited_once()
     assert result.answer == 'We cover Normandy.'
-    assert result.contexts == (context,)
+    assert result.contexts == ()
     assert result.sources == ()
+
+
+def test_meta_messages_describe_petit_guide_and_baguette_voyages() -> None:
+    """Verify that identity questions use the configured assistant context."""
+    prompt = _build_meta_messages('Who are you?')[0]['content']
+
+    assert 'Petit Guide' in prompt
+    assert 'Baguette Voyages' in prompt
+    assert 'DataTalks.club' in prompt
+    assert 'retrieval-augmented generation' in prompt
 
 
 def test_destination_catalog_detection_rejects_detailed_questions() -> None:

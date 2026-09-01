@@ -6,9 +6,21 @@ from uuid import uuid4
 import httpx
 
 from ai_tour_guide.agent.chat.models import Emotion, Message
+from ai_tour_guide.agent.identity import (
+    IDENTITY_ANSWERS,
+    TELL_ME_ABOUT_YOU_QUESTION,
+)
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
+DESTINATION_CATALOG_QUESTION = 'What destinations are covered?'
+STARTER_QUESTIONS = (TELL_ME_ABOUT_YOU_QUESTION, DESTINATION_CATALOG_QUESTION)
+DEMO_STARTER_ANSWERS = {
+    **IDENTITY_ANSWERS,
+    DESTINATION_CATALOG_QUESTION: (
+        'This demo covers a handful of questions about the beautiful region of Brittany.'
+    ),
+}
 
 
 def create_backend() -> ChatBackend:
@@ -55,10 +67,20 @@ class DemoBackend(ChatBackend):
     """Development fallback with the same payload contract as the API."""
 
     async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+        question = next(
+            (
+                message['content']
+                for message in reversed(messages)
+                if message['role'] == 'user'
+            ),
+            '',
+        )
         return self.validate_response(
             {
                 'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
-                'answer': NO_BACKEND_AVAILABLE_ANSWER,
+                'answer': DEMO_STARTER_ANSWERS.get(
+                    question, NO_BACKEND_AVAILABLE_ANSWER
+                ),
                 'sources': [],
                 'emotion': Emotion.NEUTRAL.value,
             }
