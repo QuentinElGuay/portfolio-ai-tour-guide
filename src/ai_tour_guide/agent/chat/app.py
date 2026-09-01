@@ -16,10 +16,7 @@ from ai_tour_guide.agent.chat.backends import (
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
-from ai_tour_guide.agent.identity import (
-    BACK_TO_MAIN_MENU_QUESTION,
-    IDENTITY_QUESTIONS,
-)
+from ai_tour_guide.agent.chat.navigation import options_for_question
 from ai_tour_guide.agent.source_formatting import format_pages
 
 logger = logging.getLogger(__name__)
@@ -32,17 +29,6 @@ WELCOME_MESSAGE = (
     '_Salut!_ I’m **Petit Guide**, your AI travel companion from **Baguette Voyages**. '
     'Select a suggested question or ask directly about our destinations to prepare your trip to France.'
 )
-
-
-def suggested_options(question: str) -> tuple[str, ...]:
-    """Return the next identity prompts, or restore the main menu."""
-    if question in IDENTITY_QUESTIONS:
-        return tuple(item for item in IDENTITY_QUESTIONS if item != question) + (
-            BACK_TO_MAIN_MENU_QUESTION,
-        )
-    if question == BACK_TO_MAIN_MENU_QUESTION:
-        return STARTER_QUESTIONS
-    return ()
 
 
 DEMO_WELCOME_NOTICE = (
@@ -286,11 +272,14 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
 
         updated_request_ids = dict(request_ids)
         updated_request_ids[assistant_message_index] = request_id
-        options = suggested_options(message)
+        options = options_for_question(message)
         return (
             {
                 'content': reply,
-                'options': [{'label': item, 'value': item} for item in options],
+                'options': [
+                    {'label': option.label, 'value': option.question}
+                    for option in options
+                ],
             }
             if options
             else reply,

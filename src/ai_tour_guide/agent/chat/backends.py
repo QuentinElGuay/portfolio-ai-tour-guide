@@ -6,15 +6,16 @@ from uuid import uuid4
 import httpx
 
 from ai_tour_guide.agent.chat.models import Emotion, Message
-from ai_tour_guide.agent.identity import (
-    IDENTITY_ANSWERS,
-    TELL_ME_ABOUT_YOU_QUESTION,
+from ai_tour_guide.agent.chat.navigation import (
+    DESTINATION_CATALOG_QUESTION,
+    MAIN_MENU,
+    OPTIONS,
 )
+from ai_tour_guide.agent.identity import IDENTITY_ANSWERS
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
-DESTINATION_CATALOG_QUESTION = 'What destinations are covered?'
-STARTER_QUESTIONS = (TELL_ME_ABOUT_YOU_QUESTION, DESTINATION_CATALOG_QUESTION)
+STARTER_QUESTIONS = tuple(OPTIONS[option_id].question for option_id in MAIN_MENU)
 DEMO_STARTER_ANSWERS = {
     **IDENTITY_ANSWERS,
     DESTINATION_CATALOG_QUESTION: (

@@ -59,7 +59,7 @@ def build_agent_graph(
         return 'identity' if state['question'] in IDENTITY_ANSWERS else 'decide'
 
     def answer_identity(state: AgentState) -> dict[str, object]:
-        return {'generated': GeneratedAnswer(state['identity_answer'])}
+        return {'generated': GeneratedAnswer(state.get('identity_answer', ''))}
 
     def route_after_decision(
         state: AgentState,
