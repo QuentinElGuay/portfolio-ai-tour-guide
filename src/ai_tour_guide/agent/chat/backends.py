@@ -10,8 +10,13 @@ from ai_tour_guide.agent.chat.navigation import (
     DESTINATION_CATALOG_QUESTION,
     MAIN_MENU,
     OPTIONS,
+    normalize_option_id,
+    question_for_option_id,
 )
-from ai_tour_guide.agent.identity import IDENTITY_ANSWERS
+from ai_tour_guide.agent.identity import (  # noqa: F401
+    IDENTITY_ANSWERS,
+    TELL_ME_ABOUT_YOU_QUESTION,
+)
 from ai_tour_guide.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 
 SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION = 1
@@ -35,7 +40,9 @@ class ChatBackend(ABC):
     """Backend contract with shared validation for API-shaped responses."""
 
     @abstractmethod
-    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+    async def ask(
+        self, messages: Sequence[Message], *, option_id: str | None = None
+    ) -> dict[str, object]:
         """Return a validated answer payload."""
 
     @abstractmethod
@@ -67,7 +74,9 @@ class ChatBackend(ABC):
 class DemoBackend(ChatBackend):
     """Development fallback with the same payload contract as the API."""
 
-    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+    async def ask(
+        self, messages: Sequence[Message], *, option_id: str | None = None
+    ) -> dict[str, object]:
         question = next(
             (
                 message['content']
@@ -76,6 +85,8 @@ class DemoBackend(ChatBackend):
             ),
             '',
         )
+        if option_id is not None:
+            question = question_for_option_id(option_id) or question
         return self.validate_response(
             {
                 'schema_version': SUPPORTED_ASK_RESPONSE_SCHEMA_VERSION,
@@ -119,7 +130,9 @@ class HttpChatBackend(ChatBackend):
         except httpx.HTTPError as exc:
             raise RuntimeError('Unable to reach the chat API health check.') from exc
 
-    async def ask(self, messages: Sequence[Message]) -> dict[str, object]:
+    async def ask(
+        self, messages: Sequence[Message], *, option_id: str | None = None
+    ) -> dict[str, object]:
         question = next(
             (
                 message['content']
@@ -128,13 +141,20 @@ class HttpChatBackend(ChatBackend):
             ),
             '',
         )
+        selected_option_id = normalize_option_id(option_id)
+        if selected_option_id is not None:
+            question = question_for_option_id(selected_option_id) or question
         if not question.strip():
             raise RuntimeError('The conversation does not contain a user question.')
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     self.api_url,
-                    json={'question': question, 'session_id': self.session_id},
+                    json={
+                        'question': question,
+                        'option_id': selected_option_id,
+                        'session_id': self.session_id,
+                    },
                 )
                 response.raise_for_status()
         except httpx.ConnectError as exc:

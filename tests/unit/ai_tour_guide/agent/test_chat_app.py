@@ -8,7 +8,6 @@ from ai_tour_guide.agent.chat.app import (
     DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
-    STARTER_QUESTIONS,
     _italicize_french_expressions,
     _render_response,
     create_app,
@@ -95,8 +94,9 @@ def test_create_app_explains_demo_limitations() -> None:
     welcome = chatbot.value[0]['content'][0]['text']
     assert welcome == DEMO_WELCOME_MESSAGE
     assert 'trip to Brittany' in welcome
-    assert chatbot.value[0]['options'] == [
-        {'label': question, 'value': question} for question in STARTER_QUESTIONS
+    assert [option['value'] for option in chatbot.value[0]['options']] == [
+        'Tell me about you.',
+        'What destinations are covered?',
     ]
 
 

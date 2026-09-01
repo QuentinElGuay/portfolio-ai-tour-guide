@@ -33,6 +33,7 @@ class AskRequest(BaseModel):
     """Question submitted to the tour-guide agent."""
 
     question: str
+    option_id: str | None = None
     session_id: str = Field(default_factory=lambda: str(uuid4()))
 
     @field_validator('question')
@@ -77,6 +78,7 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[SourceResponse]
     emotion: Emotion = Emotion.NEUTRAL
+    next_option_ids: list[str] = []
 
 
 class FeedbackRequest(BaseModel):
@@ -149,7 +151,9 @@ def _ensure_knowledge_base_ready() -> None:
     _last_health_failure = None
 
 
-async def _answer_question(question: str, session_id: str) -> RAGResult:
+async def _answer_question(
+    question: str, session_id: str, option_id: str | None = None
+) -> RAGResult:
     """Run the session-scoped conversation graph."""
     client = create_llm_client(AgentsSettings())
     if client is None:
@@ -166,6 +170,7 @@ async def _answer_question(question: str, session_id: str) -> RAGResult:
         strategy=None,
         checkpointer=_conversation_checkpointer,
         on_result=retain_result,
+        option_id=option_id,
     )
     conversation_input = ConversationState(
         messages=[HumanMessage(content=question)],
@@ -189,7 +194,9 @@ async def health() -> dict[str, str]:
 @app.post('/ask', response_model=AskResponse)
 async def ask(request: AskRequest) -> AskResponse:
     """Answer a question using the configured knowledge base and LLM."""
-    result = await _answer_question(request.question, request.session_id)
+    result = await _answer_question(
+        request.question, request.session_id, request.option_id
+    )
     try:
         store_rag_result(result.request_id, result.to_dict())
     except SQLAlchemyError as exc:
@@ -204,6 +211,7 @@ async def ask(request: AskRequest) -> AskResponse:
         answer=result.answer,
         sources=sources,
         emotion=result.generated.emotion,
+        next_option_ids=list(result.retrieval_metadata.get('next_option_ids', ())),
     )
 
 

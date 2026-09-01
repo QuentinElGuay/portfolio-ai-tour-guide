@@ -9,25 +9,33 @@ from pathlib import Path
 import gradio as gr
 
 from ai_tour_guide.agent.chat.backends import (
-    STARTER_QUESTIONS,
+    STARTER_QUESTIONS as _STARTER_QUESTIONS,
+)
+from ai_tour_guide.agent.chat.backends import (
     ChatBackend,
     DemoBackend,
     HttpChatBackend,
     create_backend,
 )
 from ai_tour_guide.agent.chat.models import ChatHistoryItem, Emotion, Message, Role
-from ai_tour_guide.agent.chat.navigation import options_for_question
+from ai_tour_guide.agent.chat.navigation import (
+    option_id_for_question,
+    options_for_ids,
+)
 from ai_tour_guide.agent.source_formatting import format_pages
 
 logger = logging.getLogger(__name__)
+
+# Backward-compatible import for callers that used the old app-level symbol.
+STARTER_QUESTIONS = _STARTER_QUESTIONS
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
 EMOTICONS_ENABLED = False
 
 # Welcome messages and starter questions shown when a chat session starts.
 WELCOME_MESSAGE = (
-    '_Salut!_ I’m **Petit Guide**, your AI travel companion from **Baguette Voyages**. '
-    'Select a suggested question or ask directly about our destinations to prepare your trip to France.'
+    '_Salut_! I’m **Petit Guide**. How can I help you prepare your trip to France? '
+    'Select a suggested question or ask about our destinations at any time.'
 )
 
 
@@ -252,12 +260,15 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         request_ids: dict[int, str],
     ) -> tuple[str | dict[str, object], dict[int, str]]:
         logger.info('chat question received: question=%r', message)
+        option_id = option_id_for_question(message)
+        display_question = message
         messages = normalize_history(history)
-        messages.append({'role': Role.USER, 'content': message})
+        messages.append({'role': Role.USER, 'content': display_question})
         assistant_message_index = len(history) + 1
 
+        payload: dict[str, object] = {}
         try:
-            payload = await selected_backend.ask(messages)
+            payload = await selected_backend.ask(messages, option_id=option_id)
             reply = _render_response(payload)
         except RuntimeError as exc:
             reply = f'**Backend error:** {exc}'
@@ -272,7 +283,10 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
 
         updated_request_ids = dict(request_ids)
         updated_request_ids[assistant_message_index] = request_id
-        options = options_for_question(message)
+        option_ids = payload.get('next_option_ids', [])
+        options = (
+            options_for_ids(tuple(option_ids)) if isinstance(option_ids, list) else ()
+        )
         return (
             {
                 'content': reply,
@@ -335,8 +349,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                     'role': 'assistant',
                     'content': welcome_message,
                     'options': [
-                        {'label': question, 'value': question}
-                        for question in STARTER_QUESTIONS
+                        {'label': option.label, 'value': option.question}
+                        for option in options_for_ids(('identity', 'destinations'))
                     ],
                 },
             ],

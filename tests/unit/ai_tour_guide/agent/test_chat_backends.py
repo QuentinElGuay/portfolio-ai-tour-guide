@@ -66,6 +66,32 @@ def test_http_backend_returns_validated_api_payload(async_client: MagicMock) -> 
 
 
 @patch('ai_tour_guide.agent.chat.backends.httpx.AsyncClient')
+def test_http_backend_normalizes_free_text_option_id(async_client: MagicMock) -> None:
+    """Free text is sent without a guided option identity."""
+    response = MagicMock()
+    response.json.return_value = {
+        'schema_version': 1,
+        'answer': 'Visit.',
+        'sources': [],
+        'emotion': 'neutral',
+    }
+    client = AsyncMock()
+    client.post.return_value = response
+    async_client.return_value.__aenter__.return_value = client
+    messages: list[Message] = [{'role': Role.USER, 'content': 'What should I visit?'}]
+
+    asyncio.run(
+        HttpChatBackend('http://agent/ask').ask(
+            messages, option_id='What should I visit?'
+        )
+    )
+
+    payload = client.post.await_args.kwargs['json']
+    assert payload['question'] == 'What should I visit?'
+    assert payload['option_id'] is None
+
+
+@patch('ai_tour_guide.agent.chat.backends.httpx.AsyncClient')
 def test_http_backend_submits_feedback(async_client: MagicMock) -> None:
     """Verify that http backend submits feedback."""
     response = MagicMock()

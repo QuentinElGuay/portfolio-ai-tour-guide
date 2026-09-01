@@ -7,6 +7,17 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.agent.chat.models import Message, Role
+from ai_tour_guide.agent.chat.navigation import (
+    next_option_ids,
+    normalize_option_id,
+    question_for_option_id,
+)
+from ai_tour_guide.agent.flow import (
+    DEFAULT_FLOW_STEP,
+    FlowStep,
+    flow_step_for_option,
+    input_type_for_option,
+)
 from ai_tour_guide.agent.identity import IDENTITY_ANSWERS, PETIT_GUIDE_IDENTITY
 from ai_tour_guide.agent.llm.clients import AgentLLMClient
 from ai_tour_guide.agent.rag.models import GeneratedAnswer
@@ -27,6 +38,9 @@ SEARCH_K = 5
 
 class AgentState(TypedDict):
     question: str
+    option_id: str | None
+    flow_step: str
+    input_type: str
     queries: list[str]
     contexts: tuple[RetrievedContext, ...]
     next_query: str | None
@@ -34,6 +48,7 @@ class AgentState(TypedDict):
     generated: NotRequired[GeneratedAnswer]
     retrieval_error: NotRequired[Exception]
     identity_answer: NotRequired[str]
+    next_option_ids: NotRequired[tuple[str, ...]]
 
 
 def build_agent_graph(
@@ -53,7 +68,18 @@ def build_agent_graph(
         return {'next_query': query}
 
     def identify(state: AgentState) -> dict[str, object]:
-        return {'identity_answer': IDENTITY_ANSWERS.get(state['question'], '')}
+        option_id = normalize_option_id(state['option_id'])
+        flow_step = flow_step_for_option(
+            option_id, FlowStep(state.get('flow_step', DEFAULT_FLOW_STEP))
+        )
+        question = question_for_option_id(option_id) if option_id else state['question']
+        return {
+            'question': question or state['question'],
+            'flow_step': flow_step.value,
+            'input_type': input_type_for_option(option_id),
+            'identity_answer': IDENTITY_ANSWERS.get(question or '', ''),
+            'next_option_ids': next_option_ids(option_id) if option_id else (),
+        }
 
     def route_identity(state: AgentState) -> Literal['identity', 'decide']:
         return 'identity' if state['question'] in IDENTITY_ANSWERS else 'decide'
@@ -133,15 +159,21 @@ async def run_agent_workflow(
     question: str,
     llm_client: AgentLLMClient,
     *,
+    option_id: str | None = None,
+    flow_step: FlowStep = DEFAULT_FLOW_STEP,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
 ) -> AgentState:
     """Run the bounded graph and return its complete execution state."""
+    option_id = normalize_option_id(option_id)
     if is_destination_catalog_question(question):
         titles = list_known_destination_titles(engine)
         messages = build_catalog_messages(question, titles)
         return {
             'question': question,
+            'option_id': option_id,
+            'flow_step': flow_step_for_option(option_id, flow_step).value,
+            'input_type': input_type_for_option(option_id),
             'queries': [],
             'contexts': (),
             'next_query': None,
@@ -153,7 +185,15 @@ async def run_agent_workflow(
     return cast(
         AgentState,
         await graph.ainvoke(
-            {'question': question, 'queries': [], 'contexts': (), 'next_query': None}
+            {
+                'question': question,
+                'option_id': option_id,
+                'flow_step': flow_step.value,
+                'input_type': input_type_for_option(option_id),
+                'queries': [],
+                'contexts': (),
+                'next_query': None,
+            }
         ),
     )
 

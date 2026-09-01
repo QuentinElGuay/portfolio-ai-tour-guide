@@ -12,6 +12,12 @@ When several related configuration values would otherwise be forwarded through m
 function calls, create a focused immutable dataclass to aggregate them. Pass that
 configuration object instead of a growing list of individual arguments.
 
+## Workflow orchestration
+
+Prefer LangGraph for stateful workflows, branching, and transitions whenever it is
+available and appropriate. Keep the graph as the source of truth for workflow state and
+routing; use standalone functions for simple, stateless transformations.
+
 ## Pull request descriptions
 
 When asked to create a pull request description, provide a concise Markdown snippet with

@@ -2,12 +2,20 @@
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from time import perf_counter
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_tour_guide.agent.chat.navigation import normalize_option_id
+from ai_tour_guide.agent.flow import (
+    DEFAULT_FLOW_STEP,
+    FlowStep,
+    flow_step_for_option,
+    input_type_for_option,
+)
 from ai_tour_guide.agent.llm.clients import (
     GenerationError,
     LLMClient,
@@ -43,9 +51,37 @@ def _elapsed_ms(started: float) -> int:
     return round((perf_counter() - started) * 1000)
 
 
+def _interaction_metadata(
+    state: Mapping[str, object], mode: SearchMode, flow_step: FlowStep
+) -> dict[str, object]:
+    """Expose backend-owned interaction labels in the persisted RAG trace."""
+    return {
+        'mode': mode.value,
+        'tool_queries': state.get('queries', []),
+        'option_id': state.get('option_id'),
+        'flow_step': state.get('flow_step', flow_step.value),
+        'input_type': state.get('input_type', 'free_text'),
+    }
+
+
+def _fallback_interaction_metadata(
+    option_id: str | None, flow_step: FlowStep, mode: SearchMode
+) -> dict[str, object]:
+    """Build interaction labels when the graph failed before returning state."""
+    return {
+        'mode': mode.value,
+        'tool_queries': [],
+        'option_id': option_id,
+        'flow_step': flow_step_for_option(option_id, flow_step).value,
+        'input_type': input_type_for_option(option_id),
+    }
+
+
 async def answer_question_async(
     question: str,
     *,
+    option_id: str | None = None,
+    flow_step: FlowStep = DEFAULT_FLOW_STEP,
     mode: SearchMode = DEFAULT_SEARCH_MODE,
     k: int = 5,
     llm_client: LLMClient,
@@ -57,9 +93,12 @@ async def answer_question_async(
     started = perf_counter()
     selected_request_id = request_id or uuid4()
     selected_mode = SearchMode(mode)
+    option_id = normalize_option_id(option_id)
 
     return await _answer_with_agent(
         question,
+        option_id=option_id,
+        flow_step=flow_step,
         mode=selected_mode,
         k=k,
         llm_client=llm_client,
@@ -73,6 +112,8 @@ async def answer_question_async(
 async def _answer_with_agent(
     question: str,
     *,
+    option_id: str | None,
+    flow_step: FlowStep,
     mode: SearchMode,
     k: int,
     llm_client: LLMClient,
@@ -85,7 +126,12 @@ async def _answer_with_agent(
     retrieval_started = perf_counter()
     try:
         state = await run_agent_workflow(
-            question, llm_client, engine=engine, strategy=strategy
+            question,
+            llm_client,
+            option_id=option_id,
+            flow_step=flow_step,
+            engine=engine,
+            strategy=strategy,
         )
     except (GenerationError, OSError, SQLAlchemyError) as exc:
         return RAGResult(
@@ -97,6 +143,9 @@ async def _answer_with_agent(
             generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
             error=_error('agent', exc),
             total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata=_fallback_interaction_metadata(
+                option_id, flow_step, mode
+            ),
         )
     retrieval_latency = _elapsed_ms(retrieval_started)
     contexts = state['contexts']
@@ -112,6 +161,9 @@ async def _answer_with_agent(
             error=_error('retrieval', exc),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata=_fallback_interaction_metadata(
+                option_id, flow_step, mode
+            ),
         )
     generated = state.get('generated')
     if not contexts and isinstance(generated, GeneratedAnswer):
@@ -124,7 +176,10 @@ async def _answer_with_agent(
             generated=generated,
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
-            retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
+            retrieval_metadata={
+                **_interaction_metadata(state, mode, flow_step),
+                'next_option_ids': state.get('next_option_ids', ()),
+            },
             llm_metadata=generated.llm_metadata,
             raw_provider_response=generated.raw_provider_response,
         )
@@ -139,7 +194,7 @@ async def _answer_with_agent(
             contexts=(),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
-            retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
+            retrieval_metadata=_interaction_metadata(state, mode, flow_step),
         )
     if not isinstance(generated, GeneratedAnswer):
         return RAGResult(
@@ -150,6 +205,9 @@ async def _answer_with_agent(
             messages=(),
             generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
             total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata=_fallback_interaction_metadata(
+                option_id, flow_step, mode
+            ),
         )
     validation = validate_citations(generated.citations, contexts)
     return RAGResult(
@@ -165,7 +223,7 @@ async def _answer_with_agent(
         citation_section_paths=validation.matched_section_paths,
         retrieval_latency_ms=retrieval_latency,
         total_latency_ms=_elapsed_ms(started),
-        retrieval_metadata={'mode': mode.value, 'tool_queries': state['queries']},
+        retrieval_metadata=_interaction_metadata(state, mode, flow_step),
         llm_metadata=generated.llm_metadata,
         raw_provider_response=generated.raw_provider_response,
     )

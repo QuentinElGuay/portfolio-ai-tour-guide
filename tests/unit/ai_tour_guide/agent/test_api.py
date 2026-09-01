@@ -203,6 +203,7 @@ def test_ask_http_boundary_normalizes_question_and_serializes_response(
         'answer': 'The answer.',
         'sources': [],
         'emotion': 'neutral',
+        'next_option_ids': [],
     }
 
     assert answer_question.await_args is not None
