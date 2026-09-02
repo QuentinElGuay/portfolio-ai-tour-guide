@@ -168,6 +168,15 @@ state, and turn-level agent reasoning, then implement a bounded, inspectable too
 - [x] Enforce limits on tool names, tool-call count, retrieval scope, and unsupported
   claims.
 
+### [P0] Application and chat updates
+
+- [x] Rename the Docker application service from `agent` to `app`.
+- [x] Update the Dockerfile, Compose configuration, Makefile, and documentation.
+- [x] Centralize repeated chat-facing text.
+- [x] Display suggested-question labels in Gradio instead of internal action IDs.
+- [x] Correct identity-section suggestions and transitions.
+- [x] Remove unused welcome-message code.
+
 ### [P1] Make agent behavior inspectable
 
 - [x] Define typed graph state for the question, intent, planned actions, tool calls,
@@ -208,36 +217,11 @@ ______________________________________________________________________
 
 **Status:** 📦 Shipped
 
-This release will deliver a clearly separated, source-grounded travel agent with an
-explicit retrieval tool, bounded planning and retry behavior, citation validation,
-observable execution traces, and durable provider-neutral conversation records. The
-Gradio chat remains a client of the conversation API, while LangGraph owns the stateful
-turn-level agent workflow.
-
-______________________________________________________________________
-
-## 🔄 Release v1.4.0 — Application and chat polish
-
-**Status:** 🔄 In progress
-
-This release follows v1.3.0 and focuses on clearer application naming, a smoother Gradio
-chat experience, and release-readiness improvements.
-
-### [P0] Application and chat updates
-
-- [x] Rename the Docker application service from `agent` to `app`.
-- [x] Update the Dockerfile, Compose configuration, Makefile, and documentation.
-- [x] Centralize repeated chat-facing text.
-- [x] Display suggested-question labels in Gradio instead of internal action IDs.
-- [x] Correct identity-section suggestions and transitions.
-- [x] Remove unused welcome-message code.
-
-### [P0] Release preparation
-
-- [ ] Bump the package version to `1.4.0`.
-- [ ] Update the release-image workflow for the renamed `app` service.
-- [ ] Add v1.4.0 release notes.
-- [ ] Validate the release workflow with the final tag and image names.
+This release delivers a clearly separated, source-grounded travel agent with an explicit
+retrieval tool, bounded planning and retry behavior, citation validation, observable
+execution traces, durable provider-neutral conversation records, clearer application
+naming, and a smoother Gradio chat experience. The Gradio chat remains a client of the
+conversation API, while LangGraph owns the stateful turn-level agent workflow.
 
 ______________________________________________________________________
 
