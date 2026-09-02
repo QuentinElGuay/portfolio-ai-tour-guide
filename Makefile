@@ -39,10 +39,10 @@ airflow: ## Start Airflow and its host-Docker ingestion orchestration.
 annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
-app: ## Start the agent API and Gradio chat interface.
-	@if ! $(COMPOSE) --profile app up --build -d --wait database agent; then \
-		echo "Agent startup failed. Recent agent diagnostics:" >&2; \
-		$(COMPOSE) --profile app logs --tail=20 agent >&2 || true; \
+app: ## Start the app API and Gradio chat interface.
+	@if ! $(COMPOSE) --profile app up --build -d --wait database app; then \
+		echo "App startup failed. Recent app diagnostics:" >&2; \
+		$(COMPOSE) --profile app logs --tail=20 app >&2 || true; \
 		exit 1; \
 	fi
 	@if ! $(COMPOSE) --profile app up -d --wait --no-build chat; then \
@@ -52,15 +52,15 @@ app: ## Start the agent API and Gradio chat interface.
 	fi
 ask: ## Answer a QUESTION using retrieved context and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make ask QUESTION='Where is the Brittany coast?'" >&2; exit 1)
-	$(COMPOSE) --profile agent run --rm -T agent \
+	$(COMPOSE) --profile app run --rm -T app \
 		portfolio-ai-tour-guide-agent ask $(ASK_VERBOSE_FLAG) --k "$(K)" "$(QUESTION)"
 
 chat-graph: ## Export the chat workflow as Mermaid (CHAT_GRAPH=path/to/file.mmd).
 	uv run python tools/export_chat_graph.py --output "$(CHAT_GRAPH)"
 
-cli-chat: ## Start the interactive terminal chat after the agent is ready.
-	$(COMPOSE) --profile agent up -d --wait agent
-	$(COMPOSE) --profile agent run --rm -T agent \
+cli-chat: ## Start the interactive terminal chat after the app is ready.
+	$(COMPOSE) --profile app up -d --wait app
+	$(COMPOSE) --profile app run --rm -T app \
 		portfolio-ai-tour-guide-agent chat --k "$(K)"
 
 dashboard: dashboard-init ## Start and initialize PostgreSQL and the Metabase dashboard.
@@ -176,7 +176,7 @@ help: ## Show the available commands.
 	@echo "  make airflow                         Start Airflow for parameterized ingestion"
 	@echo "  make annotate-dataset                Fill answers and source pages interactively"
 	@echo "  make annotate-dataset ANNOTATOR_ARGS='--resume'"
-	@echo "  make app                             Start the agent API and Gradio chat"
+	@echo "  make app                             Start the app API and Gradio chat"
 	@echo "  make ask QUESTION='...'              Answer with retrieved context (K defaults to 5)"
 	@echo "  make ask QUESTION='...' VERBOSE=1    Print the complete serialized RAG trace"
 	@echo "  make cli-chat                        Start the interactive terminal chat"
@@ -251,7 +251,7 @@ stop: ## Stop every Compose profile and remove containers, networks, and orphans
 
 text_search: ## Search chunks lexically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make text_search QUESTION='Brittany coast'" >&2; exit 1)
-	$(COMPOSE) --profile agent run --rm -T agent \
+	$(COMPOSE) --profile app run --rm -T app \
 		portfolio-ai-tour-guide-agent search --mode text --k "$(K)" "$(QUESTION)"
 
 validate-dashboard-backup:
@@ -262,5 +262,5 @@ validate-dashboard-backup:
 
 vector_search: ## Search chunks semantically using QUESTION and optional K.
 	@test -n "$(QUESTION)" || (echo "QUESTION is required; for example: make vector_search QUESTION='Where is the Brittany coast?'" >&2; exit 1)
-	$(COMPOSE) --profile agent run --rm -T agent \
+	$(COMPOSE) --profile app run --rm -T app \
 		portfolio-ai-tour-guide-agent search --mode vector --k "$(K)" "$(QUESTION)"

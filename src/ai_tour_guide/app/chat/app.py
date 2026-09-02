@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import gradio as gr
 
+from ai_tour_guide.app.agent.identity import WELCOME_MESSAGE
 from ai_tour_guide.app.agent.source_formatting import format_pages
 from ai_tour_guide.app.chat.backends import (
     ChatBackend,
@@ -27,23 +28,14 @@ from ai_tour_guide.app.chat.models import (
 logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
+INVALID_SOURCE_ERROR = 'The chat response has an invalid source.'
 EMOTICONS_ENABLED = False
-
-# Welcome messages and starter questions shown when a chat session starts.
-WELCOME_MESSAGE = (
-    '_Salut_! I’m **Petit Guide**, Bon Voyage’s AI travel companion for French '
-    'destinations covered by our indexed regional tourism guides. How can I help '
-    'you prepare your trip? Select a suggested question or ask about our destinations.'
-)
-
 
 DEMO_WELCOME_NOTICE = (
     '\n\n> **Demo mode:** This is a limited experience with prepared Brittany questions. '
     'It accepts modest spelling and punctuation variations.'
 )
-DEMO_WELCOME_MESSAGE = (
-    'Welcome to Bon Voyage. How can I help you prepare your trip?' + DEMO_WELCOME_NOTICE
-)
+DEMO_WELCOME_MESSAGE = WELCOME_MESSAGE + DEMO_WELCOME_NOTICE
 AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
     Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
@@ -252,17 +244,19 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             if not isinstance(buttons, list):
                 buttons = []
             buttons = cast(list[dict[str, object]], buttons)
-            input_id = cast(
-                str,
-                next(
-                    (
-                        button['input_id']
-                        for button in buttons
-                        if isinstance(button, dict)
-                        and button.get('input_id') == message
-                    ),
-                    FREE_TEXT_INPUT_ID,
+            selected_button = next(
+                (
+                    button
+                    for button in buttons
+                    if isinstance(button, dict)
+                    and message in (button.get('input_id'), button.get('label'))
                 ),
+                None,
+            )
+            input_id = (
+                cast(str, selected_button['input_id'])
+                if selected_button is not None
+                else FREE_TEXT_INPUT_ID
             )
             response = await selected_backend.send_message(
                 cast(str, request_ids['session_id']),
@@ -297,7 +291,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             {
                 'content': reply,
                 'options': [
-                    {'label': button['label'], 'value': button['input_id']}
+                    {'label': button['label'], 'value': button['label']}
                     for button in options
                     if isinstance(button, dict)
                     and isinstance(button.get('label'), str)
@@ -366,7 +360,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                         'role': 'assistant',
                         'content': welcome_message,
                         'options': [
-                            {'label': button['label'], 'value': button['input_id']}
+                            {'label': button['label'], 'value': button['label']}
                             for button in cast(
                                 list[dict[str, object]], request_ids.value['buttons']
                             )
@@ -425,7 +419,7 @@ def _render_response(payload: dict[str, object]) -> str:
         raise TypeError('The chat response has invalid sources.')
     for source in sources:
         if not isinstance(source, dict) or not isinstance(source.get('title'), str):
-            raise TypeError('The chat response has an invalid source.')
+            raise TypeError(INVALID_SOURCE_ERROR)
         pages = source.get('pages', [])
         if not isinstance(pages, list) or not all(
             isinstance(page, int) for page in pages
@@ -445,7 +439,7 @@ def _render_conversation_response(response: object) -> str:
         title = source.get('title')
         pages = source.get('pages', [])
         if not isinstance(title, str) or not isinstance(pages, list):
-            raise TypeError('The chat response has an invalid source.')
+            raise TypeError(INVALID_SOURCE_ERROR)
         suffix = f', {format_pages(pages)}' if pages else ''
         rendered.append(f'({title}{suffix})')
     return '\n'.join(rendered)

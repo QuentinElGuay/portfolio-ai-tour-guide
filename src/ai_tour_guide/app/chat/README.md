@@ -26,7 +26,7 @@ make app
 
 Open `http://localhost:7860`. Docker Compose starts:
 
-- the agent API at `http://localhost:8000`, with database and OpenAI access;
+- the app API at `http://localhost:8000`, with database and OpenAI access;
 - the Gradio interface at `http://localhost:7860`, configured to call the agent.
 
 ## Run locally
@@ -50,7 +50,7 @@ indexed guides. It uses retrieved passages for all destination details and other
 questions, so this catalog never substitutes for source-grounded advice.
 
 `CHAT_API_URL` is required when starting the chat service. The application does not use
-a local fallback in production. The agent service raises a configuration error when no
+a local fallback in production. The app service raises a configuration error when no
 OpenAI API key is configured.
 
 `create_app()` uses `DemoBackend` only when no backend is injected. This keeps UI tests

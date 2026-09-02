@@ -96,8 +96,11 @@ def test_create_app_explains_demo_limitations() -> None:
     assert 'Bon Voyage' in welcome
     assert 'Brittany questions' in welcome
     assert chatbot.value[0]['options'] == [
-        {'value': 'identity', 'label': 'Tell me about you'},
-        {'value': 'destinations', 'label': 'What destinations are covered?'},
+        {'value': 'Tell me about you', 'label': 'Tell me about you'},
+        {
+            'value': 'What destinations are covered?',
+            'label': 'What destinations are covered?',
+        },
     ]
 
 

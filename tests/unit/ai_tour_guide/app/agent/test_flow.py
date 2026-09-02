@@ -13,8 +13,35 @@ def test_backend_flow_exposes_stable_buttons_and_transitions() -> None:
         'identity',
         'destinations',
     ]
+    assert [
+        button.label
+        for button in flow_definition(FlowStep.BON_VOYAGE).rendered_buttons()
+    ] == [
+        'Tell me about you',
+        'Where does your information come from?',
+    ]
+    assert [
+        button.label
+        for button in flow_definition(FlowStep.INFORMATION_SOURCES).rendered_buttons()
+    ] == [
+        'What is Bon Voyage?',
+        'Where does your information come from?',
+    ]
     assert transition_for(FlowStep.WELCOME, 'identity') is FlowStep.IDENTITY
     assert transition_for(FlowStep.IDENTITY, 'bon_voyage') is FlowStep.BON_VOYAGE
+    assert transition_for(FlowStep.BON_VOYAGE, 'identity') is FlowStep.IDENTITY
+    assert (
+        transition_for(FlowStep.BON_VOYAGE, 'information_sources')
+        is FlowStep.INFORMATION_SOURCES
+    )
+    assert (
+        transition_for(FlowStep.INFORMATION_SOURCES, 'bon_voyage')
+        is FlowStep.BON_VOYAGE
+    )
+    assert (
+        transition_for(FlowStep.INFORMATION_SOURCES, 'information_sources')
+        is FlowStep.INFORMATION_SOURCES
+    )
     assert transition_for(FlowStep.IDENTITY, 'destinations') is None
 
 

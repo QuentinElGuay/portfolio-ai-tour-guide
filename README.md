@@ -115,6 +115,17 @@ flowchart LR
 - **Workflow orchestration:** Apache Airflow
 - **Monitoring and evaluation:** Metabase
 
+## Project structure
+
+- `src/ai_tour_guide/app/` — FastAPI application, chat interface, agent workflow, and
+  CLI.
+- `src/ai_tour_guide/ingestion/` — Document parsing and ingestion pipeline.
+- `src/ai_tour_guide/knowledge_base/` — Database schema, indexing, and retrieval.
+- `evaluation/` — RAG evaluation and judge workflows.
+- `fixtures/` — Corpus and dashboard data used for local development.
+- `docker/` and `docker-compose.yml` — Container images and local services.
+- `docs/` — Architecture, command reference, and setup documentation.
+
 ## Prerequisites
 
 The recommended workflow requires _Git_, _Docker_ with _Docker Compose_, and _GNU Make_.
@@ -177,7 +188,7 @@ These are the commands used most often during local development:
 | ------------------- | --------------------------------------------------- |
 | `make db-init`      | Initialize the pgvector application schema.         |
 | `make ingest`       | Ingest the documents in `source_files.json`.        |
-| `make app`          | Start the agent API and Gradio chat interface.      |
+| `make app`          | Start the app API and Gradio chat interface.        |
 | `make airflow`      | Start Airflow for parameterized ingestion.          |
 | `make evaluate`     | Run the full evaluation suite.                      |
 | `make dashboard`    | Start and initialize PostgreSQL and Metabase.       |

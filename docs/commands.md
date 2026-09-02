@@ -25,17 +25,17 @@ reference when you need the complete behavior, options, or safety notes.
 
 ### `make app`
 
-Build and start the agent API and Gradio chat interface. It waits for the services to
+Build and start the app API and Gradio chat interface. It waits for the services to
 become healthy. Open the chat at <http://localhost:7860> and the API documentation at
 <http://localhost:8000/docs>.
 
-When the agent cannot start, the command prints its two most recent diagnostic log
-lines. A common cause is an empty application schema; initialize it and ingest a corpus
-before starting the app.
+When the app cannot start, the command prints its two most recent diagnostic log lines.
+A common cause is an empty application schema; initialize it and ingest a corpus before
+starting the app.
 
 ### `make ask QUESTION='...'`
 
-Answer one question in the terminal with the agent RAG pipeline. The agent container is
+Answer one question in the terminal with the app RAG pipeline. The app container is
 created for the request and removed afterwards.
 
 ```bash
@@ -49,7 +49,7 @@ serialized RAG trace.
 
 ### `make cli-chat`
 
-Start the agent service, then open an interactive terminal chat. Pass `K` to change the
+Start the app service, then open an interactive terminal chat. Pass `K` to change the
 number of chunks retrieved for each answer:
 
 ```bash

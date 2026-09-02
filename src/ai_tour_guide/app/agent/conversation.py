@@ -17,7 +17,7 @@ from ai_tour_guide.app.agent.flow import (
     flow_definition,
     transition_for,
 )
-from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS
+from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
 from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
 from ai_tour_guide.app.agent.rag.models import RAGResult
 from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
@@ -123,7 +123,7 @@ def build_outer_conversation_graph(
             'latest_response': response(
                 state['session_id'],
                 FlowStep.WELCOME,
-                'Welcome to Bon Voyage. How can I help you prepare your trip?',
+                WELCOME_MESSAGE,
             ),
         }
 

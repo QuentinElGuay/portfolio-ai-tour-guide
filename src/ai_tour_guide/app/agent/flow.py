@@ -8,6 +8,7 @@ from typing import Final
 from ai_tour_guide.app.agent.identity import (
     BACK_TO_MAIN_MENU_QUESTION,
     BON_VOYAGE_QUESTION,
+    DESTINATIONS_QUESTION,
     INFORMATION_SOURCES_QUESTION,
     TELL_ME_ABOUT_YOU_QUESTION,
 )
@@ -62,37 +63,41 @@ FLOW_DEFINITIONS: Final = MappingProxyType(
             FlowStep.WELCOME,
             (
                 FlowAction('identity', 'Tell me about you'),
-                FlowAction('destinations', 'What destinations are covered?'),
+                FlowAction('destinations', DESTINATIONS_QUESTION),
             ),
         ),
         FlowStep.MAIN_MENU: FlowDefinition(
             FlowStep.MAIN_MENU,
             (
                 FlowAction('identity', 'Tell me about you'),
-                FlowAction('destinations', 'What destinations are covered?'),
+                FlowAction('destinations', DESTINATIONS_QUESTION),
             ),
         ),
         FlowStep.IDENTITY: FlowDefinition(
             FlowStep.IDENTITY,
             (
-                FlowAction('bon_voyage', 'What is Bon Voyage?'),
-                FlowAction(
-                    'information_sources', 'Where does your information come from?'
-                ),
-                FlowAction('main_menu', 'Back to the main menu'),
+                FlowAction('bon_voyage', BON_VOYAGE_QUESTION),
+                FlowAction('information_sources', INFORMATION_SOURCES_QUESTION),
+                FlowAction('main_menu', BACK_TO_MAIN_MENU_QUESTION),
             ),
         ),
         FlowStep.DESTINATIONS: FlowDefinition(
             FlowStep.DESTINATIONS,
-            (FlowAction('main_menu', 'Back to the main menu'),),
+            (FlowAction('main_menu', BACK_TO_MAIN_MENU_QUESTION),),
         ),
         FlowStep.BON_VOYAGE: FlowDefinition(
             FlowStep.BON_VOYAGE,
-            (FlowAction('main_menu', 'Back to the main menu'),),
+            (
+                FlowAction('identity', 'Tell me about you'),
+                FlowAction('information_sources', INFORMATION_SOURCES_QUESTION),
+            ),
         ),
         FlowStep.INFORMATION_SOURCES: FlowDefinition(
             FlowStep.INFORMATION_SOURCES,
-            (FlowAction('main_menu', 'Back to the main menu'),),
+            (
+                FlowAction('bon_voyage', BON_VOYAGE_QUESTION),
+                FlowAction('information_sources', INFORMATION_SOURCES_QUESTION),
+            ),
         ),
         FlowStep.TERMINAL: FlowDefinition(
             FlowStep.TERMINAL, (), accepts_free_text=False
@@ -103,7 +108,7 @@ FLOW_DEFINITIONS: Final = MappingProxyType(
 FLOW_QUESTIONS: Final = MappingProxyType(
     {
         'identity': TELL_ME_ABOUT_YOU_QUESTION,
-        'destinations': 'What destinations are covered?',
+        'destinations': DESTINATIONS_QUESTION,
         'bon_voyage': BON_VOYAGE_QUESTION,
         'information_sources': INFORMATION_SOURCES_QUESTION,
         'main_menu': BACK_TO_MAIN_MENU_QUESTION,
@@ -132,9 +137,17 @@ FLOW_TRANSITIONS: Final = MappingProxyType(
             }
         ),
         FlowStep.DESTINATIONS: MappingProxyType({'main_menu': FlowStep.MAIN_MENU}),
-        FlowStep.BON_VOYAGE: MappingProxyType({'main_menu': FlowStep.MAIN_MENU}),
+        FlowStep.BON_VOYAGE: MappingProxyType(
+            {
+                'identity': FlowStep.IDENTITY,
+                'information_sources': FlowStep.INFORMATION_SOURCES,
+            }
+        ),
         FlowStep.INFORMATION_SOURCES: MappingProxyType(
-            {'main_menu': FlowStep.MAIN_MENU}
+            {
+                'bon_voyage': FlowStep.BON_VOYAGE,
+                'information_sources': FlowStep.INFORMATION_SOURCES,
+            }
         ),
     }
 )

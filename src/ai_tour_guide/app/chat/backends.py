@@ -10,7 +10,7 @@ from ai_tour_guide.app.agent.flow import (
     flow_definition,
     transition_for,
 )
-from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS
+from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
 from ai_tour_guide.app.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
@@ -69,7 +69,7 @@ class DemoBackend(ChatBackend):
         return ConversationResponse(
             session_id=UUID(session_id),
             step_id=FlowStep.WELCOME,
-            message='Welcome to Bon Voyage. How can I help you prepare your trip?',
+            message=WELCOME_MESSAGE,
             buttons=flow_definition(FlowStep.WELCOME).rendered_buttons(),
         )
 

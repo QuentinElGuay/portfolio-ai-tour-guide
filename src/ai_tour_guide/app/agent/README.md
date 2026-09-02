@@ -68,10 +68,10 @@ Start the agent API and Gradio chat together:
 make app
 ```
 
-Docker Compose gives the optional OpenAI credential only to the `agent` service. The
-separate `chat` service calls `http://agent:8000/chat` over the internal network.
-`make app` starts the database service as an agent dependency, but it does not
-initialise or ingest the database.
+Docker Compose gives the optional OpenAI credential only to the `app` service. The
+separate `chat` service calls `http://app:8000/chat` over the internal network.
+`make app` starts the database service as an app dependency, but it does not initialise
+or ingest the database.
 
 To run only the API locally:
 
@@ -179,7 +179,7 @@ make ingest
 | `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `baguette-llm`                |
 | `AGENT_LLM_API_KEY`  | Required only for OpenAI               | Not required for Baguette LLM |
 | `AGENT_LLM_MODEL`    | LLM model identifier                   | `mini-croissant-1.0`          |
-| `AGENT_PORT`         | Host port for the agent API            | `8000`                        |
+| `APP_PORT`           | Host port for the agent API            | `8000`                        |
 | `DB_*`               | Database connection used for retrieval | See `.env.template`           |
 | `EMBEDDING_*`        | Query embedding configuration          | See `.env.template`           |
 
