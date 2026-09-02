@@ -141,7 +141,9 @@ full command reference and document-definition format.
 
 ## Chat app
 
-Once at least one document has been ingested, start the Bon Voyage chat app:
+After initializing the database, start the Bon Voyage chat app. Ingestion is optional
+for the guided demo; ingest documents first when you want source-grounded travel
+answers:
 
 ```bash
 make app

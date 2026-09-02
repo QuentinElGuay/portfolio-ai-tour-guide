@@ -17,7 +17,8 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-  - [Tutorial](#tutorial)
+  - [Demo mode](#demo-mode)
+  - [Complete mode](#complete-mode)
 - [Common commands](#common-commands)
 - [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
@@ -152,51 +153,30 @@ local installation.
 
 ## Quick start
 
-With Docker, Docker Compose, and GNU Make installed, run:
+### Demo mode
+
+With Docker, Docker Compose, and GNU Make installed, clone the project and enter its
+directory or create a Github Codespaces. Then run:
 
 ```bash
-git clone https://github.com/QuentinElGuay/portfolio-ai-tour-guide.git
-cd portfolio-ai-tour-guide
 cp .env.template .env
-make db-init
-make ingest
 make app
 ```
 
-The template starts the no-cost, limited Brittany demo. Its minimum LLM configuration
-is:
+This starts the _Bon Voyage_ travel assistant in demo mode. The demo uses a no-cost
+deterministic provider and does not require an LLM API key or ingested documents. It
+supports a prepared set of Brittany questions and suggests a supported question when it
+cannot answer. The guided chat remains available even when the knowledge base is empty.
 
-```dotenv
-AGENT_LLM_PROVIDER=baguette-llm
-AGENT_LLM_MODEL=mini-croissant-1.0
-```
+### Complete mode
 
-The demo recognizes
-[prepared Brittany questions](src/ai_tour_guide/app/agent/data/demo_dataset.jsonl) and
-modest spelling or punctuation variations. It suggests a supported question when it
-cannot answer.
-
-The demo does not use an API key. To use a live LLM, replace those settings and add your
-OpenAI API key:
-
-```dotenv
-AGENT_LLM_PROVIDER=openai
-AGENT_LLM_API_KEY=your-super-secret-api-key
-AGENT_LLM_MODEL=gpt-4.1-mini
-```
-
-> [!NOTE]
-> `OpenAI` is currently the only supported provider for live answer generation, and
-> `gpt-4.1-mini` is the recommended model.
+To run the full project with source-grounded answers, configure an LLM API key and
+ingest the document corpus. Follow the [full project tutorial](docs/README.md) for the
+complete setup.
 
 Open [http://localhost:7860](http://localhost:7860) to use the chat. The API is
 available at [http://localhost:8000](http://localhost:8000), with interactive
 documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
-
-### Tutorial
-
-For detailed setup, demo limitations, Airflow ingestion, evaluation, and dashboard
-monitoring, follow the [tutorial](docs/README.md).
 
 ## Common commands
 

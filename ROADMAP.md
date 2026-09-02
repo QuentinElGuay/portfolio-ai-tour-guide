@@ -1,266 +1,86 @@
-# IA Tour Guide Roadmap
+# Bon Voyage Roadmap
 
-> [!NOTE]
-> A shipped release represents an agreed scope, not the completion of every later
-> hardening or follow-up task listed below.
+The roadmap tracks released capabilities and the remaining improvements under
+consideration. A release represents the scope delivered in that version; later hardening
+work may remain open.
 
-## Priority and status
+## Released versions
 
-- **P0** — required for a working project or release scope
+### v0.1.0 — Retrieval prototype
 
-- **P1** — required for a strong course submission
+Delivered page-aware PDF extraction, structured document artifacts, chunking,
+embeddings, vector search, full-text search, source/page provenance, and CLI retrieval
+commands.
 
-- **P2** — optional improvement
+### v0.2.0 — End-to-end RAG MVP
 
-- **P3** — stretch goal
+Delivered the first complete RAG experience: configurable LLM generation, grounded
+answers, validated citations, a FastAPI agent API, a Gradio chat interface, and a
+source-aware CLI.
 
-- **✅ Complete** — core milestone outcome is delivered
+### v0.3.0 — Evaluation
 
-- **🔄 In progress** — active work remains
+Delivered the retrieval-quality baseline, golden evaluation dataset, retrieval
+comparison, hybrid search selection, reproducible RAG and judge workflows, and
+documented evaluation evidence.
 
-- **⏳ Planned** — not started
+### v0.4.0 — Monitoring and evaluation persistence
 
-- **📦 Shipped** — released scope
+Delivered persisted RAG results and user feedback, production and evaluation schema
+separation, LLM usage and pricing tracking, quality and cost dashboards, smoke tests,
+and Metabase backup/restore support.
 
-______________________________________________________________________
+### v1.0.0 — Reproducible multi-document delivery
 
-## ✅ Milestone 1 — Project Foundation
+Delivered multiple travel guides ingestion, Airflow-orchestrated ingestion, idempotent
+and forced re-ingestion, a containerized application, persistent storage, health checks,
+deterministic demo and smoke tests, CI/CD validation, and a complete tutorial.
 
-**Delivered:** project documentation, configuration, dependency management, logging, a
-separated runtime/development/test dependency model, and unit-test structure.
+### v1.1.0 — Petit Guide
 
-______________________________________________________________________
+Introduced Petit Guide as the Bon Voyage assistant, including its visual identity,
+mascot, avatars, and updated chat presentation.
 
-## ✅ Milestone 2 — Document Ingestion
+### v1.2.0 — Improved deterministic demo
 
-**Delivered:** page-aware PDF extraction from remote URLs or local files, structured
-artifacts, section-aware chunking, embeddings, transactional persistence, and
-independent ingestion commands.
+Improved the built-in `baguette-llm` demo with a standalone tourism dataset, fuzzy
+question matching, configurable matching thresholds, “Did you mean?” suggestions, and
+clearer disclosure of demo limitations.
 
-______________________________________________________________________
+### v1.3.0 — Bon Voyage rebrand and agentic RAG
 
-## ✅ Milestone 3 — Knowledge Base and Retrieval
+Delivered the Bon Voyage rebrand and LangGraph implementation. The release separates UI
+navigation, durable conversation state, and turn-level agent reasoning; adds a bounded
+retrieval tool loop with reformulation, evidence evaluation, refusal, and citation
+validation; exposes structured execution traces; persists provider-neutral chat
+messages; renames the Docker application service from `agent` to `app`; and improves the
+Gradio chat flow and identity suggestions.
 
-**Delivered:** persisted embedding metadata and ranked vector, full-text, and hybrid
-retrieval with source and page provenance.
+## Future milestones
 
-______________________________________________________________________
-
-## 📦 Release v0.1.0 — Retrieval prototype
-
-**Status:** 📦 Shipped
-
-Delivered PDF extraction, chunking, embeddings, vector search, full-text search, and CLI
-retrieval.
-
-______________________________________________________________________
-
-## ✅ Milestone 4 — RAG Application
-
-**Delivered:** configurable LLM generation, structured and validated citations, clear
-failure handling, HTTP and CLI access, a Gradio chat interface, a deterministic fixture
-LLM for end-to-end tests, and a zero-cost Brittany demo provider with friendly
-supported-question suggestions.
-
-______________________________________________________________________
-
-## 📦 Release v0.2.0 — RAG MVP
-
-**Status:** 📦 Shipped
-
-Delivered the end-to-end Brittany-guide RAG experience with grounded answers, validated
-citations, and a basic chat interface.
-
-______________________________________________________________________
-
-## ✅ Milestone 5 — Retrieval and RAG Evaluation
-
-**Delivered:** a 105-case golden dataset, an annotator that can edit and create cases,
-retrieval comparison and hybrid selection, reproducible search/RAG/judge workflows, and
-isolated evaluation results and ratings.
-
-______________________________________________________________________
-
-## 📦 Release v0.3.0 — Evaluation
-
-**Status:** 📦 Shipped
-
-Delivered the retrieval-quality baseline, selected hybrid configuration, runnable RAG
-and judge workflows, and documented baseline evidence.
-
-______________________________________________________________________
-
-## ✅ Milestone 6 — User Feedback
-
-**Delivered:** answer ratings and optional comments through chat, API, and CLI, linked
-to persisted RAG results.
-
-______________________________________________________________________
-
-## ✅ Milestone 7 — Monitoring
-
-**Delivered:** persisted operational RAG records and user feedback, schema-separated
-evaluation and production usage tracking, model pricing validation, curated cost views,
-and preconfigured Quality and Costs dashboards.
-
-______________________________________________________________________
-
-## 📦 Release v0.4.0 — Monitoring
-
-**Status:** 📦 Shipped
-
-Delivered persisted operational RAG records, user feedback monitoring, offline
-evaluation reporting, production quality and cost dashboards, schema-separated LLM usage
-tracking, model pricing validation, and Metabase backup/restore support.
-
-______________________________________________________________________
-
-## ✅ Milestone 8 — Reproducibility and Delivery
-
-**Delivered:** containerized application and Airflow-orchestrated ingestion services
-with persistent storage and health checks, a no-cost Brittany demo, deterministic smoke
-tests, CI validation and release-image publishing, current evaluation evidence, and
-complete README, tutorial, screenshot, and configuration documentation.
-
-______________________________________________________________________
-
-## 📦 Release v1.0.0 — Final submission
-
-**Status:** 📦 Shipped
-
-The final submission expands the service from Brittany-only content to multi-regional
-travel guides, with public screenshots and a tutorial. Delivery automation, evaluation
-evidence, and a deterministic smoke test are also available.
-
-______________________________________________________________________
-
-## 🔄 Milestone 9 — Explicitly Agentic Travel Assistant
-
-**Goal:** make the agent boundary explicit by separating UI navigation, conversation
-state, and turn-level agent reasoning, then implement a bounded, inspectable tool loop.
-
-### [P0] Separate responsibilities
-
-- [x] Keep guided buttons and labels as a chat-UI/navigation concern rather than the
-  primary routing mechanism of the RAG agent.
-- [x] Keep session history, follow-up resolution, and thread checkpointing in a separate
-  conversation layer.
-- [x] Define the travel-agent graph as the owner of one turn's planning, tool use,
-  evidence evaluation, answer generation, and stopping decision.
-- [x] Replace `ChatBackend.ask(messages, option_id=...)` with an input that accepts the
-  submitted question and optional guided-navigation ID.
-- [x] Remove app-side message construction and history normalization from the Gradio
-  layer; retain only UI rendering and event adaptation there.
-
-### [P0] Add an explicit bounded tool loop
-
-- [x] Extract retrieval into a typed `search_tourism_knowledge_base` tool returning
-  passages, source identity, pages, and relevance metadata.
-- [x] Replace the mostly one-pass graph with explicit `plan -> tool -> evaluate`
-  transitions.
-- [x] Let the agent select bounded actions: `search_knowledge_base`,
-  `reformulate_search`, `answer_from_context`, or `refuse`.
-- [x] Add an evidence-evaluation node that checks whether retrieved context is
-  sufficient before generation.
-- [x] Add bounded retry/reformulation for insufficient evidence, followed by refusal
-  when the retry budget is exhausted.
-- [x] Keep citation validation as a mandatory post-generation safety boundary.
-- [x] Enforce limits on tool names, tool-call count, retrieval scope, and unsupported
-  claims.
-
-### [P0] Application and chat updates
-
-- [x] Rename the Docker application service from `agent` to `app`.
-- [x] Update the Dockerfile, Compose configuration, Makefile, and documentation.
-- [x] Centralize repeated chat-facing text.
-- [x] Display suggested-question labels in Gradio instead of internal action IDs.
-- [x] Correct identity-section suggestions and transitions.
-- [x] Remove unused welcome-message code.
-
-### [P1] Make agent behavior inspectable
-
-- [x] Define typed graph state for the question, intent, planned actions, tool calls,
-  evidence, retry count, answer, citations, and final status.
-- [x] Record structured action metadata, without exposing private chain-of-thought, for
-  CLI verbose output, API diagnostics, evaluation, and monitoring.
-- [x] Update the README and architecture diagrams to document the bounded agent loop and
-  the separation between conversation orchestration and agent reasoning.
-- [x] Add tests for action routing, tool execution, evidence sufficiency, retry limits,
-  refusal, citation validation, and trace output.
-
-### [P1] LangGraph architecture hardening
-
-- [x] Refine the outer conversation graph to use explicit conditional edges or `Command`
-  routing for initialization, guided actions, free text, and terminal states.
-- [x] Decompose the turn-level `TravelAgent` subgraph into explicit plan, tool,
-  evaluate, answer, and refuse nodes where LangGraph provides a clear benefit.
-- [x] Keep checkpoint ownership exclusively in the outer conversation graph and verify
-  the boundary with graph-state and checkpoint tests.
-
-### [P1] Durable conversation and feedback records
-
-- [x] Persist provider-neutral `ChatMessage` records for every accepted user turn and
-  every assistant response, including guided-flow responses.
-- [x] Keep `RAGResult` limited to retrieval and generation diagnostics; store generic
-  conversation content, sources, trace metadata, buttons, and flow context on
-  `ChatMessage` instead.
-- [x] Associate each RAG-backed assistant message with its diagnostic `rag_request_id`
-  without requiring RAG for every assistant response.
-- [x] Attach feedback to any persisted assistant `message_id`, rather than to a
-  RAG-specific request ID, across the API, CLI, and Gradio client.
-- [x] Update synthetic dashboard traffic to create user and assistant messages and
-  message-scoped chat feedback, including safe cleanup of simulated records.
-
-______________________________________________________________________
-
-## 📦 Release v1.3.0 — Bounded agentic RAG
-
-**Status:** 📦 Shipped
-
-This release delivers a clearly separated, source-grounded travel agent with an explicit
-retrieval tool, bounded planning and retry behavior, citation validation, observable
-execution traces, durable provider-neutral conversation records, clearer application
-naming, and a smoother Gradio chat experience. The Gradio chat remains a client of the
-conversation API, while LangGraph owns the stateful turn-level agent workflow.
-
-______________________________________________________________________
-
-## Follow-up work
-
-These improvements are useful but are not priorities for the final submission.
-
-### [P1] Test, ingestion, and retrieval hardening
+### Test, ingestion, and retrieval hardening
 
 - [ ] Add focused chunking tests for boundaries, traceability, reproducibility,
   oversized paragraphs, and hard limits.
 - [ ] Record and verify full parser-version provenance for each imported document.
-  Source checksums, chunking configuration, embedding metadata, and debug artifacts are
-  already persisted or emitted.
 - [ ] Add PostgreSQL integration coverage for aggregate insertion, rollback, and
-  constraints; the current database fixtures are intentionally disabled until they guard
-  an isolated schema.
-- [x] Add deterministic ingestion and retrieval smoke coverage with a fixture LLM and an
-  isolated schema.
-- [x] Validate the Airflow Compose profile and DAG imports in CI.
+  constraints using an isolated schema.
 - [ ] Add container-level runtime smoke tests for the production ingestion and agent
-  images, rather than validating application behavior only through the host `uv`
-  environment.
+  images.
 - [ ] Add an Airflow CI integration test that triggers `ingest_documents` with a small
-  fixture document and verifies initialization, ingestion, and database persistence.
+  fixture document and verifies initialization, ingestion, and persistence.
 - [ ] Pin the embedding model artifact and verify reproducibility against it.
 - [ ] Add ingestion-run status, duration, counts, and failure details if operational
   monitoring becomes necessary.
-- [ ] Add detailed structured logs and traces only if future debugging needs justify
-  them.
 
-### [P2] Retrieval and answer improvements
+### Retrieval and answer improvements
 
 - [ ] Strengthen deterministic handling for unsupported and live-information questions
   where evaluation identifies a need.
 - [ ] Evaluate query rewriting, reranking, and additional hybrid configurations; retain
   them only when they improve quality within the latency budget.
 
-### [P2] Controlled LLM comparison
+### Controlled LLM comparison
 
 - [ ] Compare at least two prompt or generation configurations using controlled
   retrieval context.
@@ -269,27 +89,22 @@ These improvements are useful but are not priorities for the final submission.
 - [ ] Add robustness, efficiency, and cost studies only when they support a concrete
   product decision.
 
-______________________________________________________________________
+### Multi-version document lifecycle
 
-## Stretch goals
-
-### [P2] Multi-document lifecycle
-
-- [ ] Support multiple brochures, document versions, and safe replacement of changed
-  content.
+- [ ] Support document versions, and safe replacement of changed content.
 - [ ] Exclude superseded chunks from retrieval.
 
-### [P2] Live-information routing
+### Live-information routing
 
 - [ ] Route questions to the knowledge base, approved live tools, or a clear limitation
   response.
 - [ ] Restrict live tools to an explicit allowlist and make their use observable.
 
-### [P3] Advanced evaluation and quality gates
+### Advanced evaluation and quality gates
 
 - [ ] Add human review, robustness, cost, and CI quality-gate evaluation when a concrete
   product decision requires them.
 
-### [P3] Cloud deployment
+### Cloud deployment
 
 - [ ] Deploy a public demo with managed secrets and documented operations.
