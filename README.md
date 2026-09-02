@@ -34,7 +34,7 @@ Created as a capstone project for the
 [DataTalks.Club](https://datatalks.club), this project turns French regional tourism
 guides into a question-answering experience that helps travellers plan their trips.
 
-![Chat app answer with sources](docs/tutorial/05_chat_app_answers.png "Answers with sources")
+![Chat app answer with sources](docs/images/tutorial/05_chat_app_answers.png "Answers with sources")
 
 ### Project goals
 
