@@ -12,6 +12,7 @@ def test_collection_is_loaded_from_the_documents_input() -> None:
         StringIO(
             '{'
             '"title": "A guide to Brittany",'
+            '"destination": "Brittany",'
             '"source_url": "https://example.com/brittany",'
             '"collection": "  tour-guides  "'
             '}'
@@ -27,6 +28,7 @@ def test_collection_is_optional_in_the_documents_input() -> None:
         StringIO(
             '{'
             '"title": "A guide to Brittany",'
+            '"destination": "Brittany",'
             '"source_url": "https://example.com/brittany"'
             '}'
         )
@@ -40,7 +42,11 @@ def test_local_source_path_is_loaded_and_becomes_a_file_source_url(tmp_path) -> 
     documents = load_documents(
         StringIO(
             json.dumps(
-                {'title': 'A guide to Brittany', 'source_path': str(source_path)}
+                {
+                    'title': 'A guide to Brittany',
+                    'destination': 'Brittany',
+                    'source_path': str(source_path),
+                }
             )
         )
     )
@@ -58,6 +64,7 @@ def test_collection_rejects_empty_and_non_string_values(
         json.dumps(
             {
                 'title': 'A guide to Brittany',
+                'destination': 'Brittany',
                 'source_url': 'https://example.com/brittany',
                 'collection': collection,
             }

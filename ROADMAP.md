@@ -179,6 +179,15 @@ state, and turn-level agent reasoning, then implement a bounded, inspectable too
 - [ ] Add tests for action routing, tool execution, evidence sufficiency, retry limits,
   refusal, citation validation, and trace output.
 
+### [P1] LangGraph architecture hardening
+
+- [ ] Refine the outer conversation graph to use explicit conditional edges or `Command`
+  routing for initialization, guided actions, free text, and terminal states.
+- [ ] Decompose the turn-level `TravelAgent` subgraph into explicit plan, tool,
+  evaluate, answer, and refuse nodes where LangGraph provides a clear benefit.
+- [ ] Keep checkpoint ownership exclusively in the outer conversation graph and verify
+  the boundary with graph-state and checkpoint tests.
+
 ______________________________________________________________________
 
 ## ⏳ Release v1.3.0 — Bounded agentic RAG

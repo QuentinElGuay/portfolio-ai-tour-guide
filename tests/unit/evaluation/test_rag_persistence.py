@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import ARRAY
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from ai_tour_guide.agent.rag.models import GeneratedAnswer, RAGResult
+from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGResult
 from ai_tour_guide.knowledge_base.database.tables.evaluation import (
     metadata,
     rag_evaluation_results,

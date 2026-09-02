@@ -13,4 +13,4 @@ RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=10001,gid=10001 \
 
 EXPOSE 8000 7860
 
-CMD ["python", "-m", "uvicorn", "ai_tour_guide.agent.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "ai_tour_guide.app.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -19,6 +19,7 @@ def test_parse_downloaded_pdf_uses_the_existing_file(tmp_path: Path) -> None:
 
     document = IngestionDocument(
         title='Brittany guide',
+        destination='Brittany',
         source_url='https://example.com/guide.pdf',
         excluded_leading_pages=0,
         excluded_trailing_pages=0,
@@ -43,6 +44,7 @@ def test_parse_pdf_bytes_uses_no_intermediary_file(tmp_path: Path) -> None:
     pdf_path.unlink()
     document = IngestionDocument(
         title='Brittany guide',
+        destination='Brittany',
         source_url='https://example.com/guide.pdf',
         excluded_leading_pages=0,
         excluded_trailing_pages=0,

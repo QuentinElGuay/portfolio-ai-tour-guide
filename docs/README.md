@@ -1,6 +1,6 @@
-# "Baguette Voyages" tutorial
+# "Bon Voyage" tutorial
 
-This tutorial guides you through document ingestion, the Baguette Voyages chat app,
+This tutorial guides you through document ingestion, the Bon Voyage chat app,
 evaluation, and monitoring. See the [project README](../README.md) for prerequisites and
 environment configuration, and the [Make command reference](commands.md) for every
 available project command.
@@ -141,7 +141,7 @@ full command reference and document-definition format.
 
 ## Chat app
 
-Once at least one document has been ingested, start the Baguette Voyages chat app:
+Once at least one document has been ingested, start the Bon Voyage chat app:
 
 ```bash
 make app
@@ -150,7 +150,7 @@ make app
 The command starts the agent API and the Gradio chat interface. Open
 [http://localhost:7860](http://localhost:7860) in your browser.
 
-![Chat app welcome screen](tutorial/04_chat_app_welcome.png "Baguette Voyages chat")
+![Chat app welcome screen](tutorial/04_chat_app_welcome.png "Bon Voyage chat")
 
 Each chat session starts with a welcome from **Petit Guide**, followed by a second
 message containing example questions. Assistant messages are labelled **Petit Guide**

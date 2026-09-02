@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-portfolio-ai-tour-guide-agent = "ai_tour_guide.agent.cli:main"
+portfolio-ai-tour-guide-agent = "ai_tour_guide.app.cli:main"
 portfolio-ai-tour-guide-ingestion = "ai_tour_guide.ingestion.cli:main"
 
 [build-system]
@@ -38,6 +38,9 @@ module-name = "ai_tour_guide"
 # Configure code formatting style
 quote-style = "single"
 indent-style = "space"
+
+[tool.ruff.lint]
+extend-select = ["I"]
 
 [tool.mdformat]
 wrap = 88

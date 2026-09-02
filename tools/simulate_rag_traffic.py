@@ -8,15 +8,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from ai_tour_guide.app.agent.llm.fixture import FixtureLLMClient
 from sqlalchemy import delete, insert, select, update
 
-from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
-from ai_tour_guide.agent.rag.persistence import (
+from ai_tour_guide.app.agent.rag.persistence import (
     _usage_event_values,
     store_rag_result,
 )
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
-from ai_tour_guide.agent.responses import GENERATION_ERROR_ANSWER
+from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.app.agent.responses import GENERATION_ERROR_ANSWER
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.public import (
@@ -44,7 +44,7 @@ class SimulationSummary:
     errors: int
 
 
-_pipeline_logger = logging.getLogger('ai_tour_guide.agent.rag.pipeline')
+_pipeline_logger = logging.getLogger('ai_tour_guide.app.agent.rag.pipeline')
 
 
 def _simulated_timestamp(

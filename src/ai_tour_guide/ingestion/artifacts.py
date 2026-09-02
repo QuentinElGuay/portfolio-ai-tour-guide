@@ -186,6 +186,7 @@ def _document_record_to_dict(document: DocumentRecord) -> dict[str, Any]:
     return {
         'metadata': _metadata_to_dict(document.metadata),
         'source_checksum': document.source_checksum,
+        'destination': document.destination,
         'collection': document.collection,
         'version': document.version,
     }

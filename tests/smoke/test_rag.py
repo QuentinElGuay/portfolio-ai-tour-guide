@@ -2,8 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from ai_tour_guide.agent.api import app
-from ai_tour_guide.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.app.api import app
 
 
 def test_health_reports_a_populated_smoke_knowledge_base() -> None:
@@ -13,15 +12,22 @@ def test_health_reports_a_populated_smoke_knowledge_base() -> None:
     assert response.json() == {'status': 'ok'}
 
 
-def test_ask_returns_a_golden_answer_with_validated_source_pages() -> None:
-    response = TestClient(app).post(
-        '/ask',
-        json={'question': 'How can visitors travel from Rennes to Saint-Malo?'},
+def test_chat_message_returns_a_golden_answer_with_validated_source_pages() -> None:
+    client = TestClient(app)
+    start = client.post('/chat/start').json()
+    response = client.post(
+        '/chat/message',
+        json={
+            'session_id': start['session_id'],
+            'expected_step_id': start['step_id'],
+            'input_id': 'FREE_TEXT',
+            'text': 'How can visitors travel from Rennes to Saint-Malo?',
+        },
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload['answer'] == (
+    assert payload['message'] == (
         'Visitors can take the regional train from Rennes to Saint-Malo; the '
         'journey usually takes about fifty minutes.'
     )
@@ -31,13 +37,28 @@ def test_ask_returns_a_golden_answer_with_validated_source_pages() -> None:
     assert source['version'] is None
     assert source['pages']
     assert all(isinstance(page, int) and page > 0 for page in source['pages'])
+    assert payload['trace']['final_status'] == 'answered'
+    assert payload['trace']['evidence_sufficient'] is True
 
 
-def test_ask_refuses_an_unsupported_golden_question() -> None:
-    response = TestClient(app).post(
-        '/ask', json={'question': 'Can you reserve a hotel in Saint-Malo tonight?'}
+def test_chat_message_returns_a_demo_fallback_for_an_unsupported_question() -> None:
+    client = TestClient(app)
+    start = client.post('/chat/start').json()
+    response = client.post(
+        '/chat/message',
+        json={
+            'session_id': start['session_id'],
+            'expected_step_id': start['step_id'],
+            'input_id': 'FREE_TEXT',
+            'text': 'Can you reserve a hotel in Saint-Malo tonight?',
+        },
     )
 
     assert response.status_code == 200
-    assert response.json()['answer'] == INSUFFICIENT_CONTEXT_ANSWER
-    assert response.json()['sources'] == []
+    payload = response.json()
+    assert payload['message'].startswith(
+        'This is a demo backend with limited knowledge of Brittany'
+    )
+    assert '\n\nTry asking: “' in payload['message']
+    assert payload['sources'] == []
+    assert payload['trace']['final_status'] == 'answered'

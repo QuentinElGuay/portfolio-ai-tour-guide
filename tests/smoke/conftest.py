@@ -70,6 +70,7 @@ def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             (
                 IngestionDocument(
                     title='Brittany Weekend Notes',
+                    destination='Brittany',
                     source_url=source_url,
                     source_path=pdf_path,
                     collection='Smoke Test Guides',

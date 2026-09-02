@@ -35,14 +35,32 @@ flowchart LR
     LLM --> A[GeneratedAnswer<br/>answer + citations]
     A --> EVAL_RAG
 
-    subgraph APPS[Application interfaces]
-        CHAT[Chat UI / Chat backend]
-        API[Chat API /ask]
+    subgraph AGENT[Bounded agent workflow]
+        PLAN[Plan approved action]
+        TOOL[Typed tourism search tool]
+        EVAL[Evaluate evidence]
+        ANSWER[Answer or refuse]
+        PLAN --> TOOL --> EVAL
+        EVAL -->|sufficient| ANSWER
+        EVAL -->|insufficient and budget remains| PLAN
     end
 
-    PROMPT --> CHAT
-    A --> API
-    A --> CHAT
+    subgraph CONVERSATION[Checkpointed conversation graph]
+        FLOW[Validate step and input]
+        ROUTE[Guided action or free text]
+        FLOW --> ROUTE
+        ROUTE -->|free text| PLAN
+    end
+
+    subgraph APPS[Application interfaces]
+        CHAT[Chat UI / Chat backend]
+        API[Chat API<br/>/chat/start<br/>/chat/message<br/>/chat/feedback]
+    end
+
+    Q --> FLOW
+    ANSWER --> API
+    ANSWER --> CHAT
+    ROUTE --> CHAT
 
     classDef retrieval fill:#f5f0ff,stroke:#7b61ff,stroke-width:1.5px;
     classDef consumer fill:#eef6ff,stroke:#4a90e2,stroke-width:1.5px;
