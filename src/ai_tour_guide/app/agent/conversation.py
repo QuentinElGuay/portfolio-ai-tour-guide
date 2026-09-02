@@ -197,7 +197,7 @@ def build_outer_conversation_graph(
     async def catalog(state: OuterConversationState) -> dict[str, object]:
         titles = resolve_destinations()
         message = (
-            'Currently indexed destinations:\n'
+            'Our currently covered destinations are:\n'
             + '\n'.join(f'- {title}' for title in titles)
             if titles
             else 'No destinations are currently indexed.'

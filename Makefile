@@ -39,7 +39,7 @@ airflow: ## Start Airflow and its host-Docker ingestion orchestration.
 annotate-dataset: ## Interactively annotate golden-dataset answers and source pages.
 	uv run python tools/golden_dataset_annotator.py $(ANNOTATOR_ARGS)
 
-app: ## Start the app API and Gradio chat interface.
+app: db-init ## Initialize the database and start the app API and Gradio chat interface.
 	@if ! $(COMPOSE) --profile app up --build -d --wait database app; then \
 		echo "App startup failed. Recent app diagnostics:" >&2; \
 		$(COMPOSE) --profile app logs --tail=20 app >&2 || true; \

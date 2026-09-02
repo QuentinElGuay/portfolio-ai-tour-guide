@@ -35,7 +35,9 @@ IDENTITY_ANSWERS = {
         'I use RAG to retrieve relevant passages from regional tourism guides created by '
         '[Ibanista](https://www.ibanista.com/), a relocation company. Those passages '
         'give the LLM the context for a grounded answer, and the chat shows the supporting '
-        'sources. If the guides do not support an answer, I should say so rather than make it up.'
+        'sources.\n'
+        'My instructions are clear: if the guides do not support an answer, I should say '
+        'so rather than make an answer up.'
     ),
     BACK_TO_MAIN_MENU_QUESTION: 'What would you like to know about France?',
 }

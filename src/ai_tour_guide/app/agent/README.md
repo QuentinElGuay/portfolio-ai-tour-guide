@@ -39,13 +39,16 @@ base.
 
 ## Run the services
 
-The agent requires the knowledge-base database. Initialise its schema and ingest at
-least one document before starting the RAG application:
+The agent requires the knowledge-base database. Initialise its schema before starting
+the application:
 
 ```bash
 make db-init
-make ingest
 ```
+
+Ingestion is optional. With an empty knowledge base, the guided chat remains available,
+while travel questions return a clear no-sources response. Run `make ingest` or
+`make load-corpus` to enable source-grounded travel answers.
 
 The template defaults to the no-cost `baguette-llm` provider with the
 `mini-croissant-1.0` model. It still needs the database and embedding settings used for
@@ -70,8 +73,8 @@ make app
 
 Docker Compose gives the optional OpenAI credential only to the `app` service. The
 separate `chat` service calls `http://app:8000/chat` over the internal network.
-`make app` starts the database service as an app dependency, but it does not initialise
-or ingest the database.
+`make app` initializes the database schema and starts the database service, but does not
+ingest documents.
 
 To run only the API locally:
 

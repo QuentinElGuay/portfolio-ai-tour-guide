@@ -93,7 +93,7 @@ async def start_chat() -> ConversationResponse:
 
 
 def _ensure_knowledge_base_ready() -> None:
-    """Raise a service error when the configured schema has no corpus."""
+    """Verify database connectivity while allowing an empty knowledge base."""
     global _last_health_failure
 
     engine = create_database_engine()
@@ -119,19 +119,12 @@ def _ensure_knowledge_base_ready() -> None:
         failure = 'empty-knowledge-base'
         if _last_health_failure != failure:
             logger.warning(
-                'Knowledge-base health check failed: the public schema contains no '
-                'documents. Run `make airflow`, `make ingest` or `make load-corpus` '
-                'to ingest documents in the knowledge-base.'
+                'Knowledge-base is empty. The chat is available for guided answers, '
+                'but travel questions need ingested documents. Run `make airflow`, '
+                '`make ingest` or `make load-corpus` to populate it.'
             )
             _last_health_failure = failure
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                'Knowledge-base health check failed: the public schema contains no '
-                'documents. Run `make airflow`, `make ingest` or `make load-corpus` '
-                'to ingest documents in the knowledge-base.'
-            ),
-        )
+        return
 
     _last_health_failure = None
 

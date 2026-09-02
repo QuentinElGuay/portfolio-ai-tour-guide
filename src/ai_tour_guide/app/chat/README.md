@@ -17,7 +17,7 @@ Return to the [project overview](../../../../README.md) or the
 
 ## Run with Docker
 
-After initializing and ingesting the database, set `AGENT_LLM_API_KEY` in `.env` and
+After initializing the database, set `AGENT_LLM_API_KEY` in `.env` when using OpenAI and
 run:
 
 ```bash
@@ -28,6 +28,9 @@ Open `http://localhost:7860`. Docker Compose starts:
 
 - the app API at `http://localhost:8000`, with database and OpenAI access;
 - the Gradio interface at `http://localhost:7860`, configured to call the agent.
+
+Ingestion is optional for the guided chat. If the database has no documents, the API
+still starts and travel questions explain that source-grounded answers are unavailable.
 
 ## Run locally
 

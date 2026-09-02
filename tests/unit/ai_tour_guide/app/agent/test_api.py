@@ -169,7 +169,10 @@ def test_chat_message_catalog_is_deterministic(
         )
     )
 
-    assert response.message == 'Currently indexed destinations:\n- Brittany\n- Normandy'
+    assert (
+        response.message
+        == 'Our currently covered destinations are:\n- Brittany\n- Normandy'
+    )
     assert response.step_id == 'destinations'
     assert response.request_id is None
     list_titles.assert_called_once_with()
@@ -209,21 +212,17 @@ async def _chat_message_error(request: ChatMessageRequest) -> HTTPException:
 
 
 @patch('ai_tour_guide.app.api.create_database_engine')
-def test_health_logs_how_to_populate_an_empty_knowledge_base(
+def test_health_allows_an_empty_knowledge_base_and_logs_how_to_populate_it(
     create_database_engine: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     engine = create_database_engine.return_value
     engine.connect.return_value.__enter__.return_value.scalar.return_value = None
 
-    with (
-        caplog.at_level(logging.WARNING),
-        pytest.raises(HTTPException, match='schema contains no documents') as exc_info,
-    ):
+    with caplog.at_level(logging.WARNING):
         _ensure_knowledge_base_ready()
 
-    assert exc_info.value.status_code == 503
-    assert 'make ingest' in exc_info.value.detail
+    assert 'make ingest' in caplog.messages[-1]
     assert 'make load-corpus' in caplog.messages[-1]
     engine.dispose.assert_called_once_with()
 
