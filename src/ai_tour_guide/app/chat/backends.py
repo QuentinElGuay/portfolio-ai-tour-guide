@@ -45,7 +45,7 @@ class ChatBackend(ABC):
 
     @abstractmethod
     async def submit_feedback(
-        self, request_id: str, helpful: bool, comment: str | None = None
+        self, message_id: str, helpful: bool, comment: str | None = None
     ) -> None:
         """Submit feedback for a generated response."""
 
@@ -109,9 +109,9 @@ class DemoBackend(ChatBackend):
         )
 
     async def submit_feedback(
-        self, request_id: str, helpful: bool, comment: str | None = None
+        self, message_id: str, helpful: bool, comment: str | None = None
     ) -> None:
-        del request_id, helpful, comment
+        del message_id, helpful, comment
 
 
 class HttpChatBackend(ChatBackend):
@@ -164,14 +164,14 @@ class HttpChatBackend(ChatBackend):
         return self.validate_response(response.json())
 
     async def submit_feedback(
-        self, request_id: str, helpful: bool, comment: str | None = None
+        self, message_id: str, helpful: bool, comment: str | None = None
     ) -> None:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f'{self.api_url}/feedback',
                     json={
-                        'request_id': request_id,
+                        'message_id': message_id,
                         'helpful': helpful,
                         'comment': comment,
                     },

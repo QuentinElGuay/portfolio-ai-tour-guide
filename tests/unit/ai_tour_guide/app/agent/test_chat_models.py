@@ -29,7 +29,7 @@ def test_chat_models_round_trip_json() -> None:
         input_id=FREE_TEXT_INPUT_ID,
         text='  What should I visit?  ',
     )
-    feedback = ChatFeedbackResponse(request_id=UUID(int=1))
+    feedback = ChatFeedbackResponse(message_id=UUID(int=1))
 
     assert (
         ConversationResponse.model_validate_json(response.model_dump_json()) == response
@@ -51,14 +51,14 @@ def test_free_text_requires_non_empty_text() -> None:
 
 def test_feedback_and_safe_error_models_serialize() -> None:
     feedback = ChatFeedbackRequest(
-        request_id=UUID(int=1), helpful=True, comment='  Helpful. '
+        message_id=UUID(int=1), helpful=True, comment='  Helpful. '
     )
     error = ChatErrorResponse(
         code=ChatErrorCode.STALE_STEP, message='The conversation has moved on.'
     )
 
     assert feedback.comment == 'Helpful.'
-    assert feedback.model_dump(mode='json')['request_id'] == str(UUID(int=1))
+    assert feedback.model_dump(mode='json')['message_id'] == str(UUID(int=1))
     assert error.model_dump(mode='json') == {
         'code': 'stale_expected_step_id',
         'message': 'The conversation has moved on.',

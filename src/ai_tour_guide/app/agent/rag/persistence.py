@@ -12,7 +12,6 @@ from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.public import (
     llm_model_pricing,
     llm_usage_events,
-    rag_ratings,
     rag_results,
 )
 
@@ -140,26 +139,19 @@ def _rag_result_values(rag_result: Mapping[str, Any]) -> dict[str, object]:
     llm_metadata = _mapping(rag_result.get('llm_metadata'))
     usage = _mapping(llm_metadata.get('usage'))
     rag_trace = dict(rag_result)
+    rag_trace.pop('question', None)
+    rag_trace.pop('messages', None)
+    rag_trace.pop('generated', None)
     rag_trace.pop('raw_provider_response', None)
 
-    question = _optional_string(rag_result.get('question'))
-    answer = _optional_string(generated.get('answer'))
     search_mode = _optional_string(rag_result.get('mode'))
     retrieval_k = _optional_integer(rag_result.get('k'))
     schema_version = _optional_integer(rag_result.get('schema_version'))
-    if (
-        question is None
-        or answer is None
-        or search_mode is None
-        or retrieval_k is None
-        or schema_version is None
-    ):
+    if search_mode is None or retrieval_k is None or schema_version is None:
         raise ValueError('rag_result is missing required fields')
 
     return {
         'rag_result_schema_version': schema_version,
-        'question': question,
-        'answer': answer,
         'search_mode': search_mode,
         'retrieval_k': retrieval_k,
         'success': _success(error, contexts),
@@ -220,30 +212,4 @@ def store_rag_result(
             connection.execute(insert(llm_usage_events).values(usage_event))
 
 
-def store_feedback(
-    request_id: UUID,
-    helpful: bool,
-    comment: str | None = None,
-    *,
-    engine: Engine | None = None,
-) -> bool:
-    """Store one user-feedback event for an existing RAG result."""
-    with database_engine(engine) as db_engine, db_engine.begin() as connection:
-        result_exists = connection.scalar(
-            select(rag_results.c.request_id)
-            .where(rag_results.c.request_id == request_id)
-            .limit(1)
-        )
-        if result_exists is None:
-            return False
-        connection.execute(
-            insert(rag_ratings).values(
-                request_id=request_id,
-                helpful=helpful,
-                comment=comment,
-            )
-        )
-    return True
-
-
-__all__ = ['UnimplementedModelError', 'store_feedback', 'store_rag_result']
+__all__ = ['UnimplementedModelError', 'store_rag_result']

@@ -1,6 +1,6 @@
 from enum import StrEnum
 from typing import TypedDict
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -104,6 +104,7 @@ class ConversationResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     session_id: UUID
+    message_id: UUID = Field(default_factory=uuid4)
     step_id: str = Field(min_length=1)
     message: str = Field(min_length=1)
     buttons: list[ConversationButton] = Field(default_factory=list)
@@ -118,6 +119,23 @@ class ConversationResponse(BaseModel):
         if not value:
             raise ValueError('must not be empty')
         return value
+
+
+class ChatMessage(BaseModel):
+    """A durable, provider-neutral conversation message."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    session_id: UUID
+    role: Role
+    content: str = Field(min_length=1)
+    flow_step: str | None = None
+    input_id: str | None = None
+    message_id: UUID = Field(default_factory=uuid4)
+    rag_request_id: UUID | None = None
+    sources: list[dict[str, object]] = Field(default_factory=list)
+    trace: ConversationTrace | None = None
+    buttons: list[ConversationButton] = Field(default_factory=list)
 
 
 class ChatErrorCode(StrEnum):
@@ -141,7 +159,7 @@ class ChatFeedbackRequest(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    request_id: UUID
+    message_id: UUID
     helpful: bool
     comment: str | None = None
 
@@ -156,7 +174,7 @@ class ChatFeedbackRequest(BaseModel):
 class ChatFeedbackResponse(BaseModel):
     """Confirmation that feedback was linked to a generated response."""
 
-    request_id: UUID
+    message_id: UUID
 
 
 __all__ = [
@@ -166,6 +184,7 @@ __all__ = [
     'ChatFeedbackRequest',
     'ChatFeedbackResponse',
     'ChatHistoryItem',
+    'ChatMessage',
     'ChatMessageRequest',
     'ConversationButton',
     'ConversationResponse',

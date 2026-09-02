@@ -275,7 +275,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             reply = f'**Backend error:** {exc}'
             request_id = placeholder_request_id(assistant_message_index)
         else:
-            response_request_id = response.request_id
+            response_request_id = response.message_id
             request_id = (
                 str(response_request_id)
                 if response_request_id is not None

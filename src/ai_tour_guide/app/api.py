@@ -21,17 +21,17 @@ from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
 from ai_tour_guide.app.agent.rag.models import RAGResult
-from ai_tour_guide.app.agent.rag.persistence import (
-    store_feedback,
-    store_rag_result,
-)
+from ai_tour_guide.app.agent.rag.persistence import store_rag_result
 from ai_tour_guide.app.chat.models import (
     ChatErrorCode,
     ChatFeedbackRequest,
     ChatFeedbackResponse,
+    ChatMessage,
     ChatMessageRequest,
     ConversationResponse,
+    Role,
 )
+from ai_tour_guide.app.chat.persistence import store_chat_message, store_feedback
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
@@ -78,7 +78,18 @@ async def start_chat() -> ConversationResponse:
         {'session_id': session_id, 'messages': []},
         config={'configurable': {'thread_id': session_id}},
     )
-    return ConversationResponse.model_validate(state['latest_response'])
+    response = ConversationResponse.model_validate(state['latest_response'])
+    store_chat_message(
+        ChatMessage(
+            session_id=response.session_id,
+            role=Role.ASSISTANT,
+            content=response.message,
+            flow_step=response.step_id,
+            message_id=response.message_id,
+            buttons=response.buttons,
+        )
+    )
+    return response
 
 
 def _ensure_knowledge_base_ready() -> None:
@@ -223,7 +234,36 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
                 status_code=503,
                 detail='Unable to store the generated answer for feedback.',
             ) from exc
-    return ConversationResponse.model_validate(state['latest_response'])
+    response = ConversationResponse.model_validate(state['latest_response'])
+    try:
+        store_chat_message(
+            ChatMessage(
+                session_id=request.session_id,
+                role=Role.USER,
+                content=request.text or request.input_id,
+                flow_step=request.expected_step_id,
+                input_id=request.input_id,
+            )
+        )
+        store_chat_message(
+            ChatMessage(
+                session_id=response.session_id,
+                role=Role.ASSISTANT,
+                content=response.message,
+                flow_step=response.step_id,
+                message_id=response.message_id,
+                rag_request_id=response.request_id,
+                sources=response.sources,
+                trace=response.trace,
+                buttons=response.buttons,
+            )
+        )
+    except SQLAlchemyError as exc:
+        logger.exception('Unable to store chat messages')
+        raise HTTPException(
+            status_code=503, detail='Unable to store chat messages.'
+        ) from exc
+    return response
 
 
 async def _store_chat_feedback(
@@ -231,16 +271,16 @@ async def _store_chat_feedback(
 ) -> ChatFeedbackResponse:
     """Store a rating for a previously generated chat response."""
     try:
-        stored = store_feedback(request.request_id, request.helpful, request.comment)
+        stored = store_feedback(request.message_id, request.helpful, request.comment)
     except SQLAlchemyError as exc:
-        logger.exception('Unable to store feedback: request_id=%s', request.request_id)
+        logger.exception('Unable to store feedback: message_id=%s', request.message_id)
         raise HTTPException(
             status_code=503,
             detail='Unable to store feedback.',
         ) from exc
     if not stored:
-        raise HTTPException(status_code=404, detail='Unknown RAG result request ID.')
-    return ChatFeedbackResponse(request_id=request.request_id)
+        raise HTTPException(status_code=404, detail='Unknown chat message ID.')
+    return ChatFeedbackResponse(message_id=request.message_id)
 
 
 @app.post('/chat/feedback', response_model=ChatFeedbackResponse)

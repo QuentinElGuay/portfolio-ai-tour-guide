@@ -17,6 +17,7 @@ from ai_tour_guide.ingestion.pdf.parser import IngestionDocument
 from ai_tour_guide.ingestion.pipeline import run_pipeline
 from ai_tour_guide.ingestion.settings import IngestionSettings
 from ai_tour_guide.knowledge_base.corpus import clear_knowledge_base
+from ai_tour_guide.knowledge_base.database.init import initialize_database
 from ai_tour_guide.knowledge_base.database.settings import DatabaseSettings
 
 from .pdf_fixture import create_brittany_weekend_notes
@@ -62,6 +63,7 @@ def ingested_smoke_document(tmp_path_factory: pytest.TempPathFactory) -> Iterato
         + '\n',
         encoding='utf-8',
     )
+    initialize_database('smoke')
     clear_knowledge_base(schema_name='smoke')
     settings = IngestionSettings(timeout=10)
     embedding_settings = EmbeddingSettings()

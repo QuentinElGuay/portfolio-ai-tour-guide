@@ -55,7 +55,8 @@ typeCheckingMode = "standard"
 reportCallIssue = "none"
 venvPath = "."
 venv = ".venv"
-include = ["src", "tests"]
+include = ["src", "tests", "tools"]
+extraPaths = ["src"]
 
 [dependency-groups]
 dev = [

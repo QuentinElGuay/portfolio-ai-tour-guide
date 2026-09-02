@@ -9,14 +9,12 @@ from questionary import Choice
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.app.agent.rag.models import RAG_RESULT_SCHEMA_VERSION
-from ai_tour_guide.app.agent.rag.persistence import (
-    store_feedback,
-    store_rag_result,
-)
+from ai_tour_guide.app.agent.rag.persistence import store_rag_result
 from ai_tour_guide.app.agent.rag.pipeline import answer_question
 from ai_tour_guide.app.agent.source_formatting import format_page_range
 from ai_tour_guide.app.chat.backends import create_backend
 from ai_tour_guide.app.chat.models import FREE_TEXT_INPUT_ID
+from ai_tour_guide.app.chat.persistence import store_feedback
 from ai_tour_guide.knowledge_base.retrieval import retrieve_context
 from ai_tour_guide.knowledge_base.search import (
     DEFAULT_SEARCH_MODE,
@@ -109,24 +107,24 @@ def ask_command(question: str, mode: str, k: int, verbose: bool) -> None:
 
 
 @main.command('feedback')
-@click.argument('request_id')
+@click.argument('message_id')
 @click.option(
     '--helpful/--not-helpful',
     required=True,
     help='Whether the generated answer was helpful.',
 )
 @click.option('--comment', default=None, help='Optional feedback comment.')
-def feedback_command(request_id: str, helpful: bool, comment: str | None) -> None:
-    """Submit feedback for a previously generated RAG answer."""
+def feedback_command(message_id: str, helpful: bool, comment: str | None) -> None:
+    """Submit feedback for a previously generated chat message."""
     try:
-        parsed_request_id = UUID(request_id)
-        stored = store_feedback(parsed_request_id, helpful, comment)
+        parsed_message_id = UUID(message_id)
+        stored = store_feedback(parsed_message_id, helpful, comment)
     except (SQLAlchemyError, TypeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     if not stored:
-        raise click.ClickException('Unknown RAG result request ID.')
-    click.echo(f'Feedback stored for request {parsed_request_id}.')
+        raise click.ClickException('Unknown chat message ID.')
+    click.echo(f'Feedback stored for message {parsed_message_id}.')
 
 
 @main.command('chat')

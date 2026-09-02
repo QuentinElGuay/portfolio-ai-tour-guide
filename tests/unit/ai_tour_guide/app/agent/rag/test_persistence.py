@@ -12,8 +12,9 @@ from ai_tour_guide.app.agent.rag.persistence import (
     _usage_event_values,
 )
 from ai_tour_guide.knowledge_base.database.tables.public import (
+    chat_feedback,
+    chat_messages,
     metadata,
-    rag_ratings,
     rag_results,
 )
 
@@ -28,8 +29,6 @@ def test_rag_results_store_one_result_snapshot_per_request() -> None:
     assert isinstance(rag_results.c.rag_trace.type, JSONB)
     assert {
         'rag_result_schema_version',
-        'question',
-        'answer',
         'search_mode',
         'retrieval_k',
         'success',
@@ -49,23 +48,25 @@ def test_rag_results_store_one_result_snapshot_per_request() -> None:
     } <= set(rag_results.c.keys())
 
 
-def test_rag_rating_references_a_rag_result() -> None:
-    """Verify that rag rating references a rag result."""
-    assert rag_ratings.name == 'rag_ratings'
-    assert rag_ratings.metadata is metadata
-    assert rag_ratings.c.feedback_id.primary_key
-    assert isinstance(rag_ratings.c.request_id.type, UUID)
-    assert rag_ratings.c.helpful.nullable is False
+def test_chat_feedback_references_a_chat_message() -> None:
+    """Verify that feedback is owned by generic chat messages."""
+    assert chat_messages.name == 'chat_messages'
+    assert chat_messages.metadata is metadata
+    assert chat_feedback.name == 'chat_feedback'
+    assert chat_feedback.metadata is metadata
+    assert chat_feedback.c.feedback_id.primary_key
+    assert isinstance(chat_feedback.c.message_id.type, UUID)
+    assert chat_feedback.c.helpful.nullable is False
     assert {
         foreign_key.target_fullname
-        for foreign_key in rag_ratings.c.request_id.foreign_keys
-    } == {'rag_results.request_id'}
+        for foreign_key in chat_feedback.c.message_id.foreign_keys
+    } == {'chat_messages.message_id'}
 
 
 def test_rag_result_and_feedback_constraints() -> None:
     """Verify that rag result and feedback constraints."""
     result_constraints = {constraint.name for constraint in rag_results.constraints}
-    feedback_constraints = {constraint.name for constraint in rag_ratings.constraints}
+    feedback_constraints = {constraint.name for constraint in chat_feedback.constraints}
 
     assert result_constraints >= {
         'ck_rag_results_retrieval_k_positive',
@@ -80,8 +81,8 @@ def test_rag_result_and_feedback_constraints() -> None:
         'ix_rag_results_search_mode',
         'ix_rag_results_success',
     }
-    assert {index.name for index in rag_ratings.indexes} >= {
-        'ix_rag_ratings_request_id'
+    assert {index.name for index in chat_feedback.indexes} >= {
+        'ix_chat_feedback_message_id'
     }
 
 
@@ -117,13 +118,16 @@ def test_rag_result_values_promote_queryable_result_fields() -> None:
         }
     )
 
-    assert values['question'] == 'Where should I visit?'
-    assert values['answer'] == 'Visit the coast.'
+    assert 'question' not in values
+    assert 'answer' not in values
     assert values['success'] is True
     assert values['search_result_count'] == 3
     assert values['total_tokens'] == 30
     rag_trace = values['rag_trace']
     assert isinstance(rag_trace, dict)
+    assert 'question' not in rag_trace
+    assert 'messages' not in rag_trace
+    assert 'generated' not in rag_trace
     assert 'raw_provider_response' not in rag_trace
 
 

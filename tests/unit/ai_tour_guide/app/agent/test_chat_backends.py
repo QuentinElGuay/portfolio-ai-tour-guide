@@ -119,7 +119,7 @@ def test_http_backend_submits_feedback_under_chat_namespace(
     client.post.assert_awaited_once_with(
         'http://agent/chat/feedback',
         json={
-            'request_id': '12345678-1234-5678-1234-567812345678',
+            'message_id': '12345678-1234-5678-1234-567812345678',
             'helpful': False,
             'comment': None,
         },

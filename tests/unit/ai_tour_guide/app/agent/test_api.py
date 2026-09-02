@@ -22,6 +22,14 @@ from ai_tour_guide.app.chat.models import ChatMessageRequest, ConversationRespon
 from ai_tour_guide.knowledge_base.search import SearchMode
 
 
+@pytest.fixture(autouse=True)
+def store_chat_message_fixture(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Prevent HTTP-boundary unit tests from writing conversation rows."""
+    stored = MagicMock()
+    monkeypatch.setattr('ai_tour_guide.app.api.store_chat_message', stored)
+    return stored
+
+
 def _post(path: str, payload: Mapping[str, object]) -> httpx.Response:
     """Send one request through the ASGI boundary without starting a server thread."""
 
@@ -79,8 +87,10 @@ def test_chat_message_serializes_the_backend_response(
 
     response = asyncio.run(chat_message(request))
 
-    assert response.model_dump(mode='json') == {
+    payload = response.model_dump(mode='json')
+    assert payload == {
         'session_id': str(request.session_id),
+        'message_id': str(response.message_id),
         'step_id': 'welcome',
         'message': 'The answer.',
         'buttons': [
@@ -109,6 +119,7 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
     payload = response.json()
     assert set(payload) == {
         'session_id',
+        'message_id',
         'step_id',
         'message',
         'buttons',
@@ -129,15 +140,15 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
 def test_chat_feedback_http_boundary_uses_the_chat_namespace(
     store_feedback: MagicMock,
 ) -> None:
-    request_id = UUID(int=1)
+    message_id = UUID(int=1)
     response = _post(
         '/chat/feedback',
-        {'request_id': str(request_id), 'helpful': True, 'comment': '  Useful. '},
+        {'message_id': str(message_id), 'helpful': True, 'comment': '  Useful. '},
     )
 
     assert response.status_code == 200
-    assert response.json() == {'request_id': str(request_id)}
-    store_feedback.assert_called_once_with(request_id, True, 'Useful.')
+    assert response.json() == {'message_id': str(message_id)}
+    store_feedback.assert_called_once_with(message_id, True, 'Useful.')
 
 
 @patch(

@@ -134,74 +134,89 @@ evidence, and a deterministic smoke test are also available.
 
 ______________________________________________________________________
 
-## ⏳ Milestone 9 — Explicitly Agentic Travel Assistant
+## 🔄 Milestone 9 — Explicitly Agentic Travel Assistant
 
 **Goal:** make the agent boundary explicit by separating UI navigation, conversation
 state, and turn-level agent reasoning, then implement a bounded, inspectable tool loop.
 
 ### [P0] Separate responsibilities
 
-- [ ] Keep guided buttons and labels as a chat-UI/navigation concern rather than the
+- [x] Keep guided buttons and labels as a chat-UI/navigation concern rather than the
   primary routing mechanism of the RAG agent.
-- [ ] Keep session history, follow-up resolution, and thread checkpointing in a separate
+- [x] Keep session history, follow-up resolution, and thread checkpointing in a separate
   conversation layer.
-- [ ] Define the travel-agent graph as the owner of one turn's planning, tool use,
+- [x] Define the travel-agent graph as the owner of one turn's planning, tool use,
   evidence evaluation, answer generation, and stopping decision.
-- [ ] Replace `ChatBackend.ask(messages, option_id=...)` with an input that accepts the
+- [x] Replace `ChatBackend.ask(messages, option_id=...)` with an input that accepts the
   submitted question and optional guided-navigation ID.
-- [ ] Remove app-side message construction and history normalization from the Gradio
+- [x] Remove app-side message construction and history normalization from the Gradio
   layer; retain only UI rendering and event adaptation there.
 
 ### [P0] Add an explicit bounded tool loop
 
-- [ ] Extract retrieval into a typed `search_tourism_knowledge_base` tool returning
+- [x] Extract retrieval into a typed `search_tourism_knowledge_base` tool returning
   passages, source identity, pages, and relevance metadata.
-- [ ] Replace the mostly one-pass graph with explicit `plan -> tool -> evaluate`
+- [x] Replace the mostly one-pass graph with explicit `plan -> tool -> evaluate`
   transitions.
-- [ ] Let the agent select bounded actions: `search_knowledge_base`,
+- [x] Let the agent select bounded actions: `search_knowledge_base`,
   `reformulate_search`, `answer_from_context`, or `refuse`.
-- [ ] Add an evidence-evaluation node that checks whether retrieved context is
+- [x] Add an evidence-evaluation node that checks whether retrieved context is
   sufficient before generation.
-- [ ] Add bounded retry/reformulation for insufficient evidence, followed by refusal
+- [x] Add bounded retry/reformulation for insufficient evidence, followed by refusal
   when the retry budget is exhausted.
-- [ ] Keep citation validation as a mandatory post-generation safety boundary.
-- [ ] Enforce limits on tool names, tool-call count, retrieval scope, and unsupported
+- [x] Keep citation validation as a mandatory post-generation safety boundary.
+- [x] Enforce limits on tool names, tool-call count, retrieval scope, and unsupported
   claims.
 
 ### [P1] Make agent behavior inspectable
 
-- [ ] Define typed graph state for the question, intent, planned actions, tool calls,
+- [x] Define typed graph state for the question, intent, planned actions, tool calls,
   evidence, retry count, answer, citations, and final status.
-- [ ] Record structured action metadata, without exposing private chain-of-thought, for
+- [x] Record structured action metadata, without exposing private chain-of-thought, for
   CLI verbose output, API diagnostics, evaluation, and monitoring.
-- [ ] Update the README and architecture diagrams to document the bounded agent loop and
+- [x] Update the README and architecture diagrams to document the bounded agent loop and
   the separation between conversation orchestration and agent reasoning.
-- [ ] Add tests for action routing, tool execution, evidence sufficiency, retry limits,
+- [x] Add tests for action routing, tool execution, evidence sufficiency, retry limits,
   refusal, citation validation, and trace output.
 
 ### [P1] LangGraph architecture hardening
 
-- [ ] Refine the outer conversation graph to use explicit conditional edges or `Command`
+- [x] Refine the outer conversation graph to use explicit conditional edges or `Command`
   routing for initialization, guided actions, free text, and terminal states.
-- [ ] Decompose the turn-level `TravelAgent` subgraph into explicit plan, tool,
+- [x] Decompose the turn-level `TravelAgent` subgraph into explicit plan, tool,
   evaluate, answer, and refuse nodes where LangGraph provides a clear benefit.
-- [ ] Keep checkpoint ownership exclusively in the outer conversation graph and verify
+- [x] Keep checkpoint ownership exclusively in the outer conversation graph and verify
   the boundary with graph-state and checkpoint tests.
+
+### [P1] Durable conversation and feedback records
+
+- [x] Persist provider-neutral `ChatMessage` records for every accepted user turn and
+  every assistant response, including guided-flow responses.
+- [x] Keep `RAGResult` limited to retrieval and generation diagnostics; store generic
+  conversation content, sources, trace metadata, buttons, and flow context on
+  `ChatMessage` instead.
+- [x] Associate each RAG-backed assistant message with its diagnostic `rag_request_id`
+  without requiring RAG for every assistant response.
+- [x] Attach feedback to any persisted assistant `message_id`, rather than to a
+  RAG-specific request ID, across the API, CLI, and Gradio client.
+- [x] Update synthetic dashboard traffic to create user and assistant messages and
+  message-scoped chat feedback, including safe cleanup of simulated records.
 
 ______________________________________________________________________
 
 ## ⏳ Release v1.3.0 — Bounded agentic RAG
 
-**Status:** ⏳ Planned
+**Status:** 🔄 In progress
 
 This release will deliver a clearly separated, source-grounded travel agent with an
-explicit retrieval tool, bounded planning and retry behavior, citation validation, and
-observable execution traces. The Gradio chat remains a client of the conversation API,
-while LangGraph owns the stateful turn-level agent workflow.
+explicit retrieval tool, bounded planning and retry behavior, citation validation,
+observable execution traces, and durable provider-neutral conversation records. The
+Gradio chat remains a client of the conversation API, while LangGraph owns the stateful
+turn-level agent workflow.
 
 ______________________________________________________________________
 
-## Follow-up work after v1.0.0
+## Follow-up work
 
 These improvements are useful but are not priorities for the final submission.
 
@@ -235,14 +250,6 @@ These improvements are useful but are not priorities for the final submission.
   where evaluation identifies a need.
 - [ ] Evaluate query rewriting, reranking, and additional hybrid configurations; retain
   them only when they improve quality within the latency budget.
-
-### [P2] Conversation and agentic architecture
-
-- [ ] Separate `RAGResult` from conversation messages and agent execution state so the
-  assistant can support agentic actions, tool calls, and multi-step interactions rather
-  than only pure RAG answers. Use the new conversation/assistant-turn model as the
-  appropriate place to store answer emotion and other presentation metadata, while
-  keeping retrieval provenance attached to RAG results.
 
 ### [P2] Controlled LLM comparison
 

@@ -92,13 +92,13 @@ def test_ask_command_prints_answer_and_compact_sources(
 @patch('ai_tour_guide.app.cli.store_feedback', return_value=True)
 def test_feedback_command_stores_helpful_feedback(store_feedback: MagicMock) -> None:
     """Verify that feedback command stores helpful feedback."""
-    request_id = UUID('11111111-1111-1111-1111-111111111111')
+    message_id = UUID('11111111-1111-1111-1111-111111111111')
 
     invocation = CliRunner().invoke(
         main,
         [
             'feedback',
-            str(request_id),
+            str(message_id),
             '--helpful',
             '--comment',
             'Clear answer.',
@@ -106,22 +106,22 @@ def test_feedback_command_stores_helpful_feedback(store_feedback: MagicMock) -> 
     )
 
     assert invocation.exit_code == 0
-    assert f'Feedback stored for request {request_id}.' in invocation.output
-    store_feedback.assert_called_once_with(request_id, True, 'Clear answer.')
+    assert f'Feedback stored for message {message_id}.' in invocation.output
+    store_feedback.assert_called_once_with(message_id, True, 'Clear answer.')
 
 
 @patch('ai_tour_guide.app.cli.store_feedback', return_value=False)
 def test_feedback_command_rejects_unknown_request(store_feedback: MagicMock) -> None:
     """Verify that feedback command rejects unknown request."""
-    request_id = UUID('22222222-2222-2222-2222-222222222222')
+    message_id = UUID('22222222-2222-2222-2222-222222222222')
 
     invocation = CliRunner().invoke(
-        main, ['feedback', str(request_id), '--not-helpful']
+        main, ['feedback', str(message_id), '--not-helpful']
     )
 
     assert invocation.exit_code != 0
-    assert 'Unknown RAG result request ID.' in invocation.output
-    store_feedback.assert_called_once_with(request_id, False, None)
+    assert 'Unknown chat message ID.' in invocation.output
+    store_feedback.assert_called_once_with(message_id, False, None)
 
 
 @patch('ai_tour_guide.app.cli.questionary.text')
