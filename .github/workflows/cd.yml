@@ -49,7 +49,7 @@ jobs:
             --tag "${image_prefix}-base:${revision}" \
             .
 
-          for service in agent ingestion; do
+          for service in app ingestion; do
             docker buildx build --push \
               --file "docker/${service}.Dockerfile" \
               --build-context "ai-tour-guide-base=docker-image://${image_prefix}-base:${revision}" \
