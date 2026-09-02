@@ -17,6 +17,7 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
+  - [Tutorial](#tutorial)
 - [Common commands](#common-commands)
 - [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
@@ -191,6 +192,8 @@ AGENT_LLM_MODEL=gpt-4.1-mini
 Open [http://localhost:7860](http://localhost:7860) to use the chat. The API is
 available at [http://localhost:8000](http://localhost:8000), with interactive
 documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### Tutorial
 
 For detailed setup, demo limitations, Airflow ingestion, evaluation, and dashboard
 monitoring, follow the [tutorial](docs/README.md).

@@ -1,4 +1,4 @@
-# "Bon Voyage" tutorial
+# _Bon Voyage_ tutorial
 
 This tutorial guides you through document ingestion, the Bon Voyage chat app,
 evaluation, and monitoring. See the [project README](../README.md) for prerequisites and
