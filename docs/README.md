@@ -34,16 +34,13 @@ AGENT_LLM_MODEL=mini-croissant-1.0
 The demo can answer a prepared set of Brittany questions. For any other question, it
 explains that it is a limited demo and suggests a question it can answer.
 
-For live answer generation, switch to OpenAI and set your API key:
+Supported live LLM providers and recommended models:
 
-```dotenv
-AGENT_LLM_PROVIDER=openai
-AGENT_LLM_API_KEY=your-api-key
-AGENT_LLM_MODEL=gpt-4.1-mini
-```
+- OpenAI (ChatGPT): `gpt-4.1-mini`
+- Google Gemini: `gemini-2.5-flash-lite` (free-tier)
 
-OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
-the recommended model for this project.
+Configure the selected provider and API key in `.env` with `AGENT_LLM_PROVIDER`,
+`AGENT_LLM_API_KEY`, and `AGENT_LLM_MODEL`.
 
 The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
 contains development defaults for these values; replace them before sharing the services

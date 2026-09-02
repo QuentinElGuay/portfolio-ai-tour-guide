@@ -165,8 +165,8 @@ make app
 
 This starts the _Bon Voyage_ travel assistant in demo mode. The demo uses a no-cost
 deterministic provider and does not require an LLM API key or ingested documents. It
-supports a prepared set of Brittany questions and suggests a supported question when it
-cannot answer. The guided chat remains available even when the knowledge base is empty.
+supports a prepared set of questions and suggests a supported question when it cannot
+answer. The guided chat remains available even when the knowledge base is empty.
 
 ### Complete mode
 

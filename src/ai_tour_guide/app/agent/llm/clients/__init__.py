@@ -32,6 +32,10 @@ class LLMClient(Protocol):
 AgentLLMClient = LLMClient
 
 from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
+from ai_tour_guide.app.agent.llm.clients.gemini import (
+    GeminiClient,
+    create_gemini_client,
+)
 from ai_tour_guide.app.agent.llm.clients.openai import (
     OpenAIClient,
     _parse_answer,
@@ -41,9 +45,11 @@ from ai_tour_guide.app.agent.llm.clients.openai import (
 __all__ = [
     'AgentLLMClient',
     'DemoLLMClient',
+    'GeminiClient',
     'GenerationError',
     'LLMClient',
     'OpenAIClient',
     '_parse_answer',
+    'create_gemini_client',
     'create_openai_client',
 ]

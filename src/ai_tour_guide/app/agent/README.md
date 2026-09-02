@@ -27,15 +27,18 @@ Return to the [project overview](../../../README.md).
 6. The agent validates citations against retrieved provenance, then returns only
    validated source references and safe operational trace metadata to clients.
 
-OpenAI is the only supported provider for live answer generation, and `gpt-4.1-mini` is
-the recommended model. The bundled `baguette-llm` provider, using the
-`mini-croissant-1.0` model, is a no-cost deterministic Brittany demo; it is not a
-general-purpose LLM. It retains its deterministic matching behavior and does not use the
-LangGraph workflow.
+Supported live LLM providers and recommended models:
 
-The `baguette-llm` provider does not require an API key. OpenAI requires an API key;
-without one, the service raises a configuration error before querying the knowledge
-base.
+- OpenAI (ChatGPT): `gpt-4.1-mini`
+- Google Gemini: `gemini-2.5-flash-lite` (free-tier)
+
+The bundled `baguette-llm` provider, `mini-croissant-1.0` model, is a no-cost
+deterministic Brittany demo; it is not a general-purpose LLM. It retains its
+deterministic matching behavior and does not use the LangGraph workflow.
+
+The `baguette-llm` provider does not require an API key. OpenAI and Gemini require an
+API key; without one, the service raises a configuration error before querying the
+knowledge base.
 
 ## Run the services
 
@@ -57,13 +60,16 @@ question when it cannot answer. It also accepts modest spelling or punctuation
 variations. A somewhat similar question receives a targeted `Did you mean...?`
 suggestion; an unrelated question receives a random supported-question suggestion.
 
-To use live answer generation, switch to OpenAI and add your API key:
+To use live answer generation with ChatGPT, switch to OpenAI and add your API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
 AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
+
+To use Google Gemini, set `AGENT_LLM_PROVIDER=gemini`, add your API key, and use
+`AGENT_LLM_MODEL=gemini-2.5-flash-lite`.
 
 Start the agent API and Gradio chat together:
 
@@ -180,7 +186,7 @@ make ingest
 | Variable             | Purpose                                | Template value                |
 | -------------------- | -------------------------------------- | ----------------------------- |
 | `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `baguette-llm`                |
-| `AGENT_LLM_API_KEY`  | Required only for OpenAI               | Not required for Baguette LLM |
+| `AGENT_LLM_API_KEY`  | Required for OpenAI or Gemini          | Not required for Baguette LLM |
 | `AGENT_LLM_MODEL`    | LLM model identifier                   | `mini-croissant-1.0`          |
 | `APP_PORT`           | Host port for the agent API            | `8000`                        |
 | `DB_*`               | Database connection used for retrieval | See `.env.template`           |
@@ -191,8 +197,8 @@ use the same value for schema initialization, ingestion, and the agent so RAG re
 knowledge base you populated.
 
 `AGENT_LLM_MODEL` is required by the settings class; `.env.template` provides the
-`mini-croissant-1.0` default. OpenAI is the only supported provider for live answer
-generation, and `gpt-4.1-mini` is the recommended model.
+`mini-croissant-1.0` default. OpenAI (ChatGPT) and Google Gemini are supported providers
+for live answer generation.
 
 For the chat service's `CHAT_*` settings and development-only `DemoBackend`, see the
 [chat guide](chat/README.md).

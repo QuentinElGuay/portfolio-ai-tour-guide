@@ -8,6 +8,7 @@ from pydantic import SecretStr
 
 from ai_tour_guide.app.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
 from ai_tour_guide.app.agent.llm.clients import (
+    GeminiClient,
     GenerationError,
     OpenAIClient,
     _parse_answer,
@@ -77,6 +78,67 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     assert request['text']['format']['type'] == 'json_schema'
 
 
+def test_gemini_client_sends_messages_and_returns_structured_output() -> None:
+    """Verify that Gemini returns the shared structured answer contract."""
+    response = SimpleNamespace(
+        text='{"answer": "A grounded answer.", "citations": [], "emotion": "happy"}',
+        usage_metadata=None,
+    )
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=response)
+    settings = AgentsSettings(
+        api_key=SecretStr('test-token'),
+        model='gemini-test-model',
+    )
+
+    result = asyncio.run(
+        GeminiClient(settings, client=client).answer_question(
+            [
+                {'role': Role.SYSTEM, 'content': 'Use the context.'},
+                {'role': Role.USER, 'content': 'What should I visit?'},
+            ]
+        )
+    )
+
+    assert result.answer == 'A grounded answer.'
+    assert result.emotion.value == 'happy'
+    request = client.aio.models.generate_content.await_args.kwargs
+    assert request['model'] == 'gemini-test-model'
+    assert request['config'].response_mime_type == 'application/json'
+    assert request['config'].system_instruction == 'Use the context.'
+
+
+def test_gemini_client_extracts_search_tool_calls() -> None:
+    """Verify that Gemini tool-call arguments become a search query."""
+    function_call = SimpleNamespace(
+        name='search_tourism_knowledge_base',
+        args={'query': 'best places in Brittany'},
+    )
+    response = SimpleNamespace(
+        candidates=[
+            SimpleNamespace(
+                content=SimpleNamespace(
+                    parts=[SimpleNamespace(function_call=function_call)]
+                )
+            )
+        ]
+    )
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=response)
+    settings = AgentsSettings(
+        api_key=SecretStr('test-token'),
+        model='gemini-test-model',
+    )
+
+    result = asyncio.run(
+        GeminiClient(settings, client=client).choose_search_query(
+            'Where should I go?', previous_queries=(), has_context=False
+        )
+    )
+
+    assert result == 'best places in Brittany'
+
+
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
     """Verify that default llm client is openai when openai is configured."""
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
@@ -86,6 +148,20 @@ def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> 
 
     assert isinstance(client, OpenAIClient)
     assert client.model == 'test-model'
+
+
+def test_gemini_llm_client_is_selected_when_gemini_is_configured() -> None:
+    """Verify that the factory selects Gemini for the configured provider."""
+    client = create_llm_client(
+        AgentsSettings(
+            llm_provider=LLMProvider.GEMINI,
+            api_key=SecretStr('test-token'),
+            model='gemini-test-model',
+        )
+    )
+
+    assert isinstance(client, GeminiClient)
+    assert client.model == 'gemini-test-model'
 
 
 def test_llm_client_requires_api_key() -> None:
