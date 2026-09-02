@@ -112,7 +112,8 @@ flowchart LR
 - **Embeddings:** FastEmbed
 - **Storage and retrieval:** PostgreSQL with pgvector
 - **Containerization:** Docker Compose
-- **Workflow orchestration:** Apache Airflow
+- **Agent workflow:** LangGraph
+- **Ingestion orchestration:** Apache Airflow
 - **Monitoring and evaluation:** Metabase
 
 ## Project structure
