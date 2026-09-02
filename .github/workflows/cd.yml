@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -69,3 +69,27 @@ jobs:
             --tag "${image_prefix}-metabase-database:${version}" \
             --tag "${image_prefix}-metabase-database:${revision}" \
             .
+
+  release:
+    name: Create GitHub release
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release from versioned notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
+          test -f "${notes_file}" || {
+            echo "Release notes not found: ${notes_file}" >&2
+            exit 1
+          }
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME} — Bon Voyage improvements" \
+            --notes-file "${notes_file}"
