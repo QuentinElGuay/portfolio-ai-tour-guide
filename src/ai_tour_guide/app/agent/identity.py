@@ -1,7 +1,7 @@
 """Shared product context for Petit Guide and Bon Voyage."""
 
 WELCOME_MESSAGE = (
-    'Welcome to **“Bon Voyage”** travel agency. How can I help you prepare your trip?'
+    'Welcome to _Bon Voyage_ travel agency. How can I help you prepare your trip?'
 )
 
 PETIT_GUIDE_IDENTITY = (
