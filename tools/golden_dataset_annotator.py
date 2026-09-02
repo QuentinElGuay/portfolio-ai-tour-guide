@@ -121,12 +121,12 @@ def create_row(
     if not normalized_category or not normalized_question:
         raise ValueError('Category and question cannot be empty.')
 
-    existing_ids = [row.get('id') for row in rows]
-    if any(
-        not isinstance(case_id, int) or isinstance(case_id, bool)
-        for case_id in existing_ids
-    ):
-        raise ValueError('Existing dataset rows must have integer IDs.')
+    existing_ids: list[int] = []
+    for row in rows:
+        case_id = row.get('id')
+        if not isinstance(case_id, int) or isinstance(case_id, bool):
+            raise TypeError('Existing dataset rows must have integer IDs.')
+        existing_ids.append(case_id)
     row: dict[str, Any] = {
         'id': max(existing_ids, default=0) + 1,
         'category': normalized_category,

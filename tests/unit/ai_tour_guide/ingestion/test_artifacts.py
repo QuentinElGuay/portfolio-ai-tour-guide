@@ -77,6 +77,7 @@ def _parsed_pdf() -> ParsedPdf:
 def _document_record() -> DocumentRecord:
     return DocumentRecord(
         metadata=_metadata(),
+        destination='Brittany',
         source_checksum='source-sha256',
         collection='tour-guides',
     )
@@ -101,6 +102,7 @@ def _parsed_artifact() -> ParsedDocumentArtifact:
     return ParsedDocumentArtifact(
         document=IngestionDocument(
             title='A guide to Brittany',
+            destination='Brittany',
             source_url='https://example.test/brittany.pdf',
             collection='tour-guides',
             excluded_leading_pages=0,

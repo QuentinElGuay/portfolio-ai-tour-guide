@@ -50,7 +50,6 @@ services:
     profiles:
       - tools
       - ingestion
-      - agent
       - app
       - airflow
 
@@ -371,18 +370,17 @@ services:
     networks:
       - ai-tour-guide
 
-  agent:
-    image: ai-tour-guide-agent:local
+  app:
+    image: ai-tour-guide-app:local
     pull_policy: build
 
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/app.Dockerfile
       additional_contexts:
         ai-tour-guide-base: service:ai-tour-guide-base
 
     profiles:
-      - agent
       - app
 
     environment:
@@ -392,7 +390,7 @@ services:
       AGENT_LLM_MODEL: "${AGENT_LLM_MODEL:?AGENT_LLM_MODEL is required}"
 
     ports:
-      - "${AGENT_PORT:?AGENT_PORT is required}:8000"
+      - "${APP_PORT:?APP_PORT is required}:8000"
 
     depends_on:
       database:
@@ -417,7 +415,7 @@ services:
       - ai-tour-guide
 
   chat:
-    image: ai-tour-guide-agent:local
+    image: ai-tour-guide-app:local
     pull_policy: never
 
     profiles:
@@ -425,18 +423,18 @@ services:
 
     environment:
       AGENT_LLM_PROVIDER: "${AGENT_LLM_PROVIDER:?AGENT_LLM_PROVIDER is required}"
-      CHAT_API_URL: http://agent:8000/ask
+      CHAT_API_URL: http://app:8000/chat
       CHAT_HOST: 0.0.0.0
       CHAT_PORT: "7860"
       CHAT_TITLE: "${CHAT_TITLE:?CHAT_TITLE is required}"
 
-    command: ["python", "-m", "ai_tour_guide.agent.chat.app"]
+    command: ["python", "-m", "ai_tour_guide.app.chat.app"]
 
     ports:
       - "${CHAT_PORT:?CHAT_PORT is required}:7860"
 
     depends_on:
-      agent:
+      app:
         condition: service_healthy
 
     restart: unless-stopped

@@ -55,6 +55,7 @@ def _document() -> DocumentRecord:
             source_page_count=10,
             page_count=9,
         ),
+        destination='Brittany',
         source_checksum='source-sha256',
         collection='guides',
         version='2026',

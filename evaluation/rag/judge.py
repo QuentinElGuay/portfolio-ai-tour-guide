@@ -14,11 +14,11 @@ from openai.types.responses import (
 )
 from pydantic import AliasChoices, Field, SecretStr
 
-from ai_tour_guide.agent.llm.clients import GenerationError, create_openai_client
-from ai_tour_guide.agent.llm.rate_limit import (
+from ai_tour_guide.app.agent.llm.clients import GenerationError, create_openai_client
+from ai_tour_guide.app.agent.llm.rate_limit import (
     AsyncRateLimiter,
 )
-from ai_tour_guide.agent.llm.settings import AgentsSettings
+from ai_tour_guide.app.agent.llm.settings import AgentsSettings
 from evaluation.dataset import GoldenCase
 
 

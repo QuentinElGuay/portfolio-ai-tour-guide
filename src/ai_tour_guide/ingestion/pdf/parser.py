@@ -48,6 +48,7 @@ class IngestionDocument:
     """
 
     title: str
+    destination: str
     source_url: str = ''
     source_path: Path | None = None
     collection: str | None = None
@@ -64,6 +65,8 @@ class IngestionDocument:
             raise TypeError('title must be a string')
         if not self.title.strip():
             raise ValueError('title must not be empty')
+        if not isinstance(self.destination, str) or not self.destination.strip():
+            raise ValueError('destination must be a non-empty string')
 
         normalize_filename_stem(self.title)
 

@@ -50,6 +50,16 @@ def initialize_database(
             schema_translate_map={None: schema_name}
         )
         public_metadata.create_all(bind=schema_connection, checkfirst=True)
+        connection.execute(
+            text('ALTER TABLE documents ADD COLUMN IF NOT EXISTS destination TEXT')
+        )
+        connection.execute(
+            text('UPDATE documents SET destination = title WHERE destination IS NULL')
+        )
+        connection.execute(
+            text('ALTER TABLE documents ALTER COLUMN destination SET NOT NULL')
+        )
+        _trim_rag_result_message_columns(connection)
         _migrate_llm_usage_events(connection)
         for table in public_metadata.tables.values():
             for index in table.indexes:
@@ -61,6 +71,12 @@ def initialize_database(
             create_evaluation_views(connection, schema_name=schema_name)
         elif schema_name == 'public':
             create_operational_views(connection, schema_name=schema_name)
+
+
+def _trim_rag_result_message_columns(connection) -> None:
+    """Keep generic user and assistant content out of RAG execution records."""
+    connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS question'))
+    connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS answer'))
 
 
 def _migrate_llm_model_pricing(connection) -> None:

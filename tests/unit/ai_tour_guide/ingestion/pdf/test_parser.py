@@ -48,6 +48,7 @@ def _ingestion_document(
 ) -> IngestionDocument:
     return IngestionDocument(
         title=title,
+        destination='Brittany',
         source_url='https://example.test/guide.pdf',
         excluded_leading_pages=excluded_leading_pages,
         excluded_trailing_pages=excluded_trailing_pages,

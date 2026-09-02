@@ -7,21 +7,24 @@ import random
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import delete, insert, select, update
 
-from ai_tour_guide.agent.llm.fixture import FixtureLLMClient
-from ai_tour_guide.agent.rag.persistence import (
+from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
+from ai_tour_guide.app.agent.rag.persistence import (
     _usage_event_values,
     store_rag_result,
 )
-from ai_tour_guide.agent.rag.pipeline import answer_question_async
-from ai_tour_guide.agent.responses import GENERATION_ERROR_ANSWER
+from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.app.agent.responses import GENERATION_ERROR_ANSWER
+from ai_tour_guide.app.chat.models import ChatMessage, Role
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.public import (
+    chat_feedback,
+    chat_messages,
     llm_usage_events,
-    rag_ratings,
     rag_results,
 )
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
@@ -29,7 +32,6 @@ from ai_tour_guide.knowledge_base.search.strategies import create_search_strateg
 from evaluation.dataset import (
     DEFAULT_DATASET_ROOT,
     GoldenCase,
-    golden_dataset_path,
     load_golden_dataset,
 )
 
@@ -40,11 +42,11 @@ class SimulationSummary:
 
     rag_results: int
     usage_events: int
-    ratings: int
+    feedback_events: int
     errors: int
 
 
-_pipeline_logger = logging.getLogger('ai_tour_guide.agent.rag.pipeline')
+_pipeline_logger = logging.getLogger('ai_tour_guide.app.agent.rag.pipeline')
 
 
 def _simulated_timestamp(
@@ -77,10 +79,25 @@ def _simulated_usage(
     }
 
 
+def _chat_message_values(message: ChatMessage) -> dict[str, object]:
+    """Serialize a durable chat message for direct timestamped insertion."""
+    return {
+        'message_id': message.message_id,
+        'session_id': message.session_id,
+        'role': message.role.value,
+        'content': message.content,
+        'flow_step': message.flow_step,
+        'input_id': message.input_id,
+        'rag_request_id': message.rag_request_id,
+        'sources': message.sources,
+        'trace': message.trace.model_dump(mode='json') if message.trace else None,
+        'buttons': [button.model_dump(mode='json') for button in message.buttons],
+    }
+
+
 async def _simulate(
     *,
     cases: list[GoldenCase],
-    dataset_path: Path,
     corpus_root: Path,
     mode: SearchMode,
     k: int,
@@ -97,10 +114,10 @@ async def _simulate(
     rng = random.Random(seed)
     now = datetime.now(UTC)
     strategy = create_search_strategy(mode)
-    client = FixtureLLMClient(dataset_path=dataset_path)
+    client = DemoLLMClient()
     total_requests = 0
     usage_events = 0
-    ratings = 0
+    feedback_events = 0
     errors = 0
 
     with (
@@ -109,12 +126,24 @@ async def _simulate(
     ):
         if clear_simulated:
             with engine.begin() as connection:
-                simulated_request_ids = select(llm_usage_events.c.request_id).where(
-                    llm_usage_events.c.metadata.op('->>')('simulated') == 'true'
+                simulated_request_ids = select(rag_results.c.request_id).where(
+                    rag_results.c.rag_trace['retrieval_metadata'].op('->>')('simulated')
+                    == 'true'
                 )
                 connection.execute(
-                    delete(rag_ratings).where(
-                        rag_ratings.c.request_id.in_(simulated_request_ids)
+                    delete(chat_feedback).where(
+                        chat_feedback.c.message_id.in_(
+                            select(chat_messages.c.message_id).where(
+                                chat_messages.c.rag_request_id.in_(
+                                    simulated_request_ids
+                                )
+                            )
+                        )
+                    )
+                )
+                connection.execute(
+                    delete(chat_messages).where(
+                        chat_messages.c.rag_request_id.in_(simulated_request_ids)
                     )
                 )
                 connection.execute(
@@ -154,6 +183,11 @@ async def _simulate(
                     payload['retrieval_latency_ms'] = retrieval_latency
                     payload['generation_latency_ms'] = generation_latency
                     payload['total_latency_ms'] = retrieval_latency + generation_latency
+                    payload['retrieval_metadata'] = {
+                        **payload['retrieval_metadata'],
+                        'simulated': True,
+                        'source': 'tools/simulate_rag_traffic.py',
+                    }
                     if rng.random() < daily_error_rate:
                         payload['success'] = False
                         payload['error'] = {
@@ -205,20 +239,46 @@ async def _simulate(
                                 )
                             )
                             usage_events += 1
+                        session_id = uuid4()
+                        user_message = ChatMessage(
+                            session_id=session_id,
+                            role=Role.USER,
+                            content=case.question,
+                            input_id='FREE_TEXT',
+                        )
+                        assistant_message = ChatMessage(
+                            session_id=session_id,
+                            role=Role.ASSISTANT,
+                            content=payload['generated']['answer'],
+                            rag_request_id=result.request_id,
+                            sources=payload['sources'],
+                        )
+                        connection.execute(
+                            insert(chat_messages).values(
+                                **_chat_message_values(user_message),
+                                created_at=simulated_at,
+                            )
+                        )
+                        connection.execute(
+                            insert(chat_messages).values(
+                                **_chat_message_values(assistant_message),
+                                created_at=simulated_at,
+                            )
+                        )
                         if rng.random() < daily_feedback_rate:
                             connection.execute(
-                                insert(rag_ratings).values(
-                                    request_id=result.request_id,
+                                insert(chat_feedback).values(
+                                    message_id=assistant_message.message_id,
                                     helpful=rng.random() >= 0.2,
                                     comment='Synthetic dashboard feedback',
                                     created_at=simulated_at,
                                 )
                             )
-                            ratings += 1
+                            feedback_events += 1
                     total_requests += 1
         finally:
             _pipeline_logger.disabled = previous_pipeline_logging
-    return SimulationSummary(total_requests, usage_events, ratings, errors)
+    return SimulationSummary(total_requests, usage_events, feedback_events, errors)
 
 
 def main() -> None:
@@ -248,7 +308,7 @@ def main() -> None:
     parser.add_argument(
         '--no-simulated-usage',
         action='store_true',
-        help='Only persist RAG results and feedback, without synthetic cost events.',
+        help='Only persist RAG results and chat feedback, without synthetic cost events.',
     )
     args = parser.parse_args()
 
@@ -269,7 +329,6 @@ def main() -> None:
     summary = asyncio.run(
         _simulate(
             cases=cases,
-            dataset_path=golden_dataset_path(root=args.dataset),
             corpus_root=args.corpus,
             mode=SearchMode(args.mode or DEFAULT_SEARCH_MODE.value),
             k=args.k,
@@ -286,7 +345,7 @@ def main() -> None:
     )
     print(f'Inserted {summary.rag_results} RAG results.')
     print(f'Inserted {summary.usage_events} usage events.')
-    print(f'Inserted {summary.ratings} ratings.')
+    print(f'Inserted {summary.feedback_events} chat feedback events.')
     print(f'RAG results with errors: {summary.errors}.')
 
 

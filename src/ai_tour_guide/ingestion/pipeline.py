@@ -92,6 +92,7 @@ def chunk_document_stage(
         document=DocumentRecord(
             metadata=parsed.parsed_pdf.metadata,
             source_checksum=parsed.source_checksum,
+            destination=parsed.document.destination,
             collection=parsed.document.collection,
         ),
         chunks=chunks,

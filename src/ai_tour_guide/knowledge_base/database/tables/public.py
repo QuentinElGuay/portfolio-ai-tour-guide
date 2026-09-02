@@ -176,6 +176,7 @@ documents = Table(
     Column('collection', Text),
     Column('version', Text),
     Column('title', Text, nullable=False),
+    Column('destination', Text, nullable=False),
     Column('source_url', Text, nullable=False),
     Column('publisher', Text),
     Column('publication_date', Date),
@@ -328,9 +329,7 @@ document_chunks = Table(
 rag_results = Table(
     'rag_results',
     metadata,
-    Column('question', Text, nullable=False),
     Column('success', Boolean, nullable=False),
-    Column('answer', Text, nullable=False),
     Column('error_stage', Text),
     Column('error_type', Text),
     Column('error_message', Text),
@@ -380,14 +379,35 @@ rag_results = Table(
     ),
 )
 
-rag_ratings = Table(
-    'rag_ratings',
+chat_messages = Table(
+    'chat_messages',
+    metadata,
+    Column('message_id', UUID(as_uuid=True), primary_key=True),
+    Column('session_id', UUID(as_uuid=True), nullable=False),
+    Column('role', Text, nullable=False),
+    Column('content', Text, nullable=False),
+    Column('flow_step', Text),
+    Column('input_id', Text),
+    Column('rag_request_id', UUID(as_uuid=True)),
+    Column('sources', JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column('trace', JSONB),
+    Column('buttons', JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column(
+        'created_at', DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint(
+        "role IN ('user', 'assistant', 'system')", name='ck_chat_messages_role'
+    ),
+)
+
+chat_feedback = Table(
+    'chat_feedback',
     metadata,
     Column('feedback_id', BigInteger, Identity(), primary_key=True),
     Column(
-        'request_id',
+        'message_id',
         UUID(as_uuid=True),
-        ForeignKey('rag_results.request_id', ondelete='CASCADE'),
+        ForeignKey('chat_messages.message_id', ondelete='CASCADE'),
         nullable=False,
     ),
     Column('helpful', Boolean, nullable=False),
@@ -438,7 +458,8 @@ Index(
 )
 Index('ix_rag_results_search_mode', rag_results.c.search_mode)
 Index('ix_rag_results_success', rag_results.c.success)
-Index('ix_rag_ratings_request_id', rag_ratings.c.request_id)
+Index('ix_chat_messages_session_id', chat_messages.c.session_id)
+Index('ix_chat_feedback_message_id', chat_feedback.c.message_id)
 Index('ix_llm_usage_events_rag_run_id', llm_usage_events.c.rag_run_id)
 Index('ix_llm_usage_events_judge_run_id', llm_usage_events.c.judge_run_id)
 

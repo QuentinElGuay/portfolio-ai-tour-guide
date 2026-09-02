@@ -8,8 +8,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import insert
 from sqlalchemy.engine import Engine
 
-from ai_tour_guide.agent.rag.models import RAGResult
-from ai_tour_guide.agent.rag.persistence import _usage_event_values
+from ai_tour_guide.app.agent.rag.models import RAGResult
+from ai_tour_guide.app.agent.rag.persistence import _usage_event_values
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.evaluation import (
     rag_evaluation_results,

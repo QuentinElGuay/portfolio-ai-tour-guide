@@ -47,6 +47,7 @@ def test_typed_stages_compose_without_intermediate_files() -> None:
 
     document = IngestionDocument(
         title='A guide to Brittany',
+        destination='Brittany',
         source_url='https://example.test/brittany.pdf',
         collection='tour-guides',
         excluded_leading_pages=0,
@@ -84,7 +85,9 @@ def test_download_stage_reads_a_local_pdf_without_a_network_request(tmp_path) ->
     with pymupdf.open() as pdf:
         pdf.new_page().insert_text((72, 72), 'Visit Saint-Malo.')
         pdf.save(pdf_path)
-    document = IngestionDocument(title='A guide to Brittany', source_path=pdf_path)
+    document = IngestionDocument(
+        title='A guide to Brittany', destination='Brittany', source_path=pdf_path
+    )
 
     downloaded = download_pdf_stage(document, timeout_seconds=1)
 

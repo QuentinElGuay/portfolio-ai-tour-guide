@@ -1,11 +1,11 @@
-# Baguette Voyages
+# Bon Voyage
 
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
-_Salut! Je suis **Petit Guide**_, your AI travel companion from **Baguette Voyages**, a
-fictional French travel company. My job is to help you prepare your visit in France by
-answering your questions using **Retrieval-Augmented Generation (RAG)** based on
-regional tourism guides.
+_Salut! Je suis **Petit Guide**_, Bon Voyage’s AI travel companion for French
+destinations covered by indexed regional tourism guides. My job is to help you prepare
+your visit in France by answering your questions using **Retrieval-Augmented Generation
+(RAG)** based on regional tourism guides.
 
 ![Petit Guide, the mascot](docs/images/petit_guide.png)
 
@@ -115,6 +115,17 @@ flowchart LR
 - **Workflow orchestration:** Apache Airflow
 - **Monitoring and evaluation:** Metabase
 
+## Project structure
+
+- `src/ai_tour_guide/app/` — FastAPI application, chat interface, agent workflow, and
+  CLI.
+- `src/ai_tour_guide/ingestion/` — Document parsing and ingestion pipeline.
+- `src/ai_tour_guide/knowledge_base/` — Database schema, indexing, and retrieval.
+- `evaluation/` — RAG evaluation and judge workflows.
+- `fixtures/` — Corpus and dashboard data used for local development.
+- `docker/` and `docker-compose.yml` — Container images and local services.
+- `docs/` — Architecture, command reference, and setup documentation.
+
 ## Prerequisites
 
 The recommended workflow requires _Git_, _Docker_ with _Docker Compose_, and _GNU Make_.
@@ -144,7 +155,8 @@ AGENT_LLM_PROVIDER=baguette-llm
 AGENT_LLM_MODEL=mini-croissant-1.0
 ```
 
-The demo recognizes [prepared Brittany questions](fixtures/demo_dataset.jsonl) and
+The demo recognizes
+[prepared Brittany questions](src/ai_tour_guide/app/agent/data/demo_dataset.jsonl) and
 modest spelling or punctuation variations. It suggests a supported question when it
 cannot answer.
 
@@ -153,7 +165,7 @@ OpenAI API key:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
-AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_API_KEY=your-super-secret-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
@@ -176,7 +188,7 @@ These are the commands used most often during local development:
 | ------------------- | --------------------------------------------------- |
 | `make db-init`      | Initialize the pgvector application schema.         |
 | `make ingest`       | Ingest the documents in `source_files.json`.        |
-| `make app`          | Start the agent API and Gradio chat interface.      |
+| `make app`          | Start the app API and Gradio chat interface.        |
 | `make airflow`      | Start Airflow for parameterized ingestion.          |
 | `make evaluate`     | Run the full evaluation suite.                      |
 | `make dashboard`    | Start and initialize PostgreSQL and Metabase.       |
@@ -187,7 +199,8 @@ For every command, its options, and operational cautions, see the
 [Make command reference](docs/commands.md). `make help` remains the short terminal
 reference. The [tutorial](docs/README.md),
 [ingestion guide](src/ai_tour_guide/ingestion/README.md), and
-[agent guide](src/ai_tour_guide/agent/README.md) cover the related workflows in detail.
+[agent guide](src/ai_tour_guide/app/agent/README.md) cover the related workflows in
+detail.
 
 ## Airflow ingestion
 
@@ -307,9 +320,9 @@ follow-up work.
 
 - [Ingestion guide](src/ai_tour_guide/ingestion/README.md): document definitions,
   pipeline stages, artifacts, and ingestion configuration.
-- [Agent guide](src/ai_tour_guide/agent/README.md): RAG flow, CLI, HTTP API, and agent
-  configuration.
-- [Chat guide](src/ai_tour_guide/agent/chat/README.md): Gradio service and its HTTP
+- [Agent guide](src/ai_tour_guide/app/agent/README.md): RAG flow, CLI, HTTP API, and
+  agent configuration.
+- [Chat guide](src/ai_tour_guide/app/chat/README.md): Gradio service and its HTTP
   integration.
 - [Make command reference](docs/commands.md): every project command, its options, and
   its operational cautions.
@@ -332,7 +345,7 @@ The complete plan, including milestones and deferred work, is maintained in
 
 ### Current release — v1.0.0: Final submission
 
-This release delivers the complete Baguette Voyages portfolio application:
+This release delivers the complete Bon Voyage portfolio application:
 
 - Multi-region document ingestion from regional tourism guides
 - Grounded answers with validated source references and indexed destination discovery

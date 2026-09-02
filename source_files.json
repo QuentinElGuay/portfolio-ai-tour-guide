@@ -2,6 +2,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Brittany-Nov-2025.pdf",
     "title": "Guide to the Region of Brittany",
+    "destination": "Brittany",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -25,6 +26,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Normandy-Nov-2025.pdf",
     "title": "Guide to the Region of Normandy",
+    "destination": "Normandy",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -48,6 +50,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Occitanie-Nov-2025.pdf",
     "title": "Guide to the Occitanie Region",
+    "destination": "Occitanie",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -71,6 +74,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Nouvelle-Aquitaine-Nov-2025.pdf",
     "title": "Guide to Nouvelle-Aquitaine",
+    "destination": "Nouvelle-Aquitaine",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -94,6 +98,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-The-Alps-Nov-2025.pdf",
     "title": "Guide to the French Alps",
+    "destination": "French Alps",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -117,6 +122,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discovering-the-French-Riviera-Nov-2025.pdf",
     "title": "Guide to the French Riviera",
+    "destination": "French Riviera",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [
@@ -140,6 +146,7 @@
   {
     "source_url": "https://www.ibanista.com/wp-content/uploads/2025/11/Guide-Discover-Paris-Ile-de-France-Nov-2025.pdf",
     "title": "Guide to Paris & Île-de-France",
+    "destination": "Paris & Île-de-France",
     "collection": "Regional Guides",
     "publisher": "Ibanista",
     "keywords": [

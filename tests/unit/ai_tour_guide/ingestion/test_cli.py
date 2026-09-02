@@ -32,10 +32,12 @@ def test_individual_document_command_rejects_an_array(tmp_path: Path) -> None:
             [
                 {
                     'title': 'First guide',
+                    'destination': 'Brittany',
                     'source_url': 'https://example.test/first.pdf',
                 },
                 {
                     'title': 'Second guide',
+                    'destination': 'Brittany',
                     'source_url': 'https://example.test/second.pdf',
                 },
             ]
@@ -62,6 +64,7 @@ def test_document_pipeline_retains_artifacts_only_in_debug_mode(
     """Verify that document pipeline retains artifacts only in debug mode."""
     document = IngestionDocument(
         title='Test guide',
+        destination='Brittany',
         source_url='https://example.test/guide.pdf',
     )
     downloaded = object()
@@ -134,6 +137,7 @@ def test_document_pipeline_can_skip_existing_documents(
     """Verify that duplicate documents can be treated as successful no-ops."""
     document = IngestionDocument(
         title='Existing guide',
+        destination='Brittany',
         source_url='https://example.test/existing.pdf',
     )
     embedder: Embedder = MagicMock(spec=Embedder)
