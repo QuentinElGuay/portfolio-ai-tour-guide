@@ -118,13 +118,27 @@ flowchart LR
 
 ## Project structure
 
-- `src/ai_tour_guide/app/` — FastAPI application, chat interface, agent workflow, and
-  CLI.
-- `src/ai_tour_guide/ingestion/` — Document parsing and ingestion pipeline.
-- `src/ai_tour_guide/knowledge_base/` — Database schema, indexing, and retrieval.
+- `src/ai_tour_guide/` — Main Python package.
+  - `domain/` — Shared document, section, and chunk models.
+  - `embedding/` — Embedding providers, settings, and interfaces.
+  - `ingestion/` — Document input, PDF parsing, chunking, serialization, and ingestion
+    commands.
+  - `knowledge_base/` — Database schema, corpus loading, indexing, and retrieval.
+  - `app/` — FastAPI application, CLI, and chat interface.
+    - `agent/` — LangGraph travel-agent workflow, RAG pipeline, LLM clients, and demo
+      data.
+    - `chat/` — Gradio interface and chat backend adapters.
 - `evaluation/` — RAG evaluation and judge workflows.
 - `fixtures/` — Corpus and dashboard data used for local development.
-- `docker/` and `docker-compose.yml` — Container images and local services.
+- `tests/` — Unit and smoke tests.
+- `scripts/` — Development and maintenance scripts.
+- `tools/` — Project utilities and data tooling.
+- `airflow/` — Airflow DAGs and configuration.
+- `docker/` — Container build definitions.
+- `pyproject.toml` — Project metadata, dependencies, scripts, and tool configuration.
+- `.env.template` — Example environment configuration for local development.
+- `docker-compose.yml` — Local service definitions.
+- `Makefile` — Common development, ingestion, evaluation, and operations commands.
 - `docs/` — Architecture, command reference, and setup documentation.
 
 ## Prerequisites
