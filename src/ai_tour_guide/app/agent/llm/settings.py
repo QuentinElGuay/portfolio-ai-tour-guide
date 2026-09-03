@@ -16,6 +16,7 @@ class LLMProvider(StrEnum):
     """Supported LLM providers."""
 
     OPENAI = 'openai'
+    GEMINI = 'gemini'
     BAGUETTE_LLM = 'baguette-llm'
 
 

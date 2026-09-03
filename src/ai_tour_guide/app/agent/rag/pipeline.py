@@ -21,14 +21,17 @@ from ai_tour_guide.app.agent.llm.clients import (
 )
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.agent_workflow import run_agent_workflow
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGError, RAGResult
+from ai_tour_guide.app.agent.rag.models import (
+    GeneratedAnswer,
+    RAGError,
+    RAGErrorCategory,
+    RAGResult,
+)
 from ai_tour_guide.app.agent.rag.prompting import build_messages
 from ai_tour_guide.app.agent.rag.sources import validate_citations
+from ai_tour_guide.app.agent.rag.workflow import run_agent_workflow
 from ai_tour_guide.app.agent.responses import (
-    GENERATION_ERROR_ANSWER,
     INSUFFICIENT_CONTEXT_ANSWER,
-    RETRIEVAL_ERROR_ANSWER,
 )
 from ai_tour_guide.app.chat.navigation import normalize_option_id
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
@@ -41,9 +44,11 @@ class RetrievalError(RuntimeError):
     """An expected knowledge-base operational failure."""
 
 
-def _error(stage: str, exc: Exception) -> RAGError:
+def _error(stage: str, exc: Exception, category: RAGErrorCategory) -> RAGError:
     logger.exception('%s failed', stage)
-    return RAGError(stage=stage, type=type(exc).__name__, message=str(exc))
+    return RAGError(
+        category=category, stage=stage, type=type(exc).__name__, message=str(exc)
+    )
 
 
 def _elapsed_ms(started: float) -> int:
@@ -140,8 +145,14 @@ async def _answer_with_agent(
             mode=mode,
             k=k,
             messages=(),
-            generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
-            error=_error('agent', exc),
+            generated=GeneratedAnswer(''),
+            error=_error(
+                'agent',
+                exc,
+                RAGErrorCategory.EXTERNAL_SERVICE
+                if isinstance(exc, GenerationError)
+                else RAGErrorCategory.INTERNAL_SERVICE,
+            ),
             total_latency_ms=_elapsed_ms(started),
             retrieval_metadata=_fallback_interaction_metadata(
                 option_id, flow_step, mode
@@ -157,8 +168,8 @@ async def _answer_with_agent(
             mode=mode,
             k=k,
             messages=(),
-            generated=GeneratedAnswer(RETRIEVAL_ERROR_ANSWER),
-            error=_error('retrieval', exc),
+            generated=GeneratedAnswer(''),
+            error=_error('retrieval', exc, RAGErrorCategory.INTERNAL_SERVICE),
             retrieval_latency_ms=retrieval_latency,
             total_latency_ms=_elapsed_ms(started),
             retrieval_metadata=_fallback_interaction_metadata(
@@ -203,7 +214,7 @@ async def _answer_with_agent(
             mode=mode,
             k=k,
             messages=(),
-            generated=GeneratedAnswer(GENERATION_ERROR_ANSWER),
+            generated=GeneratedAnswer(''),
             total_latency_ms=_elapsed_ms(started),
             retrieval_metadata=_fallback_interaction_metadata(
                 option_id, flow_step, mode

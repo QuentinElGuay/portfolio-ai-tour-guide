@@ -8,12 +8,14 @@ from pydantic import SecretStr
 
 from ai_tour_guide.app.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
 from ai_tour_guide.app.agent.llm.clients import (
+    GeminiClient,
     GenerationError,
     OpenAIClient,
     _parse_answer,
 )
 from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
+from ai_tour_guide.app.agent.llm.retry import retry_provider_call
 from ai_tour_guide.app.agent.llm.settings import (
     AgentsSettings,
     LLMProvider,
@@ -77,6 +79,85 @@ def test_openai_client_sends_messages_and_returns_structured_output() -> None:
     assert request['text']['format']['type'] == 'json_schema'
 
 
+def test_gemini_client_sends_messages_and_returns_structured_output() -> None:
+    """Verify that Gemini returns the shared structured answer contract."""
+    response = SimpleNamespace(
+        text='{"answer": "A grounded answer.", "citations": [], "emotion": "happy"}',
+        usage_metadata=None,
+    )
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=response)
+    settings = AgentsSettings(
+        api_key=SecretStr('test-token'),
+        model='gemini-test-model',
+    )
+
+    result = asyncio.run(
+        GeminiClient(settings, client=client).answer_question(
+            [
+                {'role': Role.SYSTEM, 'content': 'Use the context.'},
+                {'role': Role.USER, 'content': 'What should I visit?'},
+            ]
+        )
+    )
+
+    assert result.answer == 'A grounded answer.'
+    assert result.emotion.value == 'happy'
+    await_call = client.aio.models.generate_content.await_args
+    assert await_call is not None
+    request = await_call.kwargs
+    assert request['model'] == 'gemini-test-model'
+    assert request['config'].response_mime_type == 'application/json'
+    assert request['config'].system_instruction == 'Use the context.'
+    citation_schema = request['config'].response_schema['properties']['citations']
+    citation_properties = citation_schema['items']['properties']
+    assert citation_properties['version'] == {
+        'anyOf': [{'type': 'STRING'}, {'type': 'NULL'}]
+    }
+    assert citation_properties['page_start'] == {
+        'anyOf': [{'type': 'INTEGER'}, {'type': 'NULL'}]
+    }
+    assert citation_properties['page_end'] == {
+        'anyOf': [{'type': 'INTEGER'}, {'type': 'NULL'}]
+    }
+
+
+def test_gemini_client_extracts_search_tool_calls() -> None:
+    """Verify that Gemini tool-call arguments become a search query."""
+    function_call = SimpleNamespace(
+        name='search_tourism_knowledge_base',
+        args={'query': 'best places in Brittany'},
+    )
+    response = SimpleNamespace(
+        candidates=[
+            SimpleNamespace(
+                content=SimpleNamespace(
+                    parts=[SimpleNamespace(function_call=function_call)]
+                )
+            )
+        ]
+    )
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=response)
+    settings = AgentsSettings(
+        api_key=SecretStr('test-token'),
+        model='gemini-test-model',
+    )
+
+    result = asyncio.run(
+        GeminiClient(settings, client=client).choose_search_query(
+            'Where should I go?', previous_queries=(), has_context=False
+        )
+    )
+
+    assert result == 'best places in Brittany'
+    await_call = client.aio.models.generate_content.await_args
+    assert await_call is not None
+    request = await_call.kwargs
+    parameters = request['config'].tools[0].function_declarations[0].parameters
+    assert 'additionalProperties' not in parameters
+
+
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
     """Verify that default llm client is openai when openai is configured."""
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
@@ -86,6 +167,20 @@ def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> 
 
     assert isinstance(client, OpenAIClient)
     assert client.model == 'test-model'
+
+
+def test_gemini_llm_client_is_selected_when_gemini_is_configured() -> None:
+    """Verify that the factory selects Gemini for the configured provider."""
+    client = create_llm_client(
+        AgentsSettings(
+            llm_provider=LLMProvider.GEMINI,
+            api_key=SecretStr('test-token'),
+            model='gemini-test-model',
+        )
+    )
+
+    assert isinstance(client, GeminiClient)
+    assert client.model == 'gemini-test-model'
 
 
 def test_llm_client_requires_api_key() -> None:
@@ -381,3 +476,45 @@ def test_openai_client_wraps_an_empty_structured_response() -> None:
 
     with pytest.raises(GenerationError, match='empty response'):
         asyncio.run(OpenAIClient(settings, client=client).answer_question([]))
+
+
+def test_retry_provider_call_retries_transient_failures(monkeypatch) -> None:
+    """Verify that a transient provider failure is retried with backoff."""
+    attempts = 0
+    sleeps: list[float] = []
+
+    class TemporaryProviderError(RuntimeError):
+        status_code = 503
+
+    async def operation() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise TemporaryProviderError()
+        return 'ok'
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr('ai_tour_guide.app.agent.llm.retry.asyncio.sleep', fake_sleep)
+
+    assert asyncio.run(retry_provider_call(operation)) == 'ok'
+    assert attempts == 3
+    assert sleeps == [0.5, 1.0]
+
+
+def test_retry_provider_call_does_not_retry_permanent_failures() -> None:
+    """Verify that invalid provider requests fail immediately."""
+    attempts = 0
+
+    class PermanentProviderError(RuntimeError):
+        status_code = 400
+
+    async def operation() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise PermanentProviderError()
+
+    with pytest.raises(PermanentProviderError):
+        asyncio.run(retry_provider_call(operation))
+    assert attempts == 1

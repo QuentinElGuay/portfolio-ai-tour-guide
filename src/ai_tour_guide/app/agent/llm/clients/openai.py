@@ -8,6 +8,7 @@ from openai.types.responses.response_function_tool_call import ResponseFunctionT
 
 from ai_tour_guide.app.agent.llm.clients import GenerationError
 from ai_tour_guide.app.agent.llm.rate_limit import AsyncRateLimiter
+from ai_tour_guide.app.agent.llm.retry import retry_provider_call
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, LLMCitation
 from ai_tour_guide.app.agent.rag.tools import TOURISM_SEARCH_TOOL
@@ -36,57 +37,63 @@ class OpenAIClient:
         """Generate one assistant response for the supplied messages."""
         await self._rate_limiter.acquire()
         try:
-            response = await self._client.responses.create(
-                model=self.model,
-                input=[
-                    {
-                        'role': (
-                            message['role'].value
-                            if isinstance(message['role'], Role)
-                            else message['role']
-                        ),
-                        'content': message['content'],
-                    }
-                    for message in messages
-                ],
-                text={
-                    'format': {
-                        'type': 'json_schema',
-                        'name': 'generated_answer',
-                        'strict': True,
-                        'schema': {
-                            'type': 'object',
-                            'properties': {
-                                'answer': {'type': 'string'},
-                                'citations': {
-                                    'type': 'array',
-                                    'items': {
-                                        'type': 'object',
-                                        'properties': {
-                                            'source_url': {'type': 'string'},
-                                            'version': {'type': ['string', 'null']},
-                                            'page_start': {'type': ['integer', 'null']},
-                                            'page_end': {'type': ['integer', 'null']},
+            response = await retry_provider_call(
+                lambda: self._client.responses.create(
+                    model=self.model,
+                    input=[
+                        {
+                            'role': (
+                                message['role'].value
+                                if isinstance(message['role'], Role)
+                                else message['role']
+                            ),
+                            'content': message['content'],
+                        }
+                        for message in messages
+                    ],
+                    text={
+                        'format': {
+                            'type': 'json_schema',
+                            'name': 'generated_answer',
+                            'strict': True,
+                            'schema': {
+                                'type': 'object',
+                                'properties': {
+                                    'answer': {'type': 'string'},
+                                    'citations': {
+                                        'type': 'array',
+                                        'items': {
+                                            'type': 'object',
+                                            'properties': {
+                                                'source_url': {'type': 'string'},
+                                                'version': {'type': ['string', 'null']},
+                                                'page_start': {
+                                                    'type': ['integer', 'null']
+                                                },
+                                                'page_end': {
+                                                    'type': ['integer', 'null']
+                                                },
+                                            },
+                                            'required': [
+                                                'source_url',
+                                                'version',
+                                                'page_start',
+                                                'page_end',
+                                            ],
+                                            'additionalProperties': False,
                                         },
-                                        'required': [
-                                            'source_url',
-                                            'version',
-                                            'page_start',
-                                            'page_end',
-                                        ],
-                                        'additionalProperties': False,
+                                    },
+                                    'emotion': {
+                                        'type': 'string',
+                                        'enum': [emotion.value for emotion in Emotion],
                                     },
                                 },
-                                'emotion': {
-                                    'type': 'string',
-                                    'enum': [emotion.value for emotion in Emotion],
-                                },
+                                'required': ['answer', 'citations', 'emotion'],
+                                'additionalProperties': False,
                             },
-                            'required': ['answer', 'citations', 'emotion'],
-                            'additionalProperties': False,
                         },
                     },
-                },
+                )
             )
         except APIError as exc:
             raise GenerationError(f'OpenAI request failed: {exc}') from exc
@@ -126,34 +133,36 @@ class OpenAIClient:
         """Ask the model whether to call the sole knowledge-base search tool."""
         await self._rate_limiter.acquire()
         try:
-            response = await self._client.responses.create(
-                model=self.model,
-                input=[
-                    {
-                        'role': 'system',
-                        'content': (
-                            'You are a source-grounded travel assistant. Call '
-                            f'`{TOURISM_SEARCH_TOOL.name}` for every factual tourism question. '
-                            'Do not call it only for conversational or meta questions about '
-                            'the assistant and its capabilities. Never answer tourism facts '
-                            'from model knowledge. If a previous search was insufficient, you '
-                            'may call the tool once more with a reformulated query. '
-                            f'Previous queries: {list(previous_queries)!r}. '
-                            f'Retrieved context available: {has_context}.'
-                        ),
-                    },
-                    {'role': 'user', 'content': question},
-                ],
-                tools=[
-                    {
-                        'type': 'function',
-                        'name': TOURISM_SEARCH_TOOL.name,
-                        'description': TOURISM_SEARCH_TOOL.description,
-                        'parameters': TOURISM_SEARCH_TOOL.input_schema,
-                        'strict': True,
-                    }
-                ],
-                parallel_tool_calls=False,
+            response = await retry_provider_call(
+                lambda: self._client.responses.create(
+                    model=self.model,
+                    input=[
+                        {
+                            'role': 'system',
+                            'content': (
+                                'You are a source-grounded travel assistant. Call '
+                                f'`{TOURISM_SEARCH_TOOL.name}` for every factual tourism question. '
+                                'Do not call it only for conversational or meta questions about '
+                                'the assistant and its capabilities. Never answer tourism facts '
+                                'from model knowledge. If a previous search was insufficient, you '
+                                'may call the tool once more with a reformulated query. '
+                                f'Previous queries: {list(previous_queries)!r}. '
+                                f'Retrieved context available: {has_context}.'
+                            ),
+                        },
+                        {'role': 'user', 'content': question},
+                    ],
+                    tools=[
+                        {
+                            'type': 'function',
+                            'name': TOURISM_SEARCH_TOOL.name,
+                            'description': TOURISM_SEARCH_TOOL.description,
+                            'parameters': TOURISM_SEARCH_TOOL.input_schema,
+                            'strict': True,
+                        }
+                    ],
+                    parallel_tool_calls=False,
+                )
             )
         except APIError as exc:
             raise GenerationError(f'OpenAI request failed: {exc}') from exc

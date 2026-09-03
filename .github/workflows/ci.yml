@@ -33,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -65,13 +65,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -88,13 +88,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -118,49 +118,30 @@ jobs:
       airflow: ${{ steps.filter.outputs.airflow }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
             airflow:
               - 'airflow/**'
-              - 'docker-compose.yml'
               - 'docker/airflow.Dockerfile'
-              - 'docker/base.Dockerfile'
-              - 'docker/ingestion.Dockerfile'
-              - 'src/ai_tour_guide/ingestion/**'
-              - 'src/ai_tour_guide/knowledge_base/**'
-              - '.env.template'
-              - 'pyproject.toml'
-              - 'uv.lock'
-
-  airflow-config:
-    name: Airflow configuration
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure Airflow environment
-        run: |
-          cp .env.template .env
-          echo "DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)" >> "$GITHUB_ENV"
-
-      - name: Validate Airflow Compose configuration
-        run: docker compose --profile airflow config --quiet
 
   airflow:
     name: Airflow DAG integration
-    needs: airflow-changes
+    needs: [quality, unit, smoke, airflow-changes]
     if: >-
-      github.event_name == 'push' ||
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main' &&
+      needs.quality.result == 'success' &&
+      needs.unit.result == 'success' &&
+      needs.smoke.result == 'success' &&
       needs.airflow-changes.outputs.airflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure Airflow environment
         run: |
@@ -195,3 +176,23 @@ jobs:
       - name: Stop Airflow
         if: always()
         run: docker compose --profile airflow down --volumes --remove-orphans
+
+  airflow-gate:
+    name: Airflow skipped or success
+    needs: [airflow-changes, airflow]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require a successful Airflow check when relevant
+        env:
+          AIRFLOW_CHANGED: ${{ needs.airflow-changes.outputs.airflow }}
+          AIRFLOW_RESULT: ${{ needs.airflow.result }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != 'pull_request' ] || \
+            [ "$GITHUB_BASE_REF" != 'main' ] || \
+            [ "$AIRFLOW_CHANGED" != 'true' ]; then
+            echo 'Airflow DAG integration was not required for this CI run.'
+            exit 0
+          fi
+          test "$AIRFLOW_RESULT" = 'success'

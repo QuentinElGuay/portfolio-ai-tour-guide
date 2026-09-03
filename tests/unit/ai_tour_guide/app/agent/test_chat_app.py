@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import gradio as gr
 
 from ai_tour_guide.app.chat.app import (
+    BACKEND_ERROR_MESSAGE,
     CHAT_CSS,
     DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
@@ -39,6 +40,13 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
 
     assert chatbot.elem_id == 'rag-chat'
     assert app.config['title'] == 'Bon Voyage'
+    llm_labels = [
+        component
+        for component in app.blocks.values()
+        if isinstance(component, gr.Markdown)
+        and 'baguette-llm - mini-croissant-1.0' in str(component.value)
+    ]
+    assert len(llm_labels) == 1
     assert chatbot.height == 'calc(100vh - 250px)'
     assert chatbot.value[0]['role'] == 'assistant'
     assert chatbot.value[0]['content'][0]['text'] == DEMO_WELCOME_MESSAGE
@@ -136,6 +144,15 @@ def test_italicize_french_expressions() -> None:
     assert _italicize_french_expressions('*Voilà!*') == '*Voilà!*'
 
 
+def test_italicize_all_registered_french_expressions() -> None:
+    """Keep every shared French expression formatted in italics by the UI."""
+    from ai_tour_guide.app.agent.identity import FRENCH_EXPRESSIONS
+
+    rendered = _italicize_french_expressions(' '.join(FRENCH_EXPRESSIONS))
+
+    assert rendered == ' '.join(f'*{expression}*' for expression in FRENCH_EXPRESSIONS)
+
+
 def test_update_feedback_values_preserves_previous_ratings() -> None:
     """Verify that update feedback values preserves previous ratings."""
     history: list[ChatHistoryItem] = [
@@ -187,3 +204,10 @@ def test_submit_feedback_ignores_invalid_events() -> None:
         asyncio.run(submit_feedback(selection, backend))
 
     backend.submit_feedback.assert_not_awaited()
+
+
+def test_backend_error_message_does_not_expose_transport_details() -> None:
+    """Keep client-side backend failures safe and human-oriented."""
+    assert 'Backend error' not in BACKEND_ERROR_MESSAGE
+    assert 'Chat API request failed' not in BACKEND_ERROR_MESSAGE
+    assert "I'm" in BACKEND_ERROR_MESSAGE

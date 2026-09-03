@@ -10,6 +10,7 @@ dependencies = [
     "click>=8.4.2",
     "fastapi>=0.141.1",
     "fastembed>=0.8.0",
+    "google-genai>=1.0.0",
     "gradio>=6.22.0",
     "httpx>=0.28.1",
     "langgraph>=1.2.11",
@@ -49,6 +50,9 @@ number = true
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore:'_UnionGenericAlias' is deprecated and slated for removal in Python 3.17:DeprecationWarning:google\\.genai\\.types",
+]
 
 [tool.pyright]
 typeCheckingMode = "standard"

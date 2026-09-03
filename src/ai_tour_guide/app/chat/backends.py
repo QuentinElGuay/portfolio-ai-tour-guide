@@ -1,3 +1,4 @@
+import logging
 import os
 from abc import ABC, abstractmethod
 from uuid import UUID, uuid4
@@ -16,9 +17,16 @@ from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
     ChatMessageRequest,
     ConversationResponse,
+    LLMInfo,
 )
 
 DESTINATION_CATALOG_QUESTION = FLOW_QUESTIONS['destinations']
+CHAT_SERVICE_UNAVAILABLE_ERROR = (
+    'The chat service is temporarily unavailable. Please try again shortly.'
+)
+DEFAULT_CHAT_API_TIMEOUT_SECONDS = 180.0
+
+logger = logging.getLogger(__name__)
 
 
 def create_backend() -> ChatBackend:
@@ -71,6 +79,7 @@ class DemoBackend(ChatBackend):
             step_id=FlowStep.WELCOME,
             message=WELCOME_MESSAGE,
             buttons=flow_definition(FlowStep.WELCOME).rendered_buttons(),
+            llm=LLMInfo(provider='baguette-llm', model='mini-croissant-1.0'),
         )
 
     async def send_message(
@@ -115,7 +124,11 @@ class DemoBackend(ChatBackend):
 
 
 class HttpChatBackend(ChatBackend):
-    def __init__(self, api_url: str, timeout_seconds: float = 60.0) -> None:
+    def __init__(
+        self,
+        api_url: str,
+        timeout_seconds: float = DEFAULT_CHAT_API_TIMEOUT_SECONDS,
+    ) -> None:
         self.api_url = api_url.rstrip('/')
         self.timeout = httpx.Timeout(timeout_seconds)
 
@@ -154,13 +167,17 @@ class HttpChatBackend(ChatBackend):
                 response = await client.post(f'{self.api_url}{path}', json=payload)
                 response.raise_for_status()
         except httpx.ConnectError as exc:
-            raise RuntimeError('Unable to connect to the chat API.') from exc
+            logger.exception('Unable to connect to the chat API')
+            raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(
-                f'The chat API returned HTTP {exc.response.status_code}.'
-            ) from exc
+            logger.exception('The chat API returned an HTTP error')
+            raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
         except httpx.HTTPError as exc:
-            raise RuntimeError(f'Chat API request failed: {exc}') from exc
+            logger.exception('The chat API request failed')
+            raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
+        except ValueError as exc:
+            logger.exception('The chat API returned an invalid response')
+            raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
         return self.validate_response(response.json())
 
     async def submit_feedback(
@@ -178,7 +195,8 @@ class HttpChatBackend(ChatBackend):
                 )
                 response.raise_for_status()
         except httpx.HTTPError as exc:
-            raise RuntimeError(f'Unable to store feedback: {exc}') from exc
+            logger.exception('Unable to store feedback')
+            raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
 
 
 __all__ = ['ChatBackend', 'DemoBackend', 'HttpChatBackend', 'create_backend']

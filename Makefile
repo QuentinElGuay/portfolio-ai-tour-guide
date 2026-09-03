@@ -104,9 +104,12 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	$(COMPOSE) --profile dashboard run --rm metabase-database
 
 db-init: db-validate-schema ## Start PostgreSQL and initialize its schema.
-	$(COMPOSE) --profile tools run --build --rm init-db \
-		python -m ai_tour_guide.knowledge_base.database.init \
-		--schema "$(SCHEMA)"
+	$(DATABASE_UP)
+	$(COMPOSE) --profile tools build ai-tour-guide-base init-db
+	DB_SCHEMA="$(SCHEMA)" $(COMPOSE) --profile tools create --no-build --force-recreate init-db
+	$(COMPOSE) --profile tools start init-db
+	@status=0; $(COMPOSE) --profile tools wait init-db || status=$$?; \
+		$(COMPOSE) --profile tools rm -sf init-db; exit $$status
 
 db-reset: db-validate-schema ## Reset the selected application schema without touching Metabase.
 	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
@@ -119,7 +122,7 @@ db-reset-schema: db-validate-schema ## Delete and recreate only the selected sch
 	$(COMPOSE) exec -T database sh -c \
 		'psql --username "$$POSTGRES_USER" \
 		--dbname "$$POSTGRES_DB" \
-		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
+		--command "DROP SCHEMA IF EXISTS $(SCHEMA) CASCADE"'
 	$(MAKE) db-init SCHEMA="$(SCHEMA)"
 
 db-validate-schema:
@@ -239,8 +242,7 @@ simulate-rag: ## Populate operational dashboards with deterministic synthetic RA
 	uv run python -m tools.simulate_rag_traffic $(SIMULATE_ARGS)
 
 smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke schema.
-	$(DATABASE_UP)
-	uv run python -m ai_tour_guide.knowledge_base.database.init --schema smoke
+	$(MAKE) db-reset-schema SCHEMA=smoke
 	AGENT_LLM_PROVIDER=baguette-llm \
 	AGENT_LLM_API_KEY= \
 	DB_SCHEMA=smoke \

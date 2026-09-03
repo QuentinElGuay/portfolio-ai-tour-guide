@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import gradio as gr
 
-from ai_tour_guide.app.agent.identity import WELCOME_MESSAGE
+from ai_tour_guide.app.agent.identity import FRENCH_EXPRESSIONS, WELCOME_MESSAGE
 from ai_tour_guide.app.agent.source_formatting import format_pages
 from ai_tour_guide.app.chat.backends import (
     ChatBackend,
@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
 INVALID_SOURCE_ERROR = 'The chat response has an invalid source.'
+BACKEND_ERROR_MESSAGE = (
+    "Oh là là! I'm having a little trouble reaching the travel service right now. "
+    'Please try again in a short while.'
+)
 EMOTICONS_ENABLED = False
 
 DEMO_WELCOME_NOTICE = (
@@ -40,14 +44,6 @@ AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
     Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
 )
-FRENCH_EXPRESSIONS = (
-    'Oh là là!',
-    'Voilà!',
-    'Bon appétit!',
-    'En route!',
-    'Touché!',
-    'Salut!',
-)
 EMOTICON_IMAGES = {
     emotion: Path(__file__).parent / 'assets' / 'emoticons' / f'{emotion.value}.png'
     for emotion in Emotion
@@ -55,6 +51,13 @@ EMOTICON_IMAGES = {
 }
 
 CHAT_CSS = """
+.llm-info {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin: 0.25rem auto 0;
+    text-align: center;
+}
+
 #rag-chat .message-buttons-left {
     align-items: center;
     display: flex;
@@ -265,8 +268,9 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                 None if input_id != FREE_TEXT_INPUT_ID else display_question,
             )
             reply = _render_conversation_response(response)
-        except RuntimeError as exc:
-            reply = f'**Backend error:** {exc}'
+        except RuntimeError:
+            logger.exception('Chat backend request failed')
+            reply = BACKEND_ERROR_MESSAGE
             request_id = placeholder_request_id(assistant_message_index)
         else:
             response_request_id = response.message_id
@@ -387,6 +391,12 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             examples=[],
             cache_examples=False,
         )
+        llm = start_response.llm
+        if llm is not None:
+            gr.Markdown(
+                f'Model: `{llm.provider} - {llm.model}`',
+                elem_classes=['llm-info'],
+            )
         # Gradio exposes this runtime event, but its published type information omits it.
         chatbot.like(  # pyright: ignore[reportAttributeAccessIssue]
             on_like,

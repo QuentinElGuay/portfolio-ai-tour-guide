@@ -1,7 +1,14 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from ai_tour_guide.app.chat.backends import DemoBackend, HttpChatBackend
+import httpx
+import pytest
+
+from ai_tour_guide.app.chat.backends import (
+    DEFAULT_CHAT_API_TIMEOUT_SECONDS,
+    DemoBackend,
+    HttpChatBackend,
+)
 from ai_tour_guide.app.chat.models import FREE_TEXT_INPUT_ID
 
 
@@ -40,6 +47,12 @@ def test_demo_backend_handles_free_text_as_a_first_class_input() -> None:
         assert response.message
 
     asyncio.run(exercise())
+
+
+def test_http_backend_allows_time_for_a_complete_rag_turn() -> None:
+    backend = HttpChatBackend('http://agent/chat')
+
+    assert backend.timeout.read == DEFAULT_CHAT_API_TIMEOUT_SECONDS
 
 
 @patch('ai_tour_guide.app.chat.backends.httpx.AsyncClient')
@@ -98,6 +111,34 @@ def test_http_backend_sends_only_current_session_state(
             'text': 'Where should I go?',
         },
     )
+
+
+@patch('ai_tour_guide.app.chat.backends.httpx.AsyncClient')
+def test_http_backend_hides_transport_error_details(
+    async_client: MagicMock,
+) -> None:
+    response = MagicMock()
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        'secret provider details',
+        request=httpx.Request('POST', 'http://agent/chat/message'),
+        response=httpx.Response(503),
+    )
+    client = AsyncMock()
+    client.post.return_value = response
+    async_client.return_value.__aenter__.return_value = client
+
+    with pytest.raises(RuntimeError) as error:
+        asyncio.run(
+            HttpChatBackend('http://agent/chat').send_message(
+                '12345678-1234-5678-1234-567812345678',
+                'welcome',
+                FREE_TEXT_INPUT_ID,
+                'Where should I go?',
+            )
+        )
+
+    assert 'secret provider details' not in str(error.value)
+    assert 'temporarily unavailable' in str(error.value)
 
 
 @patch('ai_tour_guide.app.chat.backends.httpx.AsyncClient')

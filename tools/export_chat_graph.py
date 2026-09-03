@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from ai_tour_guide.app.agent.rag.agent_workflow import build_agent_graph
+from ai_tour_guide.app.agent.rag.workflow import build_agent_graph
 
 
 def export_chat_graph(output: Path) -> Path:

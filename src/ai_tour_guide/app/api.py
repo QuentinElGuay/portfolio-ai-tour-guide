@@ -20,7 +20,7 @@ from ai_tour_guide.app.agent.conversation import (
 from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.models import RAGResult
+from ai_tour_guide.app.agent.rag.models import RAGErrorCategory, RAGResult
 from ai_tour_guide.app.agent.rag.persistence import store_rag_result
 from ai_tour_guide.app.chat.models import (
     ChatErrorCode,
@@ -29,6 +29,7 @@ from ai_tour_guide.app.chat.models import (
     ChatMessage,
     ChatMessageRequest,
     ConversationResponse,
+    LLMInfo,
     Role,
 )
 from ai_tour_guide.app.chat.persistence import store_chat_message, store_feedback
@@ -47,6 +48,31 @@ app = FastAPI(
 )
 _last_health_failure: str | None = None
 _conversation_checkpointer = MemorySaver()
+
+EXTERNAL_SERVICE_ERROR_MESSAGE = (
+    "_Oh là là!_ I'm having a little trouble reaching a service right now. "
+    'Please try again in a short while.'
+)
+INTERNAL_SERVICE_ERROR_MESSAGE = (
+    '_Oh là là!_ Something went a little sideways on our side. '
+    'Please try again in a short while.'
+)
+
+
+def _chat_error_message(result: RAGResult) -> str:
+    """Translate an internal error category into a safe chat message."""
+    if (
+        result.error is not None
+        and result.error.category is RAGErrorCategory.EXTERNAL_SERVICE
+    ):
+        return EXTERNAL_SERVICE_ERROR_MESSAGE
+    return INTERNAL_SERVICE_ERROR_MESSAGE
+
+
+def _llm_info() -> LLMInfo:
+    """Return the configured model identity without exposing credentials."""
+    settings = AgentsSettings()
+    return LLMInfo(provider=settings.llm_provider.value, model=settings.model)
 
 
 def _chat_error(status_code: int, code: ChatErrorCode, message: str) -> HTTPException:
@@ -78,7 +104,9 @@ async def start_chat() -> ConversationResponse:
         {'session_id': session_id, 'messages': []},
         config={'configurable': {'thread_id': session_id}},
     )
-    response = ConversationResponse.model_validate(state['latest_response'])
+    response = ConversationResponse.model_validate(state['latest_response']).model_copy(
+        update={'llm': _llm_info()}
+    )
     store_chat_message(
         ChatMessage(
             session_id=response.session_id,
@@ -227,7 +255,13 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
                 status_code=503,
                 detail='Unable to store the generated answer for feedback.',
             ) from exc
-    response = ConversationResponse.model_validate(state['latest_response'])
+    response_payload = dict(state['latest_response'])
+    if result is not None and result.error is not None:
+        response_payload['message'] = _chat_error_message(result)
+        response_payload['sources'] = []
+    response = ConversationResponse.model_validate(response_payload).model_copy(
+        update={'llm': _llm_info()}
+    )
     try:
         store_chat_message(
             ChatMessage(
