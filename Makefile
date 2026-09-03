@@ -104,10 +104,12 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	$(COMPOSE) --profile dashboard run --rm metabase-database
 
 db-init: db-validate-schema ## Start PostgreSQL and initialize its schema.
+	$(DATABASE_UP)
 	$(COMPOSE) --profile tools build ai-tour-guide-base init-db
-	$(COMPOSE) --profile tools run --rm init-db \
-		python -m ai_tour_guide.knowledge_base.database.init \
-		--schema "$(SCHEMA)"
+	DB_SCHEMA="$(SCHEMA)" $(COMPOSE) --profile tools create --no-build --force-recreate init-db
+	$(COMPOSE) --profile tools start init-db
+	@status=0; $(COMPOSE) --profile tools wait init-db || status=$$?; \
+		$(COMPOSE) --profile tools rm -sf init-db; exit $$status
 
 db-reset: db-validate-schema ## Reset the selected application schema without touching Metabase.
 	@echo "Resetting application schema '$(SCHEMA)'; the Metabase database is preserved."
