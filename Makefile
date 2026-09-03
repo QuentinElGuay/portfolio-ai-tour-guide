@@ -119,7 +119,7 @@ db-reset-schema: db-validate-schema ## Delete and recreate only the selected sch
 	$(COMPOSE) exec -T database sh -c \
 		'psql --username "$$POSTGRES_USER" \
 		--dbname "$$POSTGRES_DB" \
-		--command "DROP SCHEMA $(SCHEMA) CASCADE"'
+		--command "DROP SCHEMA IF EXISTS $(SCHEMA) CASCADE"'
 	$(MAKE) db-init SCHEMA="$(SCHEMA)"
 
 db-validate-schema:
