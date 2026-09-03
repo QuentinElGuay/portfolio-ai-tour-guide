@@ -239,8 +239,7 @@ simulate-rag: ## Populate operational dashboards with deterministic synthetic RA
 	uv run python -m tools.simulate_rag_traffic $(SIMULATE_ARGS)
 
 smoke-test: ## Run deterministic RAG smoke tests against the isolated smoke schema.
-	$(DATABASE_UP)
-	uv run python -m ai_tour_guide.knowledge_base.database.init --schema smoke
+	$(MAKE) db-reset-schema SCHEMA=smoke
 	AGENT_LLM_PROVIDER=baguette-llm \
 	AGENT_LLM_API_KEY= \
 	DB_SCHEMA=smoke \

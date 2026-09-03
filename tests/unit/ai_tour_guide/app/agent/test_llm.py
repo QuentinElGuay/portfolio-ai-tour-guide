@@ -103,7 +103,9 @@ def test_gemini_client_sends_messages_and_returns_structured_output() -> None:
 
     assert result.answer == 'A grounded answer.'
     assert result.emotion.value == 'happy'
-    request = client.aio.models.generate_content.await_args.kwargs
+    await_call = client.aio.models.generate_content.await_args
+    assert await_call is not None
+    request = await_call.kwargs
     assert request['model'] == 'gemini-test-model'
     assert request['config'].response_mime_type == 'application/json'
     assert request['config'].system_instruction == 'Use the context.'
@@ -149,7 +151,9 @@ def test_gemini_client_extracts_search_tool_calls() -> None:
     )
 
     assert result == 'best places in Brittany'
-    request = client.aio.models.generate_content.await_args.kwargs
+    await_call = client.aio.models.generate_content.await_args
+    assert await_call is not None
+    request = await_call.kwargs
     parameters = request['config'].tools[0].function_declarations[0].parameters
     assert 'additionalProperties' not in parameters
 
