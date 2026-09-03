@@ -159,7 +159,7 @@ def test_chat_feedback_http_boundary_uses_the_chat_namespace(
 
 
 @patch(
-    'ai_tour_guide.app.agent.conversation.list_known_destination_titles',
+    'ai_tour_guide.app.agent.conversation.list_indexed_destinations',
     return_value=('Brittany', 'Normandy'),
 )
 def test_chat_message_catalog_is_deterministic(

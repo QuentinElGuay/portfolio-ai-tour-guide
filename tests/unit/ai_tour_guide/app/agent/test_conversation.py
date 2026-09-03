@@ -83,7 +83,7 @@ def test_outer_conversation_graph_checkpoints_step_and_response() -> None:
     graph = build_outer_conversation_graph(
         checkpointer=MemorySaver(),
         answer_turn=answer_turn,
-        list_destinations=lambda: ('Brittany',),
+        list_destination_names=lambda: ('Brittany',),
     )
     session_id = '12345678-1234-5678-1234-567812345678'
 

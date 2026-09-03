@@ -26,7 +26,7 @@ from ai_tour_guide.app.chat.models import (
     ChatMessageRequest,
     ConversationTrace,
 )
-from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
+from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
 
@@ -62,12 +62,12 @@ def build_outer_conversation_graph(
     *,
     checkpointer: MemorySaver,
     answer_turn: Callable[[str, str, FlowStep], Awaitable[RAGResult]],
-    list_destinations: Callable[[], tuple[str, ...]] | None = None,
+    list_destination_names: Callable[[], tuple[str, ...]] | None = None,
     on_result: Callable[[RAGResult], None] | None = None,
 ):
     """Build the durable client-independent conversation graph."""
 
-    resolve_destinations = list_destinations or list_known_destination_titles
+    resolve_destination_names = list_destination_names or list_indexed_destinations
 
     def response(
         session_id: str,
@@ -198,11 +198,11 @@ def build_outer_conversation_graph(
         )
 
     async def catalog(state: OuterConversationState) -> dict[str, object]:
-        titles = resolve_destinations()
+        destination_names = resolve_destination_names()
         message = (
             'Our currently covered destinations are:\n'
-            + '\n'.join(f'- {title}' for title in titles)
-            if titles
+            + '\n'.join(f'- {name}' for name in destination_names)
+            if destination_names
             else 'No destinations are currently indexed.'
         )
         return completed_response(state, message)

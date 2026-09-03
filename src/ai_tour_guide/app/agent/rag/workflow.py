@@ -1,5 +1,6 @@
 """Bounded LangGraph workflow for source-grounded live answers."""
 
+import re
 from typing import Literal, NotRequired, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
@@ -13,6 +14,7 @@ from ai_tour_guide.app.agent.flow import (
     input_type_for_option,
 )
 from ai_tour_guide.app.agent.identity import (
+    BON_VOYAGE_IDENTITY,
     IDENTITY_ANSWERS,
     PETIT_GUIDE_IDENTITY,
     PETIT_GUIDE_PERSONALITY,
@@ -20,7 +22,6 @@ from ai_tour_guide.app.agent.identity import (
 from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer
 from ai_tour_guide.app.agent.rag.prompting import (
-    build_catalog_messages,
     build_messages,
     is_destination_catalog_question,
 )
@@ -30,7 +31,7 @@ from ai_tour_guide.app.chat.navigation import (
     normalize_option_id,
     question_for_option_id,
 )
-from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
+from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE
@@ -77,16 +78,17 @@ def build_agent_graph(
             option_id, FlowStep(state.get('flow_step', DEFAULT_FLOW_STEP))
         )
         question = question_for_option_id(option_id) if option_id else state['question']
+        identity_answer = _identity_answer_for(question or state['question'])
         return {
             'question': question or state['question'],
             'flow_step': flow_step.value,
             'input_type': input_type_for_option(option_id),
-            'identity_answer': IDENTITY_ANSWERS.get(question or '', ''),
+            'identity_answer': identity_answer,
             'next_option_ids': next_option_ids(option_id) if option_id else (),
         }
 
     def route_identity(state: AgentState) -> Literal['identity', 'decide']:
-        return 'identity' if state['question'] in IDENTITY_ANSWERS else 'decide'
+        return 'identity' if state.get('identity_answer') else 'decide'
 
     def answer_identity(state: AgentState) -> dict[str, object]:
         return {'generated': GeneratedAnswer(state.get('identity_answer', ''))}
@@ -170,9 +172,9 @@ async def run_agent_workflow(
 ) -> AgentState:
     """Run the bounded graph and return its complete execution state."""
     option_id = normalize_option_id(option_id)
-    if is_destination_catalog_question(question):
-        titles = list_known_destination_titles(engine)
-        messages = build_catalog_messages(question, titles)
+    identity_question = question_for_option_id(option_id) if option_id else None
+    identity_answer = _identity_answer_for(identity_question or question)
+    if identity_answer:
         return {
             'question': question,
             'option_id': option_id,
@@ -181,8 +183,28 @@ async def run_agent_workflow(
             'queries': [],
             'contexts': (),
             'next_query': None,
-            'messages': messages,
-            'generated': await llm_client.answer_question(messages),
+            'messages': (),
+            'generated': GeneratedAnswer(identity_answer),
+            'identity_answer': identity_answer,
+            'next_option_ids': next_option_ids(option_id) if option_id else (),
+        }
+    if is_destination_catalog_question(question):
+        destination_names = list_indexed_destinations(engine)
+        return {
+            'question': question,
+            'option_id': option_id,
+            'flow_step': flow_step_for_option(option_id, flow_step).value,
+            'input_type': input_type_for_option(option_id),
+            'queries': [],
+            'contexts': (),
+            'next_query': None,
+            'messages': (),
+            'generated': GeneratedAnswer(
+                'Our currently covered destinations are:\n'
+                + '\n'.join(f'- {name}' for name in destination_names)
+                if destination_names
+                else 'No destinations are currently indexed.'
+            ),
         }
 
     graph = build_agent_graph(llm_client, engine=engine, strategy=strategy)
@@ -207,8 +229,9 @@ def _build_meta_messages(question: str) -> tuple[Message, ...]:
         Message(
             role=Role.SYSTEM,
             content=(
-                f'{PETIT_GUIDE_IDENTITY}\n\n{PETIT_GUIDE_PERSONALITY} Answer '
-                'only conversational or meta questions about the assistant and its '
+                f'{PETIT_GUIDE_IDENTITY}\n\n{PETIT_GUIDE_PERSONALITY}\n\n'
+                f'Use this Bon Voyage identity when relevant:\n{BON_VOYAGE_IDENTITY}\n\n'
+                'Answer only conversational or meta questions about the assistant and its '
                 'capabilities. Do not answer tourism facts without retrieved source '
                 'context. Return structured JSON with `answer`, `citations`, and '
                 '`emotion`; citations must be empty.'
@@ -216,3 +239,15 @@ def _build_meta_messages(question: str) -> tuple[Message, ...]:
         ),
         Message(role=Role.USER, content=question),
     )
+
+
+def _identity_answer_for(question: str) -> str:
+    """Return a configured identity answer while tolerating simple user phrasing."""
+    normalized = re.sub(r'[^a-z0-9]+', ' ', question.casefold()).strip()
+    for configured_question, answer in IDENTITY_ANSWERS.items():
+        configured_normalized = re.sub(
+            r'[^a-z0-9]+', ' ', configured_question.casefold()
+        ).strip()
+        if normalized == configured_normalized:
+            return answer
+    return ''

@@ -21,7 +21,6 @@ from ai_tour_guide.app.agent.llm.clients import (
 )
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.agent_workflow import run_agent_workflow
 from ai_tour_guide.app.agent.rag.models import (
     GeneratedAnswer,
     RAGError,
@@ -30,6 +29,7 @@ from ai_tour_guide.app.agent.rag.models import (
 )
 from ai_tour_guide.app.agent.rag.prompting import build_messages
 from ai_tour_guide.app.agent.rag.sources import validate_citations
+from ai_tour_guide.app.agent.rag.workflow import run_agent_workflow
 from ai_tour_guide.app.agent.responses import (
     INSUFFICIENT_CONTEXT_ANSWER,
 )

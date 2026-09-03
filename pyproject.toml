@@ -50,6 +50,9 @@ number = true
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore:'_UnionGenericAlias' is deprecated and slated for removal in Python 3.17:DeprecationWarning:google\\.genai\\.types",
+]
 
 [tool.pyright]
 typeCheckingMode = "standard"
