@@ -3,7 +3,16 @@
 import json
 from pathlib import Path
 
+from ai_tour_guide.app.agent.identity import WELCOME_MESSAGE
+
 DEFAULT_DEMO_DATASET_PATH = Path(__file__).parent / 'data' / 'demo_dataset.jsonl'
+DEMO_LIMITATION_MESSAGE = (
+    'This is a limited experience with prepared Brittany questions. '
+    'It accepts modest spelling and punctuation variations.'
+)
+DEMO_WELCOME_MESSAGE = (
+    f'{WELCOME_MESSAGE}\n\n> **Demo mode:** {DEMO_LIMITATION_MESSAGE}'
+)
 
 
 def load_demo_questions(dataset_path: Path) -> tuple[str, ...]:
@@ -36,5 +45,7 @@ def load_demo_questions(dataset_path: Path) -> tuple[str, ...]:
 
 __all__ = [
     'DEFAULT_DEMO_DATASET_PATH',
+    'DEMO_LIMITATION_MESSAGE',
+    'DEMO_WELCOME_MESSAGE',
     'load_demo_questions',
 ]

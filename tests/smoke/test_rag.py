@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_LIMITATION_MESSAGE
 from ai_tour_guide.app.api import app
 
 
@@ -56,9 +57,7 @@ def test_chat_message_returns_a_demo_fallback_for_an_unsupported_question() -> N
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload['message'].startswith(
-        'This is a demo backend with limited knowledge of Brittany'
-    )
+    assert payload['message'].startswith(DEMO_LIMITATION_MESSAGE)
     assert '\n\nTry asking: “' in payload['message']
     assert payload['sources'] == []
     assert payload['trace']['final_status'] == 'answered'

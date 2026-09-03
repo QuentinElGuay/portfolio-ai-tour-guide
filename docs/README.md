@@ -7,7 +7,10 @@ available project command.
 
 ## Table of contents
 
-- [Before you begin](#before-you-begin)
+- [Progressive setup](#progressive-setup)
+  - [1. Demo mode](#1-demo-mode)
+  - [2. Live provider with an empty knowledge base](#2-live-provider-with-an-empty-knowledge-base)
+  - [3. Source-grounded travel assistant](#3-source-grounded-travel-assistant)
 - [Ingestion with Airflow](#ingestion-with-airflow)
 - [Ingestion with the command line](#ingestion-with-the-command-line)
 - [Chat app](#chat-app)
@@ -15,7 +18,7 @@ available project command.
 - [Monitoring](#monitoring)
   - [Traffic simulation](#traffic-simulation)
 
-## Before you begin
+## Progressive setup
 
 Create a local environment file from the template:
 
@@ -23,24 +26,62 @@ Create a local environment file from the template:
 cp .env.template .env
 ```
 
-The template defaults to the no-cost Brittany demo and does not require an API key:
+### 1. Demo mode
 
-```dotenv
-AGENT_LLM_PROVIDER=baguette-llm
-AGENT_LLM_API_KEY=
-AGENT_LLM_MODEL=mini-croissant-1.0
+The template configures the _Bon Voyage_ travel assistant for demo mode. The demo uses a
+no-cost, limited, deterministic assistant and does not require an LLM API key or
+ingested documents. It answers a prepared set of Brittany questions and suggests a
+supported one when it cannot answer. The chat remains available even when the knowledge
+base is empty, making this the fastest way to explore the application.
+
+Start it:
+
+```bash
+make app
 ```
 
-The demo can answer a prepared set of Brittany questions. For any other question, it
-explains that it is a limited demo and suggests a question it can answer.
+Once it is running, you can access:
+
+- the chat app at [http://localhost:7860](http://localhost:7860);
+- the chat API at [http://localhost:8000](http://localhost:8000);
+- the interactive API documentation at
+  [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### 2. Live provider with an empty knowledge base
+
+You can configure a live provider before ingesting any guides. Replace the provider,
+model, and API key in `.env`, then restart the app. For example, to use Gemini:
+
+```dotenv
+AGENT_LLM_PROVIDER=gemini
+AGENT_LLM_API_KEY=your-gemini-api-key
+AGENT_LLM_MODEL=gemini-3.5-flash-lite
+```
+
+```bash
+make app
+```
+
+The assistant starts normally and explains that the language model is ready but no
+travel guides have been ingested. Guided and identity questions remain available;
+source-grounded travel answers become available after ingestion.
 
 Supported live LLM providers and recommended models:
 
 - OpenAI (ChatGPT): `gpt-4.1-mini`
 - Google Gemini: `gemini-3.5-flash-lite`
 
-Configure the selected provider and API key in `.env` with `AGENT_LLM_PROVIDER`,
-`AGENT_LLM_API_KEY`, and `AGENT_LLM_MODEL`.
+### 3. Source-grounded travel assistant
+
+Ingest the document corpus to complete the application:
+
+```bash
+make ingest
+```
+
+Alternatively, use `make airflow` and trigger the `ingest_documents` DAG. Once the
+guides are ingested, the configured LLM answers travel questions from retrieved passages
+and returns validated source pages.
 
 The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
 contains development defaults for these values; replace them before sharing the services

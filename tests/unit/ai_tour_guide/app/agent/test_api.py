@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGResult
+from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
 from ai_tour_guide.app.api import (
     _ensure_knowledge_base_ready,
     app,
@@ -30,6 +31,14 @@ def store_chat_message_fixture(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     stored = MagicMock()
     monkeypatch.setattr('ai_tour_guide.app.api.store_chat_message', stored)
     return stored
+
+
+@pytest.fixture(autouse=True)
+def knowledge_base_ready_fixture(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Keep API tests independent from a running PostgreSQL service."""
+    ready = MagicMock(return_value=False)
+    monkeypatch.setattr('ai_tour_guide.app.api._ensure_knowledge_base_ready', ready)
+    return ready
 
 
 def _post(path: str, payload: Mapping[str, object]) -> httpx.Response:
@@ -65,6 +74,16 @@ def test_chat_start_always_creates_a_new_renderable_session() -> None:
         'identity',
         'destinations',
     ]
+
+
+def test_chat_start_notifies_a_live_provider_when_the_knowledge_base_is_empty(
+    knowledge_base_ready_fixture: MagicMock,
+) -> None:
+    knowledge_base_ready_fixture.return_value = True
+
+    response = asyncio.run(start_chat())
+
+    assert EMPTY_KNOWLEDGE_BASE_NOTICE in response.message
 
 
 @patch('ai_tour_guide.app.api.store_rag_result')

@@ -17,8 +17,9 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-  - [Demo mode](#demo-mode)
-  - [Complete mode](#complete-mode)
+  - [1. Demo mode](#1-demo-mode)
+  - [2. Live provider with an empty knowledge base](#2-live-provider-with-an-empty-knowledge-base)
+  - [3. Source-grounded travel assistant](#3-source-grounded-travel-assistant)
 - [Common commands](#common-commands)
 - [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
@@ -153,30 +154,62 @@ local installation.
 
 ## Quick start
 
-### Demo mode
+_This is a quick start. For the full tutorial, see the
+[project tutorial](docs/README.md)._
 
-With Docker, Docker Compose, and GNU Make installed, clone the project and enter its
-directory or create a Github Codespaces. Then run:
+### 1. Demo mode
+
+With Docker, Docker Compose, and GNU Make installed, clone the project and change into
+its directory, or open it in a GitHub Codespace. Then run:
 
 ```bash
 cp .env.template .env
 make app
 ```
 
-This starts the _Bon Voyage_ travel assistant in demo mode. The demo uses a no-cost
-deterministic provider and does not require an LLM API key or ingested documents. It
-supports a prepared set of questions and suggests a supported question when it cannot
-answer. The guided chat remains available even when the knowledge base is empty.
+This starts the _Bon Voyage_ travel assistant in demo mode. The demo uses a no-cost,
+limited, deterministic assistant and does not require an LLM API key or ingested
+documents. It answers a prepared set of questions and suggests a supported one when it
+cannot answer. The chat remains available even when the knowledge base is empty, making
+this the fastest way to explore the application.
 
-### Complete mode
+Once it is running, you can access:
 
-To run the full project with source-grounded answers, configure an LLM API key and
-ingest the document corpus. Follow the [full project tutorial](docs/README.md) for the
-complete setup.
+- the chat app at [http://localhost:7860](http://localhost:7860);
+- the chat API at [http://localhost:8000](http://localhost:8000);
+- the interactive API documentation at
+  [http://localhost:8000/docs](http://localhost:8000/docs).
 
-Open [http://localhost:7860](http://localhost:7860) to use the chat. The API is
-available at [http://localhost:8000](http://localhost:8000), with interactive
-documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+### 2. Live provider with an empty knowledge base
+
+You can configure a live provider before ingesting any guides. Replace the provider,
+model, and API key in `.env`, then restart the app:
+
+```dotenv
+AGENT_LLM_PROVIDER=gemini
+AGENT_LLM_API_KEY=your-gemini-api-key
+AGENT_LLM_MODEL=gemini-3.5-flash-lite
+```
+
+```bash
+make app
+```
+
+The assistant starts normally and explains that the language model is ready but no
+travel guides have been ingested. Guided and identity questions remain available;
+source-grounded travel answers become available after ingestion.
+
+### 3. Source-grounded travel assistant
+
+Ingest the document corpus to complete the application:
+
+```bash
+make ingest
+```
+
+Alternatively, use `make airflow` and trigger the `ingest_documents` DAG. Once the
+guides are ingested, the configured LLM answers travel questions from retrieved passages
+and returns validated source pages.
 
 ## Common commands
 

@@ -5,13 +5,14 @@ from uuid import UUID, uuid4
 
 import httpx
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.agent.flow import (
     FLOW_QUESTIONS,
     FlowStep,
     flow_definition,
     transition_for,
 )
-from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
+from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS
 from ai_tour_guide.app.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
@@ -77,7 +78,7 @@ class DemoBackend(ChatBackend):
         return ConversationResponse(
             session_id=UUID(session_id),
             step_id=FlowStep.WELCOME,
-            message=WELCOME_MESSAGE,
+            message=DEMO_WELCOME_MESSAGE,
             buttons=flow_definition(FlowStep.WELCOME).rendered_buttons(),
             llm=LLMInfo(provider='baguette-llm', model='mini-croissant-1.0'),
         )

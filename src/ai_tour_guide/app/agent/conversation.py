@@ -10,6 +10,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from sqlalchemy import Engine
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.agent.flow import (
     DEFAULT_FLOW_STEP,
     FLOW_QUESTIONS,
@@ -19,8 +20,10 @@ from ai_tour_guide.app.agent.flow import (
 )
 from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
 from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
+from ai_tour_guide.app.agent.llm.settings import LLMProvider
 from ai_tour_guide.app.agent.rag.models import RAGResult
 from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
+from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
     ChatMessageRequest,
@@ -58,12 +61,26 @@ class ConversationGraphError(RuntimeError):
         self.code = code
 
 
+def welcome_message_for_provider(
+    provider: LLMProvider, *, knowledge_base_is_empty: bool
+) -> str:
+    """Return the complete conversation greeting for the selected provider."""
+    if provider is LLMProvider.BAGUETTE_LLM:
+        return DEMO_WELCOME_MESSAGE
+    return (
+        f'{WELCOME_MESSAGE}\n\n> **Knowledge base:** {EMPTY_KNOWLEDGE_BASE_NOTICE}'
+        if knowledge_base_is_empty
+        else WELCOME_MESSAGE
+    )
+
+
 def build_outer_conversation_graph(
     *,
     checkpointer: MemorySaver,
     answer_turn: Callable[[str, str, FlowStep], Awaitable[RAGResult]],
     list_destination_names: Callable[[], tuple[str, ...]] | None = None,
     on_result: Callable[[RAGResult], None] | None = None,
+    welcome_message: str = WELCOME_MESSAGE,
 ):
     """Build the durable client-independent conversation graph."""
 
@@ -126,7 +143,7 @@ def build_outer_conversation_graph(
             'latest_response': response(
                 state['session_id'],
                 FlowStep.WELCOME,
-                WELCOME_MESSAGE,
+                welcome_message,
             ),
         }
 

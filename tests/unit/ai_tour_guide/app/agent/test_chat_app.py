@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import gradio as gr
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.chat.app import (
     BACKEND_ERROR_MESSAGE,
     CHAT_CSS,
-    DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
     _italicize_french_expressions,

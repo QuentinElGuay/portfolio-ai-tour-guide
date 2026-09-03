@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.chat.backends import (
     DEFAULT_CHAT_API_TIMEOUT_SECONDS,
     DemoBackend,
@@ -23,6 +24,7 @@ def test_demo_backend_starts_and_sends_without_client_history() -> None:
         )
 
         assert started.step_id == 'welcome'
+        assert started.message == DEMO_WELCOME_MESSAGE
         assert [button.input_id for button in started.buttons] == [
             'identity',
             'destinations',

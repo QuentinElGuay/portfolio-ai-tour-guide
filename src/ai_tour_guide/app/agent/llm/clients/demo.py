@@ -7,8 +7,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from ai_tour_guide.app.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
-from ai_tour_guide.app.agent.llm.clients import GenerationError
+from ai_tour_guide.app.agent.demo_questions import (
+    DEFAULT_DEMO_DATASET_PATH,
+    DEMO_LIMITATION_MESSAGE,
+)
+from ai_tour_guide.app.agent.llm.clients import (
+    GenerationError,
+    NoContextFallbackClient,
+)
 from ai_tour_guide.app.agent.llm.settings import (
     DEFAULT_CLOSE_QUESTION_DISTANCE,
     DEFAULT_SIMILAR_QUESTION_DISTANCE,
@@ -18,10 +24,6 @@ from ai_tour_guide.app.chat.models import Message
 from ai_tour_guide.domain.sections import slugify_section_path
 
 _QUESTION_MARKER = 'User question:\n'
-_DEMO_LIMITATION_MESSAGE = (
-    'This is a demo backend with limited knowledge of Brittany, so I do not have a '
-    'prepared answer for that question.'
-)
 _CONTEXT_PATTERN = re.compile(
     r'^Source: .*?\n'
     r'URL: (?P<source_url>.+)\n'
@@ -43,7 +45,7 @@ class DemoCase:
     pages: tuple[int, ...]
 
 
-class DemoLLMClient:
+class DemoLLMClient(NoContextFallbackClient):
     """Return deterministic answers from the bundled demo dataset."""
 
     def __init__(
@@ -67,6 +69,35 @@ class DemoLLMClient:
         """Return a prepared demo answer, suggestion, or generic fallback."""
         question = _question_from_messages(messages)
         return self._answer_demo_question(messages, question)
+
+    async def answer_without_context(self, question: str) -> GeneratedAnswer:
+        """Return a prepared demo answer or suggestion without a knowledge base."""
+        case = self._cases.get(question)
+        if case is None or case.answer is None:
+            matched_question = _closest_question(
+                question,
+                self._answerable_questions,
+                max_distance=self.close_question_distance,
+            )
+            case = self._cases[matched_question] if matched_question else None
+        if case is not None and case.answer is not None:
+            return GeneratedAnswer(
+                case.answer,
+                llm_metadata={
+                    'provider': 'baguette-llm',
+                    'dataset': str(self.dataset_path),
+                },
+            )
+        if question in self._cases:
+            return self._fallback_answer()
+        somewhat_similar_question = _closest_question(
+            question,
+            self._answerable_questions,
+            max_distance=self.similar_question_distance,
+        )
+        if somewhat_similar_question is not None:
+            return self._did_you_mean_answer(somewhat_similar_question)
+        return self._fallback_answer()
 
     async def choose_search_query(
         self,
@@ -149,7 +180,7 @@ class DemoLLMClient:
 
     def _did_you_mean_answer(self, suggestion: str) -> GeneratedAnswer:
         return GeneratedAnswer(
-            f'{_DEMO_LIMITATION_MESSAGE}\n\nDid you mean: “{suggestion}”?',
+            f'{DEMO_LIMITATION_MESSAGE}\n\nDid you mean: “{suggestion}”?',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),
@@ -163,7 +194,7 @@ class DemoLLMClient:
             )
         suggestion = random.choice(self._answerable_questions)
         return GeneratedAnswer(
-            f'{_DEMO_LIMITATION_MESSAGE}\n\nTry asking: “{suggestion}”',
+            f'{DEMO_LIMITATION_MESSAGE}\n\nTry asking: “{suggestion}”',
             llm_metadata={
                 'provider': 'baguette-llm',
                 'dataset': str(self.dataset_path),

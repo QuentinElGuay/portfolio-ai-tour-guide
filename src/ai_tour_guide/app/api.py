@@ -16,6 +16,7 @@ from ai_tour_guide.app.agent.conversation import (
     OuterConversationState,
     build_conversation_graph,
     build_outer_conversation_graph,
+    welcome_message_for_provider,
 )
 from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.llm.factory import create_llm_client
@@ -75,6 +76,14 @@ def _llm_info() -> LLMInfo:
     return LLMInfo(provider=settings.llm_provider.value, model=settings.model)
 
 
+def _welcome_message(*, knowledge_base_is_empty: bool) -> str:
+    """Select the greeting from the active provider configuration."""
+    return welcome_message_for_provider(
+        AgentsSettings().llm_provider,
+        knowledge_base_is_empty=knowledge_base_is_empty,
+    )
+
+
 def _chat_error(status_code: int, code: ChatErrorCode, message: str) -> HTTPException:
     """Create a safe typed chat error without exposing implementation details."""
     from ai_tour_guide.app.chat.models import ChatErrorResponse
@@ -99,6 +108,9 @@ async def start_chat() -> ConversationResponse:
     graph = build_outer_conversation_graph(
         checkpointer=_conversation_checkpointer,
         answer_turn=_answer_turn,
+        welcome_message=_welcome_message(
+            knowledge_base_is_empty=_ensure_knowledge_base_ready()
+        ),
     )
     state = await graph.ainvoke(
         {'session_id': session_id, 'messages': []},
@@ -120,7 +132,7 @@ async def start_chat() -> ConversationResponse:
     return response
 
 
-def _ensure_knowledge_base_ready() -> None:
+def _ensure_knowledge_base_ready() -> bool:
     """Verify database connectivity while allowing an empty knowledge base."""
     global _last_health_failure
 
@@ -152,9 +164,10 @@ def _ensure_knowledge_base_ready() -> None:
                 '`make ingest` or `make load-corpus` to populate it.'
             )
             _last_health_failure = failure
-        return
+        return True
 
     _last_health_failure = None
+    return False
 
 
 async def _answer_question(
@@ -215,6 +228,7 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
         checkpointer=_conversation_checkpointer,
         answer_turn=_answer_turn,
         on_result=retain,
+        welcome_message=_welcome_message(knowledge_base_is_empty=False),
     )
     try:
         state = await graph.ainvoke(

@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import gradio as gr
 
-from ai_tour_guide.app.agent.identity import FRENCH_EXPRESSIONS, WELCOME_MESSAGE
+from ai_tour_guide.app.agent.identity import FRENCH_EXPRESSIONS
 from ai_tour_guide.app.agent.source_formatting import format_pages
 from ai_tour_guide.app.chat.backends import (
     ChatBackend,
@@ -35,11 +35,6 @@ BACKEND_ERROR_MESSAGE = (
 )
 EMOTICONS_ENABLED = False
 
-DEMO_WELCOME_NOTICE = (
-    '\n\n> **Demo mode:** This is a limited experience with prepared Brittany questions. '
-    'It accepts modest spelling and punctuation variations.'
-)
-DEMO_WELCOME_MESSAGE = WELCOME_MESSAGE + DEMO_WELCOME_NOTICE
 AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
     Path(__file__).parent / 'assets' / 'avatars' / 'bot.png',
@@ -229,8 +224,6 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     selected_backend = backend or DemoBackend()
     start_response = asyncio.run(selected_backend.start_chat())
     welcome_message = start_response.message
-    if isinstance(selected_backend, DemoBackend):
-        welcome_message += DEMO_WELCOME_NOTICE
 
     async def respond(
         message: str,
