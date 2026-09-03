@@ -104,7 +104,8 @@ dashboard-restore: validate-dashboard-backup ## Restore the bundled dashboard ap
 	$(COMPOSE) --profile dashboard run --rm metabase-database
 
 db-init: db-validate-schema ## Start PostgreSQL and initialize its schema.
-	$(COMPOSE) --profile tools run --build --rm init-db \
+	$(COMPOSE) --profile tools build ai-tour-guide-base init-db
+	$(COMPOSE) --profile tools run --no-build --rm init-db \
 		python -m ai_tour_guide.knowledge_base.database.init \
 		--schema "$(SCHEMA)"
 
