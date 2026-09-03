@@ -30,7 +30,7 @@ Return to the [project overview](../../../README.md).
 Supported live LLM providers and recommended models:
 
 - OpenAI (ChatGPT): `gpt-4.1-mini`
-- Google Gemini: `gemini-2.5-flash-lite` (free-tier)
+- Google Gemini: `gemini-3.5-flash-lite`
 
 The bundled `baguette-llm` provider, `mini-croissant-1.0` model, is a no-cost
 deterministic Brittany demo; it is not a general-purpose LLM. It retains its
@@ -69,7 +69,7 @@ AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
 To use Google Gemini, set `AGENT_LLM_PROVIDER=gemini`, add your API key, and use
-`AGENT_LLM_MODEL=gemini-2.5-flash-lite`.
+`AGENT_LLM_MODEL=gemini-3.5-flash-lite`.
 
 Start the agent API and Gradio chat together:
 

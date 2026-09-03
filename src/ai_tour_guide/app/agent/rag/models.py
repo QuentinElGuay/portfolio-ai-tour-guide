@@ -23,6 +23,13 @@ class CitationInvalidReason(StrEnum):
     UNKNOWN_REASON = 'unknown_reason'
 
 
+class RAGErrorCategory(StrEnum):
+    """Machine-readable ownership category for an operational RAG failure."""
+
+    EXTERNAL_SERVICE = 'external_service'
+    INTERNAL_SERVICE = 'internal_service'
+
+
 @dataclass(frozen=True, slots=True)
 class LLMCitation:
     source_url: str
@@ -118,6 +125,7 @@ class CitationValidationResult:
 
 @dataclass(frozen=True, slots=True)
 class RAGError:
+    category: RAGErrorCategory
     stage: str
     type: str
     message: str
@@ -279,6 +287,7 @@ __all__ = [
     'InvalidCitation',
     'LLMCitation',
     'RAGError',
+    'RAGErrorCategory',
     'RAGResult',
     'SourceReference',
 ]

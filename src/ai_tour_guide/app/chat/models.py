@@ -98,6 +98,15 @@ class ChatMessageRequest(BaseModel):
         return self
 
 
+class LLMInfo(BaseModel):
+    """Public identity of the language model serving the chat."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+
+
 class ConversationResponse(BaseModel):
     """Renderable response returned by chat start and message operations."""
 
@@ -111,6 +120,7 @@ class ConversationResponse(BaseModel):
     request_id: UUID | None = None
     sources: list[dict[str, object]] = Field(default_factory=list)
     trace: ConversationTrace | None = None
+    llm: LLMInfo | None = None
 
     @field_validator('step_id', 'message')
     @classmethod
@@ -190,6 +200,7 @@ __all__ = [
     'ConversationResponse',
     'ConversationTrace',
     'Emotion',
+    'LLMInfo',
     'Message',
     'Role',
 ]

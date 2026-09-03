@@ -10,6 +10,7 @@ from google.genai import errors, types
 from ai_tour_guide.app.agent.llm.clients import GenerationError
 from ai_tour_guide.app.agent.llm.clients.openai import _parse_answer
 from ai_tour_guide.app.agent.llm.rate_limit import AsyncRateLimiter
+from ai_tour_guide.app.agent.llm.retry import retry_provider_call
 from ai_tour_guide.app.agent.llm.settings import AgentsSettings
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, LLMCitation
 from ai_tour_guide.app.agent.rag.tools import TOURISM_SEARCH_TOOL
@@ -38,48 +39,50 @@ class GeminiClient:
         """Generate one structured assistant response."""
         await self._rate_limiter.acquire()
         try:
-            response = await self._client.aio.models.generate_content(
-                model=self.model,
-                contents=cast(types.ContentListUnion, _contents(messages)),
-                config=types.GenerateContentConfig(
-                    system_instruction=_system_instruction(messages),
-                    response_mime_type='application/json',
-                    response_schema={
-                        'type': 'OBJECT',
-                        'properties': {
-                            'answer': {'type': 'STRING'},
-                            'citations': {
-                                'type': 'ARRAY',
-                                'items': {
-                                    'type': 'OBJECT',
-                                    'properties': {
-                                        'source_url': {'type': 'STRING'},
-                                        'version': {'type': 'STRING', 'nullable': True},
-                                        'page_start': {
-                                            'type': 'INTEGER',
-                                            'nullable': True,
+            response = await retry_provider_call(
+                lambda: self._client.aio.models.generate_content(
+                    model=self.model,
+                    contents=cast(types.ContentListUnion, _contents(messages)),
+                    config=types.GenerateContentConfig(
+                        system_instruction=_system_instruction(messages),
+                        response_mime_type='application/json',
+                        response_schema={
+                            'type': 'OBJECT',
+                            'properties': {
+                                'answer': {'type': 'STRING'},
+                                'citations': {
+                                    'type': 'ARRAY',
+                                    'items': {
+                                        'type': 'OBJECT',
+                                        'properties': {
+                                            'source_url': {'type': 'STRING'},
+                                            'version': _gemini_nullable_schema(
+                                                'STRING'
+                                            ),
+                                            'page_start': {
+                                                **_gemini_nullable_schema('INTEGER'),
+                                            },
+                                            'page_end': {
+                                                **_gemini_nullable_schema('INTEGER'),
+                                            },
                                         },
-                                        'page_end': {
-                                            'type': 'INTEGER',
-                                            'nullable': True,
-                                        },
+                                        'required': [
+                                            'source_url',
+                                            'version',
+                                            'page_start',
+                                            'page_end',
+                                        ],
                                     },
-                                    'required': [
-                                        'source_url',
-                                        'version',
-                                        'page_start',
-                                        'page_end',
-                                    ],
+                                },
+                                'emotion': {
+                                    'type': 'STRING',
+                                    'enum': [emotion.value for emotion in Emotion],
                                 },
                             },
-                            'emotion': {
-                                'type': 'STRING',
-                                'enum': [emotion.value for emotion in Emotion],
-                            },
+                            'required': ['answer', 'citations', 'emotion'],
                         },
-                        'required': ['answer', 'citations', 'emotion'],
-                    },
-                ),
+                    ),
+                )
             )
         except errors.APIError as exc:
             raise GenerationError(f'Gemini request failed: {exc}') from exc
@@ -118,40 +121,44 @@ class GeminiClient:
         """Ask Gemini whether to call the sole knowledge-base search tool."""
         await self._rate_limiter.acquire()
         try:
-            response = await self._client.aio.models.generate_content(
-                model=self.model,
-                contents=question,
-                config=types.GenerateContentConfig(
-                    system_instruction=(
-                        'You are a source-grounded travel assistant. Call '
-                        f'`{TOURISM_SEARCH_TOOL.name}` for every factual tourism question. '
-                        'Do not call it only for conversational or meta questions about '
-                        'the assistant and its capabilities. Never answer tourism facts '
-                        'from model knowledge. If a previous search was insufficient, you '
-                        'may call the tool once more with a reformulated query. '
-                        f'Previous queries: {list(previous_queries)!r}. '
-                        f'Retrieved context available: {has_context}.'
+            response = await retry_provider_call(
+                lambda: self._client.aio.models.generate_content(
+                    model=self.model,
+                    contents=question,
+                    config=types.GenerateContentConfig(
+                        system_instruction=(
+                            'You are a source-grounded travel assistant. Call '
+                            f'`{TOURISM_SEARCH_TOOL.name}` for every factual tourism question. '
+                            'Do not call it only for conversational or meta questions about '
+                            'the assistant and its capabilities. Never answer tourism facts '
+                            'from model knowledge. If a previous search was insufficient, you '
+                            'may call the tool once more with a reformulated query. '
+                            f'Previous queries: {list(previous_queries)!r}. '
+                            f'Retrieved context available: {has_context}.'
+                        ),
+                        tools=[
+                            types.Tool(
+                                function_declarations=[
+                                    types.FunctionDeclaration(
+                                        name=TOURISM_SEARCH_TOOL.name,
+                                        description=TOURISM_SEARCH_TOOL.description,
+                                        parameters=cast(
+                                            types.Schema,
+                                            _gemini_tool_schema(
+                                                TOURISM_SEARCH_TOOL.input_schema
+                                            ),
+                                        ),
+                                    )
+                                ]
+                            )
+                        ],
+                        tool_config=types.ToolConfig(
+                            function_calling_config=types.FunctionCallingConfig(
+                                mode=types.FunctionCallingConfigMode.AUTO
+                            )
+                        ),
                     ),
-                    tools=[
-                        types.Tool(
-                            function_declarations=[
-                                types.FunctionDeclaration(
-                                    name=TOURISM_SEARCH_TOOL.name,
-                                    description=TOURISM_SEARCH_TOOL.description,
-                                    parameters=cast(
-                                        types.Schema,
-                                        TOURISM_SEARCH_TOOL.input_schema,
-                                    ),
-                                )
-                            ]
-                        )
-                    ],
-                    tool_config=types.ToolConfig(
-                        function_calling_config=types.FunctionCallingConfig(
-                            mode=types.FunctionCallingConfigMode.AUTO
-                        )
-                    ),
-                ),
+                )
             )
         except errors.APIError as exc:
             raise GenerationError(f'Gemini request failed: {exc}') from exc
@@ -201,6 +208,28 @@ def _parse_answer_json(
 ) -> tuple[str, tuple[LLMCitation, ...], Emotion]:
     """Parse Gemini's JSON text with the shared provider-neutral validator."""
     return _parse_answer(json.loads(content))
+
+
+def _gemini_tool_schema(schema: dict[str, object]) -> dict[str, object]:
+    """Adapt the shared JSON Schema to Gemini's supported schema fields.
+
+    Gemini's function declaration schema does not accept the JSON Schema
+    ``additionalProperties`` keyword, although it is useful to providers such
+    as OpenAI for enforcing strict tool arguments.
+    """
+    return {
+        key: value for key, value in schema.items() if key != 'additionalProperties'
+    }
+
+
+def _gemini_nullable_schema(type_name: str) -> dict[str, object]:
+    """Build a Gemini schema for a value that may also be JSON null."""
+    return {
+        'anyOf': [
+            {'type': type_name},
+            {'type': 'NULL'},
+        ]
+    }
 
 
 __all__ = ['GeminiClient', 'create_gemini_client']

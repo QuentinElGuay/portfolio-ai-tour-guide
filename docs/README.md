@@ -37,7 +37,7 @@ explains that it is a limited demo and suggests a question it can answer.
 Supported live LLM providers and recommended models:
 
 - OpenAI (ChatGPT): `gpt-4.1-mini`
-- Google Gemini: `gemini-2.5-flash-lite` (free-tier)
+- Google Gemini: `gemini-3.5-flash-lite`
 
 Configure the selected provider and API key in `.env` with `AGENT_LLM_PROVIDER`,
 `AGENT_LLM_API_KEY`, and `AGENT_LLM_MODEL`.

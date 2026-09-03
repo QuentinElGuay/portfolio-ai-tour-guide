@@ -25,6 +25,8 @@ from ai_tour_guide.knowledge_base.search import SearchMode
 @pytest.fixture(autouse=True)
 def store_chat_message_fixture(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Prevent HTTP-boundary unit tests from writing conversation rows."""
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'openai')
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
     stored = MagicMock()
     monkeypatch.setattr('ai_tour_guide.app.api.store_chat_message', stored)
     return stored
@@ -57,6 +59,8 @@ def test_chat_start_always_creates_a_new_renderable_session() -> None:
     assert first.session_id != second.session_id
     assert first.step_id == 'welcome'
     assert first.message
+    assert first.llm is not None
+    assert first.llm.provider == 'openai'
     assert [button.input_id for button in first.buttons] == [
         'identity',
         'destinations',
@@ -108,6 +112,7 @@ def test_chat_message_serializes_the_backend_response(
             'retries': 0,
             'final_status': 'refused',
         },
+        'llm': {'provider': 'openai', 'model': 'test-model'},
     }
     store_rag_result.assert_called_once_with(result.request_id, result.to_dict())
 
@@ -126,6 +131,7 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
         'request_id',
         'sources',
         'trace',
+        'llm',
     }
     assert payload['step_id'] == 'welcome'
     assert payload['buttons'] == [
@@ -134,6 +140,7 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
     ]
     assert payload['request_id'] is None
     assert payload['sources'] == []
+    assert payload['llm']['provider'] == 'openai'
 
 
 @patch('ai_tour_guide.app.api.store_feedback', return_value=True)

@@ -88,4 +88,5 @@ The agent returns a renderable conversation response:
 `HttpChatBackend` validates the typed response and passes it to Gradio. Gradio controls
 presentation and renders backend-provided buttons using their labels and input IDs. The
 `FREE_TEXT` input sends its text separately; clients do not rebuild conversation
-history.
+history. The response also includes the public provider and model identity, which the
+Gradio interface displays in its footer; credentials are never included.

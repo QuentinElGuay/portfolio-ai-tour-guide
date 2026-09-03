@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+from ai_tour_guide.app.agent.prompts import build_catalog_system_prompt
 from ai_tour_guide.app.agent.rag.agent_workflow import (
     _build_meta_messages,
     build_agent_graph,
@@ -185,6 +186,18 @@ def test_system_prompt_includes_current_destination_catalog() -> None:
     assert '- Guide to Normandy' in prompt
     assert '- Guide to Occitanie' in prompt
     assert 'Do not provide any destination\ndetails from the catalog alone.' in prompt
+
+
+def test_catalog_prompt_reuses_shared_persona_and_output_contract() -> None:
+    """Verify that catalog mode shares common instructions without retrieval rules."""
+    prompt = build_catalog_system_prompt(('Guide to Normandy',))
+
+    assert 'Petit Guide' in prompt
+    assert 'Return the answer as structured JSON' in prompt
+    assert '- Guide to Normandy' in prompt
+    assert (
+        'List the available destinations without adding destination details.' in prompt
+    )
 
 
 def test_build_messages_sends_instructions_as_a_system_message() -> None:

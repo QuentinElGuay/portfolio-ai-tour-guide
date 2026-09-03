@@ -2,7 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Literal, NotRequired, TypedDict
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -24,7 +24,6 @@ from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
     ChatMessageRequest,
-    ConversationResponse,
     ConversationTrace,
 )
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_known_destination_titles
@@ -73,21 +72,25 @@ def build_outer_conversation_graph(
     def response(
         session_id: str,
         step: FlowStep,
-        message: str,
+        message: str | None,
         *,
         request_id: UUID | None = None,
         sources: list[dict[str, object]] | None = None,
         trace: ConversationTrace | None = None,
     ) -> dict[str, object]:
-        return ConversationResponse(
-            session_id=UUID(session_id),
-            step_id=step,
-            message=message,
-            buttons=flow_definition(step).rendered_buttons(),
-            request_id=request_id,
-            sources=sources or [],
-            trace=trace,
-        ).model_dump(mode='json')
+        return {
+            'session_id': session_id,
+            'message_id': str(uuid4()),
+            'step_id': step.value,
+            'message': message,
+            'buttons': [
+                button.model_dump(mode='json')
+                for button in flow_definition(step).rendered_buttons()
+            ],
+            'request_id': str(request_id) if request_id is not None else None,
+            'sources': sources or [],
+            'trace': trace.model_dump(mode='json') if trace is not None else None,
+        }
 
     def trace_for(result: RAGResult) -> ConversationTrace:
         metadata = result.retrieval_metadata
@@ -160,7 +163,7 @@ def build_outer_conversation_graph(
 
     def completed_response(
         state: OuterConversationState,
-        message: str,
+        message: str | None,
         *,
         request_id: UUID | None = None,
         sources: list[dict[str, object]] | None = None,
@@ -174,7 +177,7 @@ def build_outer_conversation_graph(
         return {
             'messages': [
                 HumanMessage(content=request.text or request.input_id),
-                AIMessage(content=message),
+                AIMessage(content=message or ''),
             ],
             'flow_step': next_step.value,
             'latest_response': response(

@@ -12,7 +12,11 @@ from ai_tour_guide.app.agent.flow import (
     flow_step_for_option,
     input_type_for_option,
 )
-from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, PETIT_GUIDE_IDENTITY
+from ai_tour_guide.app.agent.identity import (
+    IDENTITY_ANSWERS,
+    PETIT_GUIDE_IDENTITY,
+    PETIT_GUIDE_PERSONALITY,
+)
 from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer
 from ai_tour_guide.app.agent.rag.prompting import (
@@ -203,7 +207,7 @@ def _build_meta_messages(question: str) -> tuple[Message, ...]:
         Message(
             role=Role.SYSTEM,
             content=(
-                f'{PETIT_GUIDE_IDENTITY} Answer '
+                f'{PETIT_GUIDE_IDENTITY}\n\n{PETIT_GUIDE_PERSONALITY} Answer '
                 'only conversational or meta questions about the assistant and its '
                 'capabilities. Do not answer tourism facts without retrieved source '
                 'context. Return structured JSON with `answer`, `citations`, and '
