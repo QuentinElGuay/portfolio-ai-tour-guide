@@ -126,18 +126,18 @@ jobs:
           filters: |
             airflow:
               - 'airflow/**'
-              - 'docker-compose.yml'
               - 'docker/airflow.Dockerfile'
-              - 'docker/base.Dockerfile'
-              - 'docker/ingestion.Dockerfile'
-              - 'src/ai_tour_guide/ingestion/**'
-              - 'src/ai_tour_guide/knowledge_base/**'
-              - '.env.template'
-              - 'pyproject.toml'
-              - 'uv.lock'
 
   airflow-config:
     name: Airflow configuration
+    needs: [quality, unit, smoke, airflow-changes]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main' &&
+      needs.quality.result == 'success' &&
+      needs.unit.result == 'success' &&
+      needs.smoke.result == 'success' &&
+      needs.airflow-changes.outputs.airflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -155,6 +155,8 @@ jobs:
     name: Airflow DAG integration
     needs: [quality, unit, smoke, airflow-changes]
     if: >-
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main' &&
       needs.quality.result == 'success' &&
       needs.unit.result == 'success' &&
       needs.smoke.result == 'success' &&
@@ -210,8 +212,10 @@ jobs:
           AIRFLOW_CHANGED: ${{ needs.airflow-changes.outputs.airflow }}
           AIRFLOW_RESULT: ${{ needs.airflow.result }}
         run: |
-          if [ "$AIRFLOW_CHANGED" != 'true' ]; then
-            echo 'No Airflow-relevant files changed; skipping DAG integration.'
+          if [ "$GITHUB_EVENT_NAME" != 'pull_request' ] || \
+            [ "$GITHUB_BASE_REF" != 'main' ] || \
+            [ "$AIRFLOW_CHANGED" != 'true' ]; then
+            echo 'Airflow DAG integration was not required for this CI run.'
             exit 0
           fi
           test "$AIRFLOW_RESULT" = 'success'

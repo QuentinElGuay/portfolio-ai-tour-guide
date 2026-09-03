@@ -17,8 +17,50 @@ env:
   EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
 
 jobs:
+  airflow:
+    name: Airflow DAG integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Airflow environment
+        run: |
+          cp .env.template .env
+          echo "DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)" >> "$GITHUB_ENV"
+
+      - name: Start Airflow services
+        run: >-
+          docker compose --profile airflow up --build -d --wait
+          database airflow-webserver airflow-scheduler airflow-dag-processor
+
+      - name: Verify DAG import
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if ! import_errors=$(docker compose --profile airflow exec -T \
+              airflow-dag-processor airflow dags list-import-errors --output json); then
+              sleep 5
+              continue
+            fi
+            printf '%s\n' "$import_errors"
+            if [ "$(jq 'length' <<<"$import_errors")" -eq 0 ]; then
+              docker compose --profile airflow exec -T \
+                airflow-dag-processor airflow dags list | grep -q 'ingest_documents'
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Airflow DAG import errors did not clear.' >&2
+          exit 1
+
+      - name: Stop Airflow
+        if: always()
+        run: docker compose --profile airflow down --volumes --remove-orphans
+
   publish:
     name: Build and publish release images
+    needs: airflow
     runs-on: ubuntu-latest
 
     steps:
