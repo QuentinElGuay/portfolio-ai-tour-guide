@@ -153,9 +153,11 @@ jobs:
 
   airflow:
     name: Airflow DAG integration
-    needs: airflow-changes
+    needs: [quality, unit, smoke, airflow-changes]
     if: >-
-      github.event_name == 'push' ||
+      needs.quality.result == 'success' &&
+      needs.unit.result == 'success' &&
+      needs.smoke.result == 'success' &&
       needs.airflow-changes.outputs.airflow == 'true'
     runs-on: ubuntu-latest
 
@@ -195,3 +197,21 @@ jobs:
       - name: Stop Airflow
         if: always()
         run: docker compose --profile airflow down --volumes --remove-orphans
+
+  airflow-gate:
+    name: Airflow skipped or success
+    needs: [airflow-changes, airflow]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require a successful Airflow check when relevant
+        env:
+          AIRFLOW_CHANGED: ${{ needs.airflow-changes.outputs.airflow }}
+          AIRFLOW_RESULT: ${{ needs.airflow.result }}
+        run: |
+          if [ "$AIRFLOW_CHANGED" != 'true' ]; then
+            echo 'No Airflow-relevant files changed; skipping DAG integration.'
+            exit 0
+          fi
+          test "$AIRFLOW_RESULT" = 'success'
