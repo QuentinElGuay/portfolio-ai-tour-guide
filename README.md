@@ -374,17 +374,26 @@ are not redistributed in this repository.
 The complete plan, including milestones and deferred work, is maintained in
 [ROADMAP.md](ROADMAP.md).
 
-### Current release — v1.0.0: Final submission
+### Current release — v1.4.1: Multi-provider Petit Guide patch
 
-This release delivers the complete Bon Voyage portfolio application:
+v1.4.1 is a patch release for v1.4.0’s Gemini and Petit Guide improvements:
 
-- Multi-region document ingestion from regional tourism guides
-- Grounded answers with validated source references and indexed destination discovery
-- Hybrid retrieval selected from vector, full-text, and hybrid measurements
-- Airflow 3 orchestration with mapped ingestion, safe skipping, and forced re-ingestion
-- Gradio chat interface, HTTP API, and Metabase monitoring dashboards
-- Reproducible Docker Compose setup with health checks and CI/CD validation
-- End-to-end tutorial, public screenshots, evaluation reports, and smoke tests
+- Gemini supports structured, source-grounded answers and bounded search-tool usage.
+- Petit Guide has a consistent personality across conversational and retrieval prompts.
+- Configured identity and destination questions can be answered directly from
+  application data without an LLM call.
+- The chat and API expose the active LLM provider and model, with safer retries and
+  user-friendly unavailable-service errors.
+
+See the complete [v1.4.0 release notes](docs/releases/v1.4.0.md).
+
+The v1.4.1 patch also improves the Gradio chat experience:
+
+- Independent browser chat sessions and a reliable `/chat/start` welcome message.
+- Immediate user-message rendering while Petit Guide prepares a response.
+- Clearer demo-mode labelling and provider-neutral `request_id` chat persistence.
+
+See the complete [v1.4.1 release notes](docs/releases/v1.4.1.md).
 
 ### Follow-up work
 

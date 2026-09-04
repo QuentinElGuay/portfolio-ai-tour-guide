@@ -56,6 +56,23 @@ validation; exposes structured execution traces; persists provider-neutral chat
 messages; renames the Docker application service from `agent` to `app`; and improves the
 Gradio chat flow and identity suggestions.
 
+### v1.4.0 — Multi-provider Petit Guide
+
+Added Google Gemini alongside OpenAI for structured, source-grounded answers with
+bounded search-tool usage. The release also strengthened Petit Guide’s identity and
+personality, answered configured identity and destination questions directly, exposed
+the active provider and model, and improved provider retries and user-facing
+unavailable-service errors.
+
+### v1.4.1 — Reliable demo chat
+
+Made demo mode usable without an indexed knowledge base and improved the Gradio chat’s
+first-run experience. Each browser now receives its own backend session and
+`/chat/start` welcome message; user messages render before the response arrives; demo
+mode is labelled in Petit Guide’s name; and HTTP-backed demo responses use a
+configurable short delay. The release also decoupled lightweight chat startup from
+embedding settings and migrated chat persistence from `rag_request_id` to `request_id`.
+
 ## Future milestones
 
 ### Test, ingestion, and retrieval hardening
