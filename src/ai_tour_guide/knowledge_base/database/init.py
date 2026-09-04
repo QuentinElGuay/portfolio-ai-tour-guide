@@ -59,6 +59,7 @@ def initialize_database(
         connection.execute(
             text('ALTER TABLE documents ALTER COLUMN destination SET NOT NULL')
         )
+        _migrate_chat_messages(connection)
         _trim_rag_result_message_columns(connection)
         _migrate_llm_usage_events(connection)
         for table in public_metadata.tables.values():
@@ -77,6 +78,36 @@ def _trim_rag_result_message_columns(connection) -> None:
     """Keep generic user and assistant content out of RAG execution records."""
     connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS question'))
     connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS answer'))
+
+
+def _migrate_chat_messages(connection) -> None:
+    """Rename the chat request reference to its provider-neutral name."""
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'chat_messages'
+                      AND column_name = 'rag_request_id'
+                ) AND NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'chat_messages'
+                      AND column_name = 'request_id'
+                ) THEN
+                    ALTER TABLE chat_messages
+                    RENAME COLUMN rag_request_id TO request_id;
+                END IF;
+            END
+            $$
+            """
+        )
+    )
 
 
 def _migrate_llm_model_pricing(connection) -> None:

@@ -34,6 +34,7 @@ BACKEND_ERROR_MESSAGE = (
     'Please try again in a short while.'
 )
 EMOTICONS_ENABLED = False
+ASSISTANT_LABEL_PLACEHOLDER = '__assistant_label__'
 
 AVATAR_IMAGES = (
     Path(__file__).parent / 'assets' / 'avatars' / 'user.png',
@@ -53,44 +54,44 @@ CHAT_CSS = """
     text-align: center;
 }
 
-#rag-chat .message-buttons-left {
+#chat .message-buttons-left {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
 }
 
-#rag-chat {
+#chat {
     max-height: none;
     overflow-y: hidden !important;
 }
 
 /* Gradio autoscrolls bubble-wrap, so it is the sole scroll owner. */
-#rag-chat .panel-wrap {
+#chat .panel-wrap {
     overflow-y: visible !important;
 }
 
-#rag-chat [role="log"] {
+#chat [role="log"] {
     overflow: visible !important;
 }
 
-#rag-chat .bubble-wrap {
+#chat .bubble-wrap {
     height: 100% !important;
     overflow-y: auto !important;
 }
 
-#rag-chat .message.bot .message-content {
+#chat .message.bot .message-content {
     background: transparent !important;
     border-radius: 16px !important;
 }
 
-#rag-chat .message.bot {
+#chat .message.bot {
     margin-left: 0.5rem !important;
     padding: 0.25rem 0.5rem !important;
 }
 
-#rag-chat .message.bot::before,
-#rag-chat .message.user::before {
+#chat .message.bot::before,
+#chat .message.user::before {
     color: #334155;
     display: block;
     font-size: 0.85rem;
@@ -98,30 +99,30 @@ CHAT_CSS = """
     margin-bottom: 0.25rem;
 }
 
-#rag-chat .message.bot::before {
-    content: "Petit Guide";
+#chat .message.bot::before {
+    content: "__assistant_label__";
 }
 
-#rag-chat .message.user::before {
+#chat .message.user::before {
     content: "You";
 }
 
-#rag-chat .message.user .message-content {
+#chat .message.user .message-content {
     background: transparent !important;
     border-radius: 16px !important;
 }
 
-#rag-chat .message {
+#chat .message {
     margin-bottom: 0.75rem;
 }
 
-#rag-chat .avatar-container,
-#rag-chat .avatar-container img {
+#chat .avatar-container,
+#chat .avatar-container img {
     height: 80px !important;
     width: 80px !important;
 }
 
-#rag-chat img.chat-emoticon {
+#chat img.chat-emoticon {
     display: inline-block !important;
     height: 30px !important;
     max-height: 30px !important;
@@ -131,26 +132,26 @@ CHAT_CSS = """
     width: 30px !important;
 }
 
-#rag-chat .message-buttons-left::before {
+#chat .message-buttons-left::before {
     content: "Was this answer helpful?";
     margin-right: 0.25rem;
     white-space: nowrap;
 }
 
-#rag-chat .message-buttons-left button[aria-label="Liked"],
-#rag-chat .message-buttons-left button[aria-label="clicked like"] {
+#chat .message-buttons-left button[aria-label="Liked"],
+#chat .message-buttons-left button[aria-label="clicked like"] {
     background: #dcfce7 !important;
     color: #15803d !important;
 }
 
-#rag-chat .message-buttons-left button[aria-label="Disliked"],
-#rag-chat .message-buttons-left button[aria-label="clicked dislike"] {
+#chat .message-buttons-left button[aria-label="Disliked"],
+#chat .message-buttons-left button[aria-label="clicked dislike"] {
     background: #fee2e2 !important;
     color: #b91c1c !important;
 }
 
 @media (max-width: 480px) {
-    #rag-chat .message-buttons-left::before {
+    #chat .message-buttons-left::before {
         flex-basis: 100%;
     }
 }
@@ -219,20 +220,75 @@ async def submit_feedback(
     await backend.submit_feedback(request_id, helpful)
 
 
+async def start_client_chat(
+    backend: ChatBackend,
+) -> tuple[dict[object, object], list[ChatHistoryItem], str]:
+    """Start and render an independent conversation for one Gradio client."""
+    response = await backend.start_chat()
+    request_ids: dict[object, object] = {
+        'session_id': str(response.session_id),
+        'step_id': str(response.step_id),
+        'buttons': [button.model_dump() for button in response.buttons],
+    }
+    welcome = cast(
+        ChatHistoryItem,
+        {
+            'role': 'assistant',
+            'content': response.message,
+            'options': [
+                {'label': button.label, 'value': button.label}
+                for button in response.buttons
+            ],
+        },
+    )
+    llm_label = (
+        f'Model: `{response.llm.provider} - {response.llm.model}`'
+        if response.llm is not None
+        else ''
+    )
+    return request_ids, [welcome], llm_label
+
+
+def chat_css(*, demo_mode: bool) -> str:
+    """Return chat styling with the assistant label for the selected backend."""
+    assistant_label = 'Petit Guide (demo mode)' if demo_mode else 'Petit Guide'
+    return CHAT_CSS.replace(ASSISTANT_LABEL_PLACEHOLDER, assistant_label)
+
+
+def is_demo_mode() -> bool:
+    """Return whether the configured LLM is the deterministic demo provider."""
+    return os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm'
+
+
 def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
     """Create the UI with an injected backend or its development fallback."""
     selected_backend = backend or DemoBackend()
-    start_response = asyncio.run(selected_backend.start_chat())
-    welcome_message = start_response.message
+
+    async def initialize_client() -> tuple[
+        dict[object, object], list[ChatHistoryItem], str
+    ]:
+        """Create a conversation when a browser client loads the interface."""
+        return await start_client_chat(selected_backend)
+
+    def add_user_message(
+        message: str,
+        history: list[ChatHistoryItem],
+    ) -> tuple[str, list[ChatHistoryItem], str]:
+        """Render the user's message before the backend begins its response."""
+        return (
+            '',
+            [*history, {'role': Role.USER, 'content': message}],
+            message,
+        )
 
     async def respond(
         message: str,
         history: list[ChatHistoryItem],
         request_ids: dict[object, object],
-    ) -> tuple[str | dict[str, object], dict[object, object]]:
+    ) -> tuple[str, list[ChatHistoryItem], dict[object, object]]:
         logger.info('chat question received: question=%r', message)
         display_question = message
-        assistant_message_index = len(history) + 1
+        assistant_message_index = len(history)
 
         response = None
         try:
@@ -283,9 +339,11 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                     'buttons': [button.model_dump() for button in response.buttons],
                 }
             )
-        options = cast(list[dict[str, object]], updated_request_ids['buttons'])
-        return (
+        options = cast(list[dict[str, object]], updated_request_ids.get('buttons', []))
+        assistant_message = cast(
+            ChatHistoryItem,
             {
+                'role': Role.ASSISTANT,
                 'content': reply,
                 'options': [
                     {'label': button['label'], 'value': button['label']}
@@ -294,11 +352,22 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                     and isinstance(button.get('label'), str)
                     and isinstance(button.get('input_id'), str)
                 ],
-            }
-            if options
-            else reply,
+            },
+        )
+        return (
+            '',
+            [*history, assistant_message],
             updated_request_ids,
         )
+
+    def add_selected_option(
+        history: list[ChatHistoryItem],
+        data: gr.SelectData,
+    ) -> tuple[str, list[ChatHistoryItem], str]:
+        """Render a selected backend option as a normal user message."""
+        if not isinstance(data.value, str):
+            return '', history, ''
+        return add_user_message(data.value, history)
 
     async def on_like(
         request_ids: dict[object, object],
@@ -331,65 +400,65 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         )
 
     with gr.Blocks(title='Bon Voyage') as app:
-        request_ids = gr.State(
-            {
-                'session_id': str(start_response.session_id),
-                'step_id': str(start_response.step_id),
-                'buttons': [button.model_dump() for button in start_response.buttons],
-            }
+        gr.Markdown(f'# {os.getenv("CHAT_TITLE", "Bon Voyage")}')
+        gr.Markdown(
+            "We'll answer your questions based on the travel guides _de la maison_."
         )
+        request_ids = gr.State({})
         feedback_values = gr.State([])
+        pending_message = gr.State('')
+        chatbot = gr.Chatbot(
+            elem_id='chat',
+            avatar_images=AVATAR_IMAGES,
+            feedback_options=('Like', 'Dislike'),
+            feedback_value=[],
+            height='calc(100vh - 250px)',
+            value=[],
+            placeholder=(
+                '<h2>Starting your conversation with Petit Guide…</h2>'
+                '<p>Please wait a moment.</p>'
+            ),
+        )
         textbox = gr.Textbox(
             placeholder='Write a message and press enter to ask a question.',
             container=False,
             autofocus=True,
         )
-        chatbot = gr.Chatbot(
-            elem_id='rag-chat',
-            avatar_images=AVATAR_IMAGES,
-            feedback_options=('Like', 'Dislike'),
-            feedback_value=[],
-            height='calc(100vh - 250px)',
-            value=cast(
-                Any,
-                [
-                    {
-                        'role': 'assistant',
-                        'content': welcome_message,
-                        'options': [
-                            {'label': button['label'], 'value': button['label']}
-                            for button in cast(
-                                list[dict[str, object]], request_ids.value['buttons']
-                            )
-                        ],
-                    },
-                ],
-            ),
-            placeholder=(
-                '<h2>Prepare your trip to France with Petit Guide</h2>'
-                "<p>We'll answer your questions based on our famous travel guides.</p>"
-            ),
+        llm_info = gr.Markdown('', elem_classes=['llm-info'])
+        app.load(
+            initialize_client,
+            outputs=[request_ids, chatbot, llm_info],
+            api_visibility='private',
+            show_progress='hidden',
         )
-        gr.ChatInterface(
-            fn=respond,
-            chatbot=chatbot,
-            additional_inputs=request_ids,
-            additional_outputs=request_ids,
-            textbox=textbox,
+        textbox.submit(
+            add_user_message,
+            inputs=[textbox, chatbot],
+            outputs=[textbox, chatbot, pending_message],
+            api_visibility='private',
+            queue=False,
+            show_progress='hidden',
+        ).then(
+            respond,
+            inputs=[pending_message, chatbot, request_ids],
+            outputs=[textbox, chatbot, request_ids],
+            api_visibility='private',
             show_progress='minimal',
-            title=os.getenv('CHAT_TITLE', 'Bon Voyage'),
-            description=(
-                "We'll answer your questions based on our famous travel guides."
-            ),
-            examples=[],
-            cache_examples=False,
         )
-        llm = start_response.llm
-        if llm is not None:
-            gr.Markdown(
-                f'Model: `{llm.provider} - {llm.model}`',
-                elem_classes=['llm-info'],
-            )
+        chatbot.option_select(
+            add_selected_option,
+            inputs=[chatbot],
+            outputs=[textbox, chatbot, pending_message],
+            api_visibility='private',
+            queue=False,
+            show_progress='hidden',
+        ).then(
+            respond,
+            inputs=[pending_message, chatbot, request_ids],
+            outputs=[textbox, chatbot, request_ids],
+            api_visibility='private',
+            show_progress='minimal',
+        )
         # Gradio exposes this runtime event, but its published type information omits it.
         chatbot.like(  # pyright: ignore[reportAttributeAccessIssue]
             on_like,
@@ -403,7 +472,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
 
 
 def _render_response(payload: dict[str, object]) -> str:
-    """Default display only; source selection is already complete in RAG."""
+    """Default display only; source selection is already complete upstream."""
     answer = payload['answer']
     if not isinstance(answer, str):
         raise TypeError('The chat response has no answer.')
@@ -475,7 +544,8 @@ def main() -> None:
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),
         show_error=True,
-        css=CHAT_CSS,
+        css=chat_css(demo_mode=is_demo_mode()),
+        footer_links=[],
     )
 
 

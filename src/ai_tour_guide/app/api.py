@@ -293,7 +293,7 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
                 content=response.message,
                 flow_step=response.step_id,
                 message_id=response.message_id,
-                rag_request_id=response.request_id,
+                request_id=response.request_id,
                 sources=response.sources,
                 trace=response.trace,
                 buttons=response.buttons,

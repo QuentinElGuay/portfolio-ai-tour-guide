@@ -10,9 +10,7 @@ DEMO_LIMITATION_MESSAGE = (
     'This is a limited experience with prepared Brittany questions. '
     'It accepts modest spelling and punctuation variations.'
 )
-DEMO_WELCOME_MESSAGE = (
-    f'{WELCOME_MESSAGE}\n\n> **Demo mode:** {DEMO_LIMITATION_MESSAGE}'
-)
+DEMO_WELCOME_MESSAGE = WELCOME_MESSAGE
 
 
 def load_demo_questions(dataset_path: Path) -> tuple[str, ...]:
