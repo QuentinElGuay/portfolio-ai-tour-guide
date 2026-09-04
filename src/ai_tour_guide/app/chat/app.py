@@ -425,13 +425,13 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             autofocus=True,
         )
         llm_info = gr.Markdown('', elem_classes=['llm-info'])
-        app.load(
+        app.load(  # pyright: ignore[reportAttributeAccessIssue]
             initialize_client,
             outputs=[request_ids, chatbot, llm_info],
             api_visibility='private',
             show_progress='hidden',
         )
-        textbox.submit(
+        textbox.submit(  # pyright: ignore[reportAttributeAccessIssue]
             add_user_message,
             inputs=[textbox, chatbot],
             outputs=[textbox, chatbot, pending_message],
@@ -445,7 +445,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             api_visibility='private',
             show_progress='minimal',
         )
-        chatbot.option_select(
+        chatbot.option_select(  # pyright: ignore[reportAttributeAccessIssue]
             add_selected_option,
             inputs=[chatbot],
             outputs=[textbox, chatbot, pending_message],
