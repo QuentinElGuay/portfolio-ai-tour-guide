@@ -8,13 +8,13 @@ import questionary
 from questionary import Choice
 from sqlalchemy.exc import SQLAlchemyError
 
-from ai_tour_guide.app.agent.rag.models import RAG_RESULT_SCHEMA_VERSION
-from ai_tour_guide.app.agent.rag.persistence import store_rag_result
-from ai_tour_guide.app.agent.rag.pipeline import answer_question
 from ai_tour_guide.app.agent.source_formatting import format_page_range
-from ai_tour_guide.app.chat.backends import create_backend
+from ai_tour_guide.app.chat.backends import create_chat_service
 from ai_tour_guide.app.chat.models import FREE_TEXT_INPUT_ID
 from ai_tour_guide.app.chat.persistence import store_feedback
+from ai_tour_guide.app.services.rag.models import RAG_RESULT_SCHEMA_VERSION
+from ai_tour_guide.app.services.rag.persistence import store_rag_result
+from ai_tour_guide.app.services.rag.pipeline import answer_question
 from ai_tour_guide.knowledge_base.retrieval import retrieve_context
 from ai_tour_guide.knowledge_base.search import (
     DEFAULT_SEARCH_MODE,
@@ -143,10 +143,10 @@ def feedback_command(message_id: str, helpful: bool, comment: str | None) -> Non
     help='Maximum number of chunks to use as context.',
 )
 def chat_command(mode: str, k: int) -> None:
-    """Start an interactive backend-owned conversation."""
+    """Start an interactive conversation through the configured chat service."""
     del mode, k
-    backend = create_backend()
-    response = asyncio.run(backend.start_chat())
+    service = create_chat_service()
+    response = asyncio.run(service.start_chat())
     click.echo(response.message)
 
     while True:
@@ -165,7 +165,7 @@ def chat_command(mode: str, k: int) -> None:
             click.echo('Chat ended.')
             return
         if selection == '/new':
-            response = asyncio.run(backend.start_chat())
+            response = asyncio.run(service.start_chat())
             click.echo(response.message)
             continue
 
@@ -176,12 +176,12 @@ def chat_command(mode: str, k: int) -> None:
                 click.echo('Chat ended.')
                 return
             if text.strip() == '/new':
-                response = asyncio.run(backend.start_chat())
+                response = asyncio.run(service.start_chat())
                 click.echo(response.message)
                 continue
         try:
             response = asyncio.run(
-                backend.send_message(
+                service.send_message(
                     str(response.session_id),
                     str(response.step_id),
                     selection,

@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 
 import httpx
 
-from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.agent.flow import (
     FLOW_QUESTIONS,
     FlowStep,
@@ -23,6 +22,7 @@ from ai_tour_guide.app.chat.models import (
     ConversationResponse,
     LLMInfo,
 )
+from ai_tour_guide.app.services.demo.questions import DEMO_WELCOME_MESSAGE
 
 DESTINATION_CATALOG_QUESTION = FLOW_QUESTIONS['destinations']
 CHAT_SERVICE_UNAVAILABLE_ERROR = (
@@ -71,21 +71,21 @@ def demo_response_delay_from_environment() -> DemoResponseDelay:
     return DemoResponseDelay(min_seconds=min_seconds, max_seconds=max_seconds)
 
 
-def create_backend() -> ChatBackend:
+def create_chat_service() -> ChatService:
     api_url = os.getenv('CHAT_API_URL')
     if api_url:
         delay = demo_response_delay_from_environment()
-        return HttpChatBackend(
+        return HttpChatService(
             api_url.rstrip('/'),
             demo_response_delay=(
                 delay if os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm' else None
             ),
         )
-    return DemoBackend()
+    return DemoChatService()
 
 
-class ChatBackend(ABC):
-    """Client contract for backend-owned conversation sessions."""
+class ChatService(ABC):
+    """Conversation service contract used by the Gradio chat application."""
 
     @abstractmethod
     async def start_chat(self) -> ConversationResponse:
@@ -115,8 +115,8 @@ class ChatBackend(ABC):
             raise RuntimeError('Invalid chat API response.') from exc
 
 
-class DemoBackend(ChatBackend):
-    """Deterministic development backend with server-like session state."""
+class DemoChatService(ChatService):
+    """Deterministic in-memory chat service for development and tests."""
 
     def __init__(self) -> None:
         self._sessions: dict[str, FlowStep] = {}
@@ -173,7 +173,7 @@ class DemoBackend(ChatBackend):
         del message_id, helpful, comment
 
 
-class HttpChatBackend(ChatBackend):
+class HttpChatService(ChatService):
     def __init__(
         self,
         api_url: str,
@@ -261,10 +261,10 @@ async def _wait_for_demo_response(delay: DemoResponseDelay) -> None:
 
 
 __all__ = [
-    'ChatBackend',
-    'DemoBackend',
+    'ChatService',
+    'DemoChatService',
     'DemoResponseDelay',
-    'HttpChatBackend',
-    'create_backend',
+    'HttpChatService',
+    'create_chat_service',
     'demo_response_delay_from_environment',
 ]

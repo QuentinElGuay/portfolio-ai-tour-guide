@@ -96,6 +96,11 @@ embedding settings and migrated chat persistence from `rag_request_id` to `reque
   where evaluation identifies a need.
 - [ ] Evaluate query rewriting, reranking, and additional hybrid configurations; retain
   them only when they improve quality within the latency budget.
+- [ ] Finish separating the RAG service from travel-agent-specific flow and navigation
+  concerns. The outer conversation graph now uses `TravelTurnResult`, but parts of the
+  RAG workflow still import travel-agent flow and identity helpers. Completing this
+  boundary will keep RAG reusable infrastructure and make travel-specific behavior live
+  entirely in the travel-agent layer.
 
 ### Controlled LLM comparison
 

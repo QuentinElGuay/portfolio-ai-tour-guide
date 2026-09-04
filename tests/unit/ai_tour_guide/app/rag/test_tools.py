@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai_tour_guide.app.agent.rag.tools import (
+from ai_tour_guide.app.services.rag.tools import (
     RetrievalStatus,
     search_tourism_knowledge_base,
 )
@@ -43,7 +43,8 @@ def _context() -> RetrievedContext:
 
 def test_search_tool_returns_provenance_rich_evidence() -> None:
     with patch(
-        'ai_tour_guide.app.agent.rag.tools.retrieve_context', return_value=(_context(),)
+        'ai_tour_guide.app.services.rag.tools.retrieve_context',
+        return_value=(_context(),),
     ):
         result = search_tourism_knowledge_base('  train travel  ')
 
@@ -57,7 +58,9 @@ def test_search_tool_returns_provenance_rich_evidence() -> None:
 
 
 def test_search_tool_distinguishes_empty_results() -> None:
-    with patch('ai_tour_guide.app.agent.rag.tools.retrieve_context', return_value=()):
+    with patch(
+        'ai_tour_guide.app.services.rag.tools.retrieve_context', return_value=()
+    ):
         result = search_tourism_knowledge_base('unknown')
 
     assert result.status is RetrievalStatus.EMPTY
@@ -67,7 +70,7 @@ def test_search_tool_distinguishes_empty_results() -> None:
 
 def test_search_tool_returns_typed_retrieval_errors() -> None:
     with patch(
-        'ai_tour_guide.app.agent.rag.tools.retrieve_context',
+        'ai_tour_guide.app.services.rag.tools.retrieve_context',
         side_effect=RuntimeError('database unavailable'),
     ):
         result = search_tourism_knowledge_base('train')

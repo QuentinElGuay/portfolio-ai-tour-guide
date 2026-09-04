@@ -3,8 +3,8 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer
 from ai_tour_guide.app.chat.models import Message
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer
 
 
 class GenerationError(RuntimeError):
@@ -40,12 +40,11 @@ class NoContextFallbackClient:
         raise NotImplementedError
 
 
-from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
-from ai_tour_guide.app.agent.llm.clients.gemini import (
+from ai_tour_guide.app.llm.clients.gemini import (
     GeminiClient,
     create_gemini_client,
 )
-from ai_tour_guide.app.agent.llm.clients.openai import (
+from ai_tour_guide.app.llm.clients.openai import (
     OpenAIClient,
     _parse_answer,
     create_openai_client,
@@ -53,7 +52,6 @@ from ai_tour_guide.app.agent.llm.clients.openai import (
 
 __all__ = [
     'AgentLLMClient',
-    'DemoLLMClient',
     'GeminiClient',
     'GenerationError',
     'LLMClient',

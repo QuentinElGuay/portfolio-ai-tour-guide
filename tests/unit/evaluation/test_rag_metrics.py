@@ -2,7 +2,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from ai_tour_guide.app.agent.rag.models import (
+from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.app.services.rag.models import (
     CitationInvalidReason,
     GeneratedAnswer,
     InvalidCitation,
@@ -10,7 +11,6 @@ from ai_tour_guide.app.agent.rag.models import (
     RAGResult,
     SourceReference,
 )
-from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
 from ai_tour_guide.knowledge_base.search import SearchMode
 
 PROJECT_ROOT = Path(__file__).parents[3]

@@ -19,20 +19,20 @@ from ai_tour_guide.app.agent.identity import (
     PETIT_GUIDE_IDENTITY,
     PETIT_GUIDE_PERSONALITY,
 )
-from ai_tour_guide.app.agent.llm.clients import (
-    AgentLLMClient,
-    NoContextFallbackClient,
-)
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer
-from ai_tour_guide.app.agent.rag.prompting import (
-    build_messages,
-    is_destination_catalog_question,
-)
 from ai_tour_guide.app.chat.models import Message, Role
 from ai_tour_guide.app.chat.navigation import (
     next_option_ids,
     normalize_option_id,
     question_for_option_id,
+)
+from ai_tour_guide.app.llm.clients import (
+    AgentLLMClient,
+    NoContextFallbackClient,
+)
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer
+from ai_tour_guide.app.services.rag.prompting import (
+    build_messages,
+    is_destination_catalog_question,
 )
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
 from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context

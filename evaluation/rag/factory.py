@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ai_tour_guide.app.agent.llm.clients import LLMProvider
+from ai_tour_guide.app.llm.clients import LLMProvider
 from evaluation.dataset import GoldenCase
 from evaluation.rag.judge import JudgesSettings, JudgeVerdict, OpenAIAnswerJudge
 

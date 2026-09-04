@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ai_tour_guide.app.agent.llm.rate_limit import DEFAULT_REQUESTS_PER_SECOND
+from ai_tour_guide.app.llm.rate_limit import DEFAULT_REQUESTS_PER_SECOND
 
 DEFAULT_CLOSE_QUESTION_DISTANCE = 0.25
 DEFAULT_SIMILAR_QUESTION_DISTANCE = 0.50

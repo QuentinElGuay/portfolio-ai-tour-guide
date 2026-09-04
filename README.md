@@ -128,8 +128,10 @@ flowchart LR
     commands.
   - `knowledge_base/` — Database schema, corpus loading, indexing, and retrieval.
   - `app/` — FastAPI application, CLI, and chat interface.
-    - `agent/` — LangGraph travel-agent workflow, RAG pipeline, LLM clients, and demo
-      data.
+    - `agent/` — LangGraph conversation flow and travel-agent implementations.
+    - `llm/` — Provider clients, configuration, retries, and rate limiting.
+    - `services/` — Demo prepared-question data and RAG workflow, prompts, citations,
+      and persistence.
     - `chat/` — Gradio interface and chat backend adapters.
 - `evaluation/` — RAG evaluation and judge workflows.
 - `fixtures/` — Corpus and dashboard data used for local development.

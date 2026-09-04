@@ -7,8 +7,8 @@ score the semantic quality of an answer; that requires a human or judge model.
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from ai_tour_guide.app.agent.rag.models import RAGResult
 from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.app.services.rag.models import RAGResult
 from evaluation.dataset import GoldenCase, slugify_section_path
 from evaluation.rag.judge import JudgeVerdict
 

@@ -4,25 +4,27 @@ from uuid import UUID
 
 import pytest
 
-from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.app.agent.prompts import build_catalog_system_prompt
-from ai_tour_guide.app.agent.rag.models import (
+from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.app.chat.models import Role
+from ai_tour_guide.app.services.rag.models import (
     CitationValidationResult,
     GeneratedAnswer,
     SourceReference,
 )
-from ai_tour_guide.app.agent.rag.pipeline import answer_question, answer_question_async
-from ai_tour_guide.app.agent.rag.prompting import (
+from ai_tour_guide.app.services.rag.pipeline import (
+    answer_question,
+    answer_question_async,
+)
+from ai_tour_guide.app.services.rag.prompting import (
     build_messages,
     build_system_prompt,
     is_destination_catalog_question,
 )
-from ai_tour_guide.app.agent.rag.workflow import (
+from ai_tour_guide.app.services.rag.workflow import (
     _build_meta_messages,
     build_agent_graph,
 )
-from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
-from ai_tour_guide.app.chat.models import Role
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
 from ai_tour_guide.knowledge_base.search.models import (
@@ -70,8 +72,8 @@ def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
     )
 
 
-@patch('ai_tour_guide.app.agent.rag.pipeline.validate_citations')
-@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.pipeline.validate_citations')
+@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
 def test_answer_question_retrieves_context_and_returns_sources(
     retrieve_context: MagicMock,
     validate_citations: MagicMock,
@@ -101,14 +103,18 @@ def test_answer_question_retrieves_context_and_returns_sources(
 
 
 @patch(
-    'ai_tour_guide.app.agent.rag.pipeline.answer_question_async', new_callable=AsyncMock
+    'ai_tour_guide.app.services.rag.pipeline.answer_question_async',
+    new_callable=AsyncMock,
 )
+@patch('ai_tour_guide.app.services.rag.pipeline.create_llm_client')
 def test_answer_question_assigns_and_propagates_request_id(
+    create_llm_client: MagicMock,
     answer_question_async_mock: AsyncMock,
 ) -> None:
     """Verify that answer question assigns and propagates request id."""
     expected = MagicMock()
     answer_question_async_mock.return_value = expected
+    create_llm_client.return_value = MagicMock()
 
     result = answer_question('Question')
 
@@ -117,7 +123,7 @@ def test_answer_question_assigns_and_propagates_request_id(
     assert result is expected
 
 
-@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context', return_value=())
+@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context', return_value=())
 def test_answer_question_handles_empty_retrieval(
     retrieve_context: MagicMock,
 ) -> None:
@@ -135,26 +141,8 @@ def test_answer_question_handles_empty_retrieval(
     retrieve_context.assert_called_once()
 
 
-@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context', return_value=())
-def test_demo_answer_question_returns_a_prepared_answer_without_evidence(
-    retrieve_context: MagicMock,
-) -> None:
-    """Verify that agent changes cannot make the self-contained demo unusable."""
-    result = asyncio.run(
-        answer_question_async('What is kouign-amann?', llm_client=DemoLLMClient())
-    )
-
-    assert result.answer == (
-        'Kouign-amann is a rich, buttery Breton pastry known for its caramelised '
-        'sugar crust.'
-    )
-    assert result.contexts == ()
-    assert result.sources == ()
-    retrieve_context.assert_called_once()
-
-
-@patch('ai_tour_guide.app.agent.rag.workflow.list_indexed_destinations')
-@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.workflow.list_indexed_destinations')
+@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
 def test_answer_question_reads_destination_catalog_without_rag(
     retrieve_context: MagicMock,
     list_indexed_destinations: MagicMock,
@@ -180,7 +168,7 @@ def test_answer_question_reads_destination_catalog_without_rag(
     assert result.sources == ()
 
 
-@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
 def test_configured_identity_question_uses_fixed_answer(
     retrieve_context: MagicMock,
 ) -> None:
@@ -243,7 +231,7 @@ def test_build_messages_sends_instructions_as_a_system_message() -> None:
     assert messages[0]['role'] is Role.SYSTEM
 
 
-@patch('ai_tour_guide.app.agent.rag.pipeline.create_llm_client', return_value=None)
+@patch('ai_tour_guide.app.services.rag.pipeline.create_llm_client', return_value=None)
 def test_answer_question_requires_llm_configuration(
     create_llm_client: MagicMock,
 ) -> None:

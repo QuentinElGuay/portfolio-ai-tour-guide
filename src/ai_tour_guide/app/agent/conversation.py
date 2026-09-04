@@ -10,7 +10,6 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from sqlalchemy import Engine
 
-from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.agent.flow import (
     DEFAULT_FLOW_STEP,
     FLOW_QUESTIONS,
@@ -19,16 +18,18 @@ from ai_tour_guide.app.agent.flow import (
     transition_for,
 )
 from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
-from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
-from ai_tour_guide.app.agent.llm.settings import LLMProvider
-from ai_tour_guide.app.agent.rag.models import RAGResult
-from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
+from ai_tour_guide.app.agent.travel.contracts import TravelTurnResult
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
     ChatMessageRequest,
     ConversationTrace,
 )
+from ai_tour_guide.app.llm.clients import AgentLLMClient
+from ai_tour_guide.app.llm.settings import LLMProvider
+from ai_tour_guide.app.services.demo.questions import DEMO_WELCOME_MESSAGE
+from ai_tour_guide.app.services.rag.models import RAGResult
+from ai_tour_guide.app.services.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
@@ -77,9 +78,9 @@ def welcome_message_for_provider(
 def build_outer_conversation_graph(
     *,
     checkpointer: MemorySaver,
-    answer_turn: Callable[[str, str, FlowStep], Awaitable[RAGResult]],
+    answer_turn: Callable[[str, str, FlowStep], Awaitable[TravelTurnResult]],
     list_destination_names: Callable[[], tuple[str, ...]] | None = None,
-    on_result: Callable[[RAGResult], None] | None = None,
+    on_result: Callable[[TravelTurnResult], None] | None = None,
     welcome_message: str = WELCOME_MESSAGE,
 ):
     """Build the durable client-independent conversation graph."""
@@ -109,31 +110,17 @@ def build_outer_conversation_graph(
             'trace': trace.model_dump(mode='json') if trace is not None else None,
         }
 
-    def trace_for(result: RAGResult) -> ConversationTrace:
-        metadata = result.retrieval_metadata
-        queries = [
-            query
-            for query in metadata.get('tool_queries', [])
-            if isinstance(query, str)
-        ]
-        actions = [
-            'search_knowledge_base' if index == 0 else 'reformulate_search'
-            for index in range(len(queries))
-        ]
-        if result.contexts:
-            actions.append('answer_from_context')
-        else:
-            actions.append('refuse')
+    def trace_for(result: TravelTurnResult) -> ConversationTrace:
+        trace = result.trace
+        queries = list(trace.tool_inputs)
         return ConversationTrace(
-            intent='travel_question',
-            actions=actions,
+            intent=trace.intent,
+            actions=list(trace.actions),
             tool_inputs=queries,
             tool_call_count=len(queries),
-            evidence_sufficient=bool(result.contexts),
+            evidence_sufficient=trace.evidence_sufficient,
             retries=max(len(queries) - 1, 0),
-            final_status='answered'
-            if not result.error and result.contexts
-            else 'refused',
+            final_status=result.status.value,
         )
 
     async def initialize(state: OuterConversationState) -> dict[str, object]:
@@ -239,7 +226,7 @@ def build_outer_conversation_graph(
             state,
             result.answer,
             request_id=result.request_id,
-            sources=[source.to_dict() for source in result.sources],
+            sources=[dict(source) for source in result.sources],
             trace=trace_for(result),
         )
 

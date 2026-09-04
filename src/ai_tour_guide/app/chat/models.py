@@ -38,7 +38,7 @@ class ChatHistoryItem(TypedDict):
 
 
 class ConversationButton(BaseModel):
-    """A backend-defined action that a generic client can render."""
+    """A chat-service action that a generic client can render."""
 
     model_config = ConfigDict(extra='forbid')
 

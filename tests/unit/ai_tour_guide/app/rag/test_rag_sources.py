@@ -1,5 +1,5 @@
-from ai_tour_guide.app.agent.rag.models import CitationInvalidReason, LLMCitation
-from ai_tour_guide.app.agent.rag.sources import validate_citations
+from ai_tour_guide.app.services.rag.models import CitationInvalidReason, LLMCitation
+from ai_tour_guide.app.services.rag.sources import validate_citations
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search.models import (

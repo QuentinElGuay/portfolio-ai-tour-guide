@@ -5,7 +5,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ai_tour_guide.app.agent.rag.models import (
+from ai_tour_guide.app.services.rag.models import (
     CitationInvalidReason,
     CitationValidationResult,
     InvalidCitation,

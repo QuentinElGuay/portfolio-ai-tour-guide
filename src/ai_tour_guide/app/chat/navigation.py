@@ -12,12 +12,12 @@ def question_for_option_id(option_id: str) -> str | None:
 
 
 def normalize_option_id(option_id: str | None) -> str | None:
-    """Accept only backend-defined option IDs for legacy agent adapters."""
+    """Accept only chat-service option IDs for legacy agent adapters."""
     return option_id if option_id in FLOW_QUESTIONS else None
 
 
 def next_option_ids(option_id: str) -> tuple[str, ...]:
-    """Return backend-defined transitions for legacy agent adapters."""
+    """Return chat-service transitions for legacy agent adapters."""
     transitions = {
         input_id: next_step
         for step in FlowStep
