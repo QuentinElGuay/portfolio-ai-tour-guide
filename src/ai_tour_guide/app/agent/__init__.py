@@ -1,1 +1,1 @@
-"""Agent-specific orchestration, language-model clients, and RAG code."""
+"""Travel-agent and conversation orchestration."""

@@ -15,25 +15,25 @@ from ai_tour_guide.app.agent.flow import (
     flow_step_for_option,
     input_type_for_option,
 )
-from ai_tour_guide.app.agent.llm.clients import (
+from ai_tour_guide.app.agent.responses import (
+    INSUFFICIENT_CONTEXT_ANSWER,
+)
+from ai_tour_guide.app.chat.navigation import normalize_option_id
+from ai_tour_guide.app.llm.clients import (
     GenerationError,
     LLMClient,
 )
-from ai_tour_guide.app.agent.llm.factory import create_llm_client
-from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.models import (
+from ai_tour_guide.app.llm.factory import create_llm_client
+from ai_tour_guide.app.llm.settings import AgentsSettings
+from ai_tour_guide.app.services.rag.models import (
     GeneratedAnswer,
     RAGError,
     RAGErrorCategory,
     RAGResult,
 )
-from ai_tour_guide.app.agent.rag.prompting import build_messages
-from ai_tour_guide.app.agent.rag.sources import validate_citations
-from ai_tour_guide.app.agent.rag.workflow import run_agent_workflow
-from ai_tour_guide.app.agent.responses import (
-    INSUFFICIENT_CONTEXT_ANSWER,
-)
-from ai_tour_guide.app.chat.navigation import normalize_option_id
+from ai_tour_guide.app.services.rag.prompting import build_messages
+from ai_tour_guide.app.services.rag.sources import validate_citations
+from ai_tour_guide.app.services.rag.workflow import run_agent_workflow
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 

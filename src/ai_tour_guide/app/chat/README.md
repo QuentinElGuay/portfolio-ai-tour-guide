@@ -58,9 +58,9 @@ questions, so this catalog never substitutes for source-grounded advice.
 a local fallback in production. The app service raises a configuration error when no
 OpenAI API key is configured.
 
-`create_app()` uses `DemoBackend` only when no backend is injected. This keeps UI tests
-and local interface development independent of the agent API; the demo response says
-that no backend is available.
+`create_app()` uses `DemoChatService` only when no service is injected. This keeps UI
+tests and local interface development independent of the agent API; the demo response
+says that no chat service is available.
 
 ## HTTP contract
 
@@ -87,8 +87,8 @@ The agent returns a renderable conversation response:
 }
 ```
 
-`HttpChatBackend` validates the typed response and passes it to Gradio. Gradio controls
-presentation and renders backend-provided buttons using their labels and input IDs. The
+`HttpChatService` validates the typed response and passes it to Gradio. Gradio controls
+presentation and renders service-provided buttons using their labels and input IDs. The
 `FREE_TEXT` input sends its text separately; clients do not rebuild conversation
 history. The response also includes the public provider and model identity, which the
 Gradio interface displays in its footer; credentials are never included.

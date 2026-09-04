@@ -9,10 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import gradio as gr
 import pytest
 
-from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.chat.app import (
-    BACKEND_ERROR_MESSAGE,
     CHAT_CSS,
+    CHAT_SERVICE_ERROR_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
     _italicize_french_expressions,
@@ -27,8 +26,9 @@ from ai_tour_guide.app.chat.app import (
     submit_feedback,
     update_feedback_values,
 )
-from ai_tour_guide.app.chat.backends import DemoBackend
+from ai_tour_guide.app.chat.backends import DemoChatService
 from ai_tour_guide.app.chat.models import ChatHistoryItem
+from ai_tour_guide.app.services.demo.questions import DEMO_WELCOME_MESSAGE
 
 
 def _like_data(index: object, liked: object) -> gr.LikeData:
@@ -50,9 +50,12 @@ def _registered_function(app: gr.Blocks, name: str) -> Callable[..., Any]:
 
 
 @patch('ai_tour_guide.app.chat.app.create_app')
-@patch('ai_tour_guide.app.chat.app.create_backend', return_value=DemoBackend())
+@patch(
+    'ai_tour_guide.app.chat.app.create_chat_service',
+    return_value=DemoChatService(),
+)
 def test_main_hides_gradio_footer(
-    create_backend: MagicMock,
+    create_chat_service: MagicMock,
     create_app: MagicMock,
 ) -> None:
     """Hide Gradio footer controls that are irrelevant to this app."""
@@ -61,14 +64,14 @@ def test_main_hides_gradio_footer(
 
     main()
 
-    create_backend.assert_called_once_with()
+    create_chat_service.assert_called_once_with()
     app.launch.assert_called_once()
     assert app.launch.call_args.kwargs['footer_links'] == []
 
 
 def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     """Verify that create app configures chatbot feedback and like event."""
-    app = create_app(DemoBackend())
+    app = create_app(DemoChatService())
 
     chatbot = next(
         component
@@ -142,13 +145,13 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
 
 
 def test_start_client_chat_creates_an_independent_demo_session() -> None:
-    """Verify that every Gradio client receives its own backend session."""
-    backend = DemoBackend()
+    """Verify that every Gradio client receives its own chat-service session."""
+    service = DemoChatService()
     first_state, first_history, first_llm_label = asyncio.run(
-        start_client_chat(backend)
+        start_client_chat(service)
     )
     second_state, second_history, second_llm_label = asyncio.run(
-        start_client_chat(backend)
+        start_client_chat(service)
     )
 
     assert first_state['session_id'] != second_state['session_id']
@@ -170,8 +173,8 @@ def test_start_client_chat_creates_an_independent_demo_session() -> None:
 
 
 def test_first_option_keeps_the_backend_welcome_in_history() -> None:
-    """Keep the welcome and render the user option before the backend response."""
-    app = create_app(DemoBackend())
+    """Keep the welcome and render the user option before the service response."""
+    app = create_app(DemoChatService())
     initialize_client = _registered_function(app, 'initialize_client')
     respond = _registered_function(app, 'respond')
     add_user_message = _registered_function(app, 'add_user_message')
@@ -193,7 +196,7 @@ def test_first_option_keeps_the_backend_welcome_in_history() -> None:
     assert 'Petit Guide' in str(updated_history[2]['content'])
 
 
-def test_chat_css_uses_a_demo_label_only_for_the_demo_backend() -> None:
+def test_chat_css_uses_a_demo_label_only_for_the_demo_service() -> None:
     """Verify that demo mode is shown in the assistant label."""
     assert 'content: "Petit Guide (demo mode)"' in chat_css(demo_mode=True)
     assert 'content: "Petit Guide"' in chat_css(demo_mode=False)
@@ -285,20 +288,20 @@ def test_update_feedback_values_preserves_previous_ratings() -> None:
 
 def test_submit_feedback_forwards_like_and_dislike_events() -> None:
     """Verify that submit feedback forwards like and dislike events."""
-    backend = MagicMock()
-    backend.submit_feedback = AsyncMock()
+    service = MagicMock()
+    service.submit_feedback = AsyncMock()
     request_ids = {1: 'TODO: request_id:1', 3: 'TODO: request_id:3'}
 
     first = select_feedback(request_ids, _like_data(1, True))
     second = select_feedback(request_ids, _like_data(3, False))
-    asyncio.run(submit_feedback(first, backend))
-    asyncio.run(submit_feedback(second, backend))
+    asyncio.run(submit_feedback(first, service))
+    asyncio.run(submit_feedback(second, service))
 
-    assert backend.submit_feedback.await_args_list[0].args == (
+    assert service.submit_feedback.await_args_list[0].args == (
         'TODO: request_id:1',
         True,
     )
-    assert backend.submit_feedback.await_args_list[1].args == (
+    assert service.submit_feedback.await_args_list[1].args == (
         'TODO: request_id:3',
         False,
     )
@@ -306,8 +309,8 @@ def test_submit_feedback_forwards_like_and_dislike_events() -> None:
 
 def test_submit_feedback_ignores_invalid_events() -> None:
     """Verify that submit feedback ignores invalid events."""
-    backend = MagicMock()
-    backend.submit_feedback = AsyncMock()
+    service = MagicMock()
+    service.submit_feedback = AsyncMock()
     request_ids = {1: 'TODO: request_id:1'}
 
     for data in (
@@ -316,13 +319,13 @@ def test_submit_feedback_ignores_invalid_events() -> None:
         _like_data(2, True),
     ):
         selection = select_feedback(request_ids, data)
-        asyncio.run(submit_feedback(selection, backend))
+        asyncio.run(submit_feedback(selection, service))
 
-    backend.submit_feedback.assert_not_awaited()
+    service.submit_feedback.assert_not_awaited()
 
 
-def test_backend_error_message_does_not_expose_transport_details() -> None:
-    """Keep client-side backend failures safe and human-oriented."""
-    assert 'Backend error' not in BACKEND_ERROR_MESSAGE
-    assert 'Chat API request failed' not in BACKEND_ERROR_MESSAGE
-    assert "I'm" in BACKEND_ERROR_MESSAGE
+def test_chat_service_error_message_does_not_expose_transport_details() -> None:
+    """Keep client-side chat-service failures safe and human-oriented."""
+    assert 'Backend error' not in CHAT_SERVICE_ERROR_MESSAGE
+    assert 'Chat API request failed' not in CHAT_SERVICE_ERROR_MESSAGE
+    assert "I'm" in CHAT_SERVICE_ERROR_MESSAGE

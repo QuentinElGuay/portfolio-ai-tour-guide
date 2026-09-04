@@ -10,9 +10,11 @@ graph TD;
 	decide(decide)
 	search(search)
 	generate(generate)
+	fallback(fallback)
 	insufficient(insufficient)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> identify;
+	decide -.-> fallback;
 	decide -.-> generate;
 	decide -.-> insufficient;
 	decide -.-> search;
@@ -20,6 +22,7 @@ graph TD;
 	identify -.-> identity;
 	search -.-> decide;
 	search -.-> insufficient;
+	fallback --> __end__;
 	generate --> __end__;
 	identity --> __end__;
 	insufficient --> __end__;

@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from ai_tour_guide.app.agent.rag.persistence import (
+from ai_tour_guide.app.services.rag.persistence import (
     UnimplementedModelError,
     _rag_result_values,
     _usage_event_values,

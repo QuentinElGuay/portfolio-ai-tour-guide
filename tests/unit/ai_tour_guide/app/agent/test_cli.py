@@ -4,13 +4,13 @@ from uuid import UUID
 
 from click.testing import CliRunner
 
-from ai_tour_guide.app.agent.rag.models import (
+from ai_tour_guide.app.chat.models import ConversationResponse
+from ai_tour_guide.app.cli import main
+from ai_tour_guide.app.services.rag.models import (
     GeneratedAnswer,
     RAGResult,
     SourceReference,
 )
-from ai_tour_guide.app.chat.models import ConversationResponse
-from ai_tour_guide.app.cli import main
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 
 
@@ -126,22 +126,22 @@ def test_feedback_command_rejects_unknown_request(store_feedback: MagicMock) -> 
 
 @patch('ai_tour_guide.app.cli.questionary.text')
 @patch('ai_tour_guide.app.cli.questionary.select')
-@patch('ai_tour_guide.app.cli.create_backend')
+@patch('ai_tour_guide.app.cli.create_chat_service')
 def test_chat_command_sends_free_text_and_quits(
-    create_backend: MagicMock,
+    create_chat_service: MagicMock,
     select: MagicMock,
     text: MagicMock,
 ) -> None:
-    backend = MagicMock()
+    service = MagicMock()
     started = ConversationResponse(
         session_id=UUID(int=1), step_id='welcome', message='Welcome.'
     )
     answered = ConversationResponse(
         session_id=UUID(int=1), step_id='welcome', message='Answer.'
     )
-    backend.start_chat = AsyncMock(return_value=started)
-    backend.send_message = AsyncMock(return_value=answered)
-    create_backend.return_value = backend
+    service.start_chat = AsyncMock(return_value=started)
+    service.send_message = AsyncMock(return_value=answered)
+    create_chat_service.return_value = service
     select.return_value.ask.side_effect = ['FREE_TEXT', '/quit']
     text.return_value.ask.return_value = 'What?'
 
@@ -149,20 +149,20 @@ def test_chat_command_sends_free_text_and_quits(
 
     assert invocation.exit_code == 0
     assert 'Answer.' in invocation.output
-    backend.send_message.assert_called_once_with(
+    service.send_message.assert_called_once_with(
         str(started.session_id), 'welcome', 'FREE_TEXT', 'What?'
     )
     text.assert_called_once_with('Write a message')
 
 
 @patch('ai_tour_guide.app.cli.questionary.select')
-@patch('ai_tour_guide.app.cli.create_backend')
+@patch('ai_tour_guide.app.cli.create_chat_service')
 def test_chat_command_new_replaces_local_session(
-    create_backend: MagicMock,
+    create_chat_service: MagicMock,
     select: MagicMock,
 ) -> None:
-    backend = MagicMock()
-    backend.start_chat = AsyncMock(
+    service = MagicMock()
+    service.start_chat = AsyncMock(
         side_effect=[
             ConversationResponse(
                 session_id=UUID(int=1), step_id='welcome', message='First.'
@@ -172,13 +172,13 @@ def test_chat_command_new_replaces_local_session(
             ),
         ]
     )
-    create_backend.return_value = backend
+    create_chat_service.return_value = service
     select.return_value.ask.side_effect = ['/new', '/quit']
 
     invocation = CliRunner().invoke(main, ['chat'])
 
     assert invocation.exit_code == 0
-    assert backend.start_chat.call_count == 2
+    assert service.start_chat.call_count == 2
     assert 'Second.' in invocation.output
 
 

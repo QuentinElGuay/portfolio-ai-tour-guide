@@ -6,13 +6,13 @@ from collections.abc import Sequence
 from openai import APIError, AsyncOpenAI
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 
-from ai_tour_guide.app.agent.llm.clients import GenerationError
-from ai_tour_guide.app.agent.llm.rate_limit import AsyncRateLimiter
-from ai_tour_guide.app.agent.llm.retry import retry_provider_call
-from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, LLMCitation
-from ai_tour_guide.app.agent.rag.tools import TOURISM_SEARCH_TOOL
 from ai_tour_guide.app.chat.models import Emotion, Message, Role
+from ai_tour_guide.app.llm.clients import GenerationError
+from ai_tour_guide.app.llm.rate_limit import AsyncRateLimiter
+from ai_tour_guide.app.llm.retry import retry_provider_call
+from ai_tour_guide.app.llm.settings import AgentsSettings
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer, LLMCitation
+from ai_tour_guide.app.services.rag.tools import TOURISM_SEARCH_TOOL
 
 
 def create_openai_client(settings: AgentsSettings) -> AsyncOpenAI:

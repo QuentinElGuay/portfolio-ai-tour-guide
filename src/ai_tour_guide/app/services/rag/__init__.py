@@ -1,4 +1,4 @@
-"""Retrieval-augmented generation for tour-guide questions."""
+"""Retrieval-augmented generation infrastructure."""
 
 from .tools import (
     TOURISM_SEARCH_TOOL,

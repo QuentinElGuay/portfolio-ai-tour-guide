@@ -1,8 +1,10 @@
-# Agent and RAG API
+# Travel-agent API
 
-This package owns retrieval, prompt construction, and LLM generation. It exposes those
-capabilities through a CLI and a small HTTP API. The browser interface is documented in
-the [chat guide](../chat/README.md).
+The `agent` package owns travel-agent and conversation orchestration. `llm` provides
+provider communication, while `services.demo` and `services.rag` provide deterministic
+prepared questions and retrieval-augmented generation. Together, they are exposed
+through a CLI and a small HTTP API. The browser interface is documented in the
+[chat guide](../chat/README.md).
 
 Return to the [project overview](../../../README.md).
 
@@ -19,8 +21,9 @@ Return to the [project overview](../../../README.md).
 1. The client starts a backend-owned session through `POST /chat/start`.
 2. `ConversationGraph` checkpoints the session and validates each `input_id` against the
    current public `step_id`.
-3. Free-text turns invoke the isolated, bounded `TravelAgent` workflow; guided actions
-   are resolved deterministically by the outer conversation flow.
+3. Free-text turns use `DeterministicTravelAgent` for prepared demo answers or the live
+   RAG workflow for source-grounded answers; guided actions are resolved
+   deterministically by the outer conversation flow.
 4. The turn-level workflow selects an approved retrieval action, searches the knowledge
    base, evaluates evidence, and may reformulate once before refusing.
 5. The configured `LLMClient` generates an answer and document/page citations.
@@ -54,11 +57,10 @@ while travel questions return a clear no-sources response. Run `make ingest` or
 `make load-corpus` to enable source-grounded travel answers.
 
 The template defaults to the no-cost `baguette-llm` provider with the
-`mini-croissant-1.0` model. It still needs the database and embedding settings used for
-retrieval. The demo is limited to prepared Brittany questions and suggests a supported
-question when it cannot answer. It also accepts modest spelling or punctuation
-variations. A somewhat similar question receives a targeted `Did you mean...?`
-suggestion; an unrelated question receives a random supported-question suggestion.
+`mini-croissant-1.0` model. It uses only prepared Brittany questions, so it does not
+need an indexed knowledge base or embedding settings. It suggests a supported question
+when it cannot answer, accepts modest spelling or punctuation variations, and returns a
+targeted `Did you mean...?` suggestion for somewhat similar questions.
 
 To use live answer generation with ChatGPT, switch to OpenAI and add your API key:
 
@@ -200,5 +202,5 @@ knowledge base you populated.
 `mini-croissant-1.0` default. OpenAI (ChatGPT) and Google Gemini are supported providers
 for live answer generation.
 
-For the chat service's `CHAT_*` settings and development-only `DemoBackend`, see the
+For the chat service's `CHAT_*` settings and development-only `DemoChatService`, see the
 [chat guide](chat/README.md).

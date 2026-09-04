@@ -5,24 +5,25 @@ from typing import cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from ai_tour_guide.app.agent.conversation import (
     ConversationGraphError,
-    ConversationState,
     OuterConversationState,
-    build_conversation_graph,
     build_outer_conversation_graph,
     welcome_message_for_provider,
 )
 from ai_tour_guide.app.agent.flow import FlowStep
-from ai_tour_guide.app.agent.llm.factory import create_llm_client
-from ai_tour_guide.app.agent.llm.settings import AgentsSettings
-from ai_tour_guide.app.agent.rag.models import RAGErrorCategory, RAGResult
-from ai_tour_guide.app.agent.rag.persistence import store_rag_result
+from ai_tour_guide.app.agent.travel.contracts import (
+    TravelTurnContext,
+    TravelTurnResult,
+)
+from ai_tour_guide.app.agent.travel.deterministic import (
+    create_deterministic_travel_agent,
+)
+from ai_tour_guide.app.agent.travel.llm import LLMTravelAgent
 from ai_tour_guide.app.chat.models import (
     ChatErrorCode,
     ChatFeedbackRequest,
@@ -34,6 +35,9 @@ from ai_tour_guide.app.chat.models import (
     Role,
 )
 from ai_tour_guide.app.chat.persistence import store_chat_message, store_feedback
+from ai_tour_guide.app.llm.factory import create_llm_client
+from ai_tour_guide.app.llm.settings import AgentsSettings, LLMProvider
+from ai_tour_guide.app.services.rag.persistence import store_rag_result
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
@@ -60,12 +64,9 @@ INTERNAL_SERVICE_ERROR_MESSAGE = (
 )
 
 
-def _chat_error_message(result: RAGResult) -> str:
+def _chat_error_message(error_message: str | None) -> str:
     """Translate an internal error category into a safe chat message."""
-    if (
-        result.error is not None
-        and result.error.category is RAGErrorCategory.EXTERNAL_SERVICE
-    ):
+    if error_message == 'external_service':
         return EXTERNAL_SERVICE_ERROR_MESSAGE
     return INTERNAL_SERVICE_ERROR_MESSAGE
 
@@ -96,20 +97,34 @@ def _chat_error(status_code: int, code: ChatErrorCode, message: str) -> HTTPExce
 
 async def _answer_turn(
     question: str, session_id: str, flow_step: FlowStep
-) -> RAGResult:
-    """Adapt the existing turn runner to the outer graph's handler contract."""
-    return await _answer_question(question, session_id, flow_step=flow_step)
+) -> TravelTurnResult:
+    """Dispatch a turn to either the demo or retrieval-backed agent."""
+    settings = AgentsSettings()
+    if settings.llm_provider is LLMProvider.BAGUETTE_LLM:
+        deterministic_agent = create_deterministic_travel_agent(settings)
+        response = await deterministic_agent.answer(
+            question, TravelTurnContext(session_id=session_id, flow_step=flow_step)
+        )
+        return response
+    return await LLMTravelAgent(create_llm_client(settings)).answer(
+        question, TravelTurnContext(session_id=session_id, flow_step=flow_step)
+    )
 
 
 @app.post('/chat/start', response_model=ConversationResponse)
 async def start_chat() -> ConversationResponse:
     """Create a new chat session and return its initial renderable response."""
     session_id = str(uuid4())
+    settings = AgentsSettings()
     graph = build_outer_conversation_graph(
         checkpointer=_conversation_checkpointer,
         answer_turn=_answer_turn,
         welcome_message=_welcome_message(
-            knowledge_base_is_empty=_ensure_knowledge_base_ready()
+            knowledge_base_is_empty=(
+                False
+                if settings.llm_provider is LLMProvider.BAGUETTE_LLM
+                else _ensure_knowledge_base_ready()
+            )
         ),
     )
     state = await graph.ainvoke(
@@ -170,57 +185,20 @@ def _ensure_knowledge_base_ready() -> bool:
     return False
 
 
-async def _answer_question(
-    question: str,
-    session_id: str,
-    option_id: str | None = None,
-    *,
-    flow_step: FlowStep = FlowStep.MAIN_MENU,
-) -> RAGResult:
-    """Run the session-scoped conversation graph."""
-    client = create_llm_client(AgentsSettings())
-    if client is None:
-        raise RuntimeError('No LLM client is configured.')
-    result: RAGResult | None = None
-
-    def retain_result(value: RAGResult) -> None:
-        nonlocal result
-        result = value
-
-    graph = build_conversation_graph(
-        client,
-        engine=None,
-        strategy=None,
-        checkpointer=MemorySaver(),
-        on_result=retain_result,
-        option_id=option_id,
-    )
-    conversation_input = ConversationState(
-        messages=[HumanMessage(content=question)],
-        flow_step=flow_step.value,
-    )
-    await graph.ainvoke(
-        conversation_input,
-        config={'configurable': {'thread_id': session_id}},
-    )
-    if result is None:
-        raise RuntimeError('The conversation graph did not return a result.')
-    return result
-
-
 @app.get('/health')
 async def health() -> dict[str, str]:
     """Report that the HTTP process and its knowledge base are ready."""
-    _ensure_knowledge_base_ready()
+    if AgentsSettings().llm_provider is not LLMProvider.BAGUETTE_LLM:
+        _ensure_knowledge_base_ready()
     return {'status': 'ok'}
 
 
 @app.post('/chat/message', response_model=ConversationResponse)
 async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
     """Resolve one request through the checkpointed outer conversation graph."""
-    result: RAGResult | None = None
+    result: TravelTurnResult | None = None
 
-    def retain(value: RAGResult) -> None:
+    def retain(value: TravelTurnResult) -> None:
         nonlocal result
         result = value
 
@@ -260,9 +238,11 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
             status_code=503,
             detail='Unable to store the generated answer for feedback.',
         ) from exc
-    if result is not None:
+    if result is not None and result.persistence_payload is not None:
         try:
-            store_rag_result(result.request_id, result.to_dict())
+            if result.request_id is None:
+                raise RuntimeError('A persisted travel turn requires a request ID.')
+            store_rag_result(result.request_id, result.persistence_payload)
         except SQLAlchemyError as exc:
             logger.exception('Unable to store RAG result')
             raise HTTPException(
@@ -270,8 +250,8 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
                 detail='Unable to store the generated answer for feedback.',
             ) from exc
     response_payload = dict(state['latest_response'])
-    if result is not None and result.error is not None:
-        response_payload['message'] = _chat_error_message(result)
+    if result is not None and result.error_message is not None:
+        response_payload['message'] = _chat_error_message(result.error_message)
         response_payload['sources'] = []
     response = ConversationResponse.model_validate(response_payload).model_copy(
         update={'llm': _llm_info()}

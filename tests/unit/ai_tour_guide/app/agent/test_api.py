@@ -10,9 +10,14 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGResult
+from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
+from ai_tour_guide.app.agent.travel.contracts import (
+    TravelAgentStatus,
+    TravelTurnResult,
+)
 from ai_tour_guide.app.api import (
+    _answer_turn,
     _ensure_knowledge_base_ready,
     app,
     chat_message,
@@ -20,6 +25,8 @@ from ai_tour_guide.app.api import (
     start_chat,
 )
 from ai_tour_guide.app.chat.models import ChatMessageRequest, ConversationResponse
+from ai_tour_guide.app.llm.settings import LLMProvider
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer, RAGResult
 from ai_tour_guide.knowledge_base.search import SearchMode
 
 
@@ -86,18 +93,75 @@ def test_chat_start_notifies_a_live_provider_when_the_knowledge_base_is_empty(
     assert EMPTY_KNOWLEDGE_BASE_NOTICE in response.message
 
 
+def test_demo_turn_does_not_use_retrieval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.BAGUETTE_LLM.value)
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'mini-croissant-1.0')
+    result = asyncio.run(
+        _answer_turn('What is kouign-amann?', 'session', FlowStep.MAIN_MENU)
+    )
+
+    assert result.answer.startswith('Kouign-amann is a rich, buttery Breton pastry')
+    assert result.sources == ()
+
+
+def test_demo_start_does_not_check_the_knowledge_base(
+    monkeypatch: pytest.MonkeyPatch,
+    knowledge_base_ready_fixture: MagicMock,
+) -> None:
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.BAGUETTE_LLM.value)
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'mini-croissant-1.0')
+
+    response = asyncio.run(start_chat())
+
+    assert response.llm is not None
+    assert response.llm.provider == LLMProvider.BAGUETTE_LLM.value
+    knowledge_base_ready_fixture.assert_not_called()
+
+
+@patch('ai_tour_guide.app.api.store_rag_result')
+def test_demo_message_does_not_persist_a_rag_result(
+    store_rag_result: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.BAGUETTE_LLM.value)
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'mini-croissant-1.0')
+    session = asyncio.run(start_chat())
+
+    response = asyncio.run(
+        chat_message(
+            ChatMessageRequest(
+                session_id=session.session_id,
+                expected_step_id='welcome',
+                input_id='FREE_TEXT',
+                text='What is kouign-amann?',
+            )
+        )
+    )
+
+    assert response.sources == []
+    store_rag_result.assert_not_called()
+
+
 @patch('ai_tour_guide.app.api.store_rag_result')
 @patch('ai_tour_guide.app.api._answer_turn', new_callable=AsyncMock)
 def test_chat_message_serializes_the_backend_response(
     answer_question: AsyncMock,
     store_rag_result: MagicMock,
 ) -> None:
-    result = RAGResult(
+    rag_result = RAGResult(
         question='Where?',
         mode=SearchMode.HYBRID,
         k=5,
         messages=(),
         generated=GeneratedAnswer('The answer.'),
+    )
+    result = TravelTurnResult(
+        answer='The answer.',
+        status=TravelAgentStatus.ANSWERED,
+        request_id=rag_result.request_id,
+        persistence_payload=rag_result.to_dict(),
     )
     answer_question.return_value = result
     session = asyncio.run(start_chat())
@@ -124,16 +188,18 @@ def test_chat_message_serializes_the_backend_response(
         'sources': [],
         'trace': {
             'intent': 'travel_question',
-            'actions': ['refuse'],
+            'actions': [],
             'tool_inputs': [],
             'tool_call_count': 0,
             'evidence_sufficient': False,
             'retries': 0,
-            'final_status': 'refused',
+            'final_status': 'answered',
         },
         'llm': {'provider': 'openai', 'model': 'test-model'},
     }
-    store_rag_result.assert_called_once_with(result.request_id, result.to_dict())
+    store_rag_result.assert_called_once_with(
+        rag_result.request_id, rag_result.to_dict()
+    )
 
 
 def test_chat_start_http_boundary_returns_contract_fields() -> None:
