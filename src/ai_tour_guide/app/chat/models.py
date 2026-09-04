@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -34,6 +34,7 @@ class ChatHistoryItem(TypedDict):
 
     role: str
     content: object
+    options: NotRequired[list[dict[str, str]]]
 
 
 class ConversationButton(BaseModel):

@@ -2,6 +2,8 @@ import asyncio
 import os
 import subprocess
 import sys
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import gradio as gr
@@ -34,6 +36,17 @@ def _like_data(index: object, liked: object) -> gr.LikeData:
     data.index = index
     data.liked = liked
     return data
+
+
+def _registered_function(app: gr.Blocks, name: str) -> Callable[..., Any]:
+    """Return a registered Gradio callback whose presence is required by the test."""
+    block_function = next(
+        (function for function in app.fns.values() if function.name == name),
+        None,
+    )
+    assert block_function is not None
+    assert block_function.fn is not None
+    return block_function.fn
 
 
 @patch('ai_tour_guide.app.chat.app.create_app')
@@ -141,7 +154,7 @@ def test_start_client_chat_creates_an_independent_demo_session() -> None:
     assert first_state['session_id'] != second_state['session_id']
     assert first_state['step_id'] == second_state['step_id'] == 'welcome'
     assert first_history[0]['content'] == DEMO_WELCOME_MESSAGE
-    assert first_history[0]['options'] == [
+    assert first_history[0].get('options') == [
         {'label': 'Tell me about you', 'value': 'Tell me about you'},
         {
             'label': 'What destinations are covered?',
@@ -159,19 +172,9 @@ def test_start_client_chat_creates_an_independent_demo_session() -> None:
 def test_first_option_keeps_the_backend_welcome_in_history() -> None:
     """Keep the welcome and render the user option before the backend response."""
     app = create_app(DemoBackend())
-    initialize_client = next(
-        function.fn
-        for function in app.fns.values()
-        if function.name == 'initialize_client'
-    )
-    respond = next(
-        function.fn for function in app.fns.values() if function.name == 'respond'
-    )
-    add_user_message = next(
-        function.fn
-        for function in app.fns.values()
-        if function.name == 'add_user_message'
-    )
+    initialize_client = _registered_function(app, 'initialize_client')
+    respond = _registered_function(app, 'respond')
+    add_user_message = _registered_function(app, 'add_user_message')
     request_ids, history, _ = asyncio.run(initialize_client())
 
     _, history_with_user, pending_message = add_user_message(
