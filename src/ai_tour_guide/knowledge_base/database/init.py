@@ -9,7 +9,7 @@ from sqlalchemy.schema import CreateSchema
 from .connection import database_engine
 from .settings import DatabaseSettings
 from .tables.evaluation import metadata as evaluation_metadata
-from .tables.public import llm_model_pricing
+from .tables.public import EMBEDDING_DIMENSIONS, llm_model_pricing
 from .tables.public import metadata as public_metadata
 from .views import create_evaluation_views, create_operational_views
 
@@ -59,6 +59,7 @@ def initialize_database(
         connection.execute(
             text('ALTER TABLE documents ALTER COLUMN destination SET NOT NULL')
         )
+        _migrate_document_chunks(connection)
         _migrate_chat_messages(connection)
         _trim_rag_result_message_columns(connection)
         _migrate_llm_usage_events(connection)
@@ -78,6 +79,16 @@ def _trim_rag_result_message_columns(connection) -> None:
     """Keep generic user and assistant content out of RAG execution records."""
     connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS question'))
     connection.execute(text('ALTER TABLE rag_results DROP COLUMN IF EXISTS answer'))
+
+
+def _migrate_document_chunks(connection) -> None:
+    """Add embeddings to schemas created before vector retrieval was introduced."""
+    connection.execute(
+        text(
+            'ALTER TABLE document_chunks '
+            f'ADD COLUMN IF NOT EXISTS embedding vector({EMBEDDING_DIMENSIONS})'
+        )
+    )
 
 
 def _migrate_chat_messages(connection) -> None:

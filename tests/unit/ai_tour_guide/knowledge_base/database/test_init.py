@@ -24,12 +24,17 @@ def test_initialize_database_creates_extension_schema_tables_and_indexes() -> No
         metadata.tables = {'document_chunks': table}
         init.initialize_database('smoke', engine=engine)
 
-    assert connection.execute.call_count == 8
+    assert connection.execute.call_count == 9
     connection.execution_options.assert_called_once_with(
         schema_translate_map={None: 'smoke'}
     )
     metadata.create_all.assert_called_once_with(bind=schema_connection, checkfirst=True)
     index.create.assert_called_once_with(bind=schema_connection, checkfirst=True)
+    assert any(
+        'ADD COLUMN IF NOT EXISTS embedding vector('
+        in getattr(call.args[0], 'text', '')
+        for call in connection.execute.call_args_list
+    )
 
 
 def test_initialize_database_rejects_unsupported_schema() -> None:

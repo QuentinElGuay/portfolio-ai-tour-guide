@@ -163,6 +163,7 @@ def test_gemini_client_extracts_search_tool_calls() -> None:
 
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
     """Verify that default llm client is openai when openai is configured."""
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.OPENAI.value)
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
@@ -189,6 +190,7 @@ def test_gemini_llm_client_is_selected_when_gemini_is_configured() -> None:
 def test_llm_client_requires_api_key() -> None:
     """Verify that llm client requires api key."""
     settings = AgentsSettings(
+        llm_provider=LLMProvider.OPENAI,
         api_key=SecretStr(' '),
         model='test-model',
     )
