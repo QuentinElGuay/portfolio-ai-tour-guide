@@ -1,10 +1,10 @@
 # Chat interface
 
-The Gradio chat is the user interface for the RAG agent. It does not retrieve documents
-or access an LLM provider directly. Instead, it sends each question to the agent's HTTP
-API and displays the grounded answer with its source pages. Each session starts with a
-welcome from **Petit Guide**, followed by example questions. Assistant and user messages
-are labelled **Petit Guide** and **You**, respectively.
+The Gradio chat is the user interface for the travel agent. It does not retrieve
+documents or access an LLM provider directly. Instead, it sends each question to the
+agent's HTTP API and displays the grounded answer with its source pages. Each session
+starts with a welcome from **Petit Guide**, followed by example questions. Assistant and
+user messages are labelled **Petit Guide** and **You**, respectively.
 
 Return to the [project overview](../../../../README.md) or the
 [agent guide](../agent/README.md).
@@ -46,7 +46,9 @@ uv run python -m ai_tour_guide.app.chat.app
 
 The defaults in `.env.template` configure the chat to call `http://localhost:8000/chat`.
 `CHAT_API_URL`, `CHAT_HOST`, `CHAT_PORT`, and `CHAT_TITLE` can be changed for another
-environment.
+environment. When the `baguette-llm` provider is active, the chat adds a randomized demo
+response delay between `CHAT_DEMO_RESPONSE_DELAY_MIN_SECONDS` and
+`CHAT_DEMO_RESPONSE_DELAY_MAX_SECONDS` (2–3 seconds by default).
 
 The assistant can answer which destinations it covers from the titles of the currently
 indexed guides. It uses retrieved passages for all destination details and other travel

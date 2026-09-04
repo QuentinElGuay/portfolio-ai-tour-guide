@@ -19,7 +19,10 @@ from ai_tour_guide.app.agent.identity import (
     PETIT_GUIDE_IDENTITY,
     PETIT_GUIDE_PERSONALITY,
 )
-from ai_tour_guide.app.agent.llm.clients import AgentLLMClient
+from ai_tour_guide.app.agent.llm.clients import (
+    AgentLLMClient,
+    NoContextFallbackClient,
+)
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer
 from ai_tour_guide.app.agent.rag.prompting import (
     build_messages,
@@ -95,11 +98,15 @@ def build_agent_graph(
 
     def route_after_decision(
         state: AgentState,
-    ) -> Literal['search', 'generate', 'insufficient']:
+    ) -> Literal['search', 'generate', 'fallback', 'insufficient']:
         if state['next_query'] is not None and len(state['queries']) < MAX_SEARCH_CALLS:
             return 'search'
+        if state['contexts'] or not state['queries']:
+            return 'generate'
         return (
-            'generate' if state['contexts'] or not state['queries'] else 'insufficient'
+            'fallback'
+            if isinstance(llm_client, NoContextFallbackClient)
+            else 'insufficient'
         )
 
     def search(state: AgentState) -> dict[str, object]:
@@ -138,6 +145,11 @@ def build_agent_graph(
             'generated': await llm_client.answer_question(messages),
         }
 
+    async def fallback(state: AgentState) -> dict[str, object]:
+        if not isinstance(llm_client, NoContextFallbackClient):
+            return {}
+        return {'generated': await llm_client.answer_without_context(state['question'])}
+
     def insufficient(state: AgentState) -> dict[str, object]:
         return {}
 
@@ -147,6 +159,7 @@ def build_agent_graph(
     graph.add_node('decide', decide)
     graph.add_node('search', search)
     graph.add_node('generate', generate)
+    graph.add_node('fallback', fallback)
     graph.add_node('insufficient', insufficient)
     graph.add_edge(START, 'identify')
     graph.add_conditional_edges('identify', route_identity)
@@ -154,6 +167,7 @@ def build_agent_graph(
     graph.add_conditional_edges('decide', route_after_decision)
     graph.add_conditional_edges('search', route_after_search)
     graph.add_edge('generate', END)
+    graph.add_edge('fallback', END)
     graph.add_edge('insufficient', END)
     # RetrievedContext contains ORM objects and is intentionally runtime-only.
     # This graph can run inside the checkpointed conversation graph, so it must not

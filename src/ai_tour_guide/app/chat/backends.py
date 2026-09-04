@@ -1,17 +1,21 @@
+import asyncio
 import logging
 import os
+import random
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import httpx
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.agent.flow import (
     FLOW_QUESTIONS,
     FlowStep,
     flow_definition,
     transition_for,
 )
-from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
+from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS
 from ai_tour_guide.app.agent.responses import NO_BACKEND_AVAILABLE_ANSWER
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
@@ -25,13 +29,59 @@ CHAT_SERVICE_UNAVAILABLE_ERROR = (
     'The chat service is temporarily unavailable. Please try again shortly.'
 )
 DEFAULT_CHAT_API_TIMEOUT_SECONDS = 180.0
+DEFAULT_DEMO_RESPONSE_DELAY_MIN_SECONDS = 2.0
+DEFAULT_DEMO_RESPONSE_DELAY_MAX_SECONDS = 3.0
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class DemoResponseDelay:
+    """Configurable delay used to simulate a demo response being generated."""
+
+    min_seconds: float = DEFAULT_DEMO_RESPONSE_DELAY_MIN_SECONDS
+    max_seconds: float = DEFAULT_DEMO_RESPONSE_DELAY_MAX_SECONDS
+
+    def __post_init__(self) -> None:
+        if self.min_seconds < 0:
+            raise ValueError('The demo response delay minimum must be non-negative.')
+        if self.max_seconds < self.min_seconds:
+            raise ValueError(
+                'The demo response delay maximum must be at least the minimum.'
+            )
+
+
+def demo_response_delay_from_environment() -> DemoResponseDelay:
+    """Read the demo response delay from chat-specific environment settings."""
+    try:
+        min_seconds = float(
+            os.getenv(
+                'CHAT_DEMO_RESPONSE_DELAY_MIN_SECONDS',
+                str(DEFAULT_DEMO_RESPONSE_DELAY_MIN_SECONDS),
+            )
+        )
+        max_seconds = float(
+            os.getenv(
+                'CHAT_DEMO_RESPONSE_DELAY_MAX_SECONDS',
+                str(DEFAULT_DEMO_RESPONSE_DELAY_MAX_SECONDS),
+            )
+        )
+    except ValueError as exc:
+        raise ValueError('Demo response delay settings must be numbers.') from exc
+    return DemoResponseDelay(min_seconds=min_seconds, max_seconds=max_seconds)
+
+
 def create_backend() -> ChatBackend:
     api_url = os.getenv('CHAT_API_URL')
-    return HttpChatBackend(api_url.rstrip('/')) if api_url else DemoBackend()
+    if api_url:
+        delay = demo_response_delay_from_environment()
+        return HttpChatBackend(
+            api_url.rstrip('/'),
+            demo_response_delay=(
+                delay if os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm' else None
+            ),
+        )
+    return DemoBackend()
 
 
 class ChatBackend(ABC):
@@ -77,7 +127,7 @@ class DemoBackend(ChatBackend):
         return ConversationResponse(
             session_id=UUID(session_id),
             step_id=FlowStep.WELCOME,
-            message=WELCOME_MESSAGE,
+            message=DEMO_WELCOME_MESSAGE,
             buttons=flow_definition(FlowStep.WELCOME).rendered_buttons(),
             llm=LLMInfo(provider='baguette-llm', model='mini-croissant-1.0'),
         )
@@ -128,9 +178,12 @@ class HttpChatBackend(ChatBackend):
         self,
         api_url: str,
         timeout_seconds: float = DEFAULT_CHAT_API_TIMEOUT_SECONDS,
+        *,
+        demo_response_delay: DemoResponseDelay | None = None,
     ) -> None:
         self.api_url = api_url.rstrip('/')
         self.timeout = httpx.Timeout(timeout_seconds)
+        self._demo_response_delay = demo_response_delay
 
     async def check_ready(self) -> None:
         """Verify that the API and knowledge base are ready."""
@@ -157,7 +210,10 @@ class HttpChatBackend(ChatBackend):
             input_id=input_id,
             text=text,
         )
-        return await self._post('/message', request.model_dump(mode='json'))
+        response = await self._post('/message', request.model_dump(mode='json'))
+        if self._demo_response_delay is not None:
+            await _wait_for_demo_response(self._demo_response_delay)
+        return response
 
     async def _post(
         self, path: str, payload: dict[str, object]
@@ -199,4 +255,16 @@ class HttpChatBackend(ChatBackend):
             raise RuntimeError(CHAT_SERVICE_UNAVAILABLE_ERROR) from exc
 
 
-__all__ = ['ChatBackend', 'DemoBackend', 'HttpChatBackend', 'create_backend']
+async def _wait_for_demo_response(delay: DemoResponseDelay) -> None:
+    """Wait for a randomized demo response delay without blocking the event loop."""
+    await asyncio.sleep(random.uniform(delay.min_seconds, delay.max_seconds))
+
+
+__all__ = [
+    'ChatBackend',
+    'DemoBackend',
+    'DemoResponseDelay',
+    'HttpChatBackend',
+    'create_backend',
+    'demo_response_delay_from_environment',
+]

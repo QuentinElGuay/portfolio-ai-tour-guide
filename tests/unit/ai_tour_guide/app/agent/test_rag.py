@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.app.agent.prompts import build_catalog_system_prompt
 from ai_tour_guide.app.agent.rag.models import (
     CitationValidationResult,
@@ -131,6 +132,24 @@ def test_answer_question_handles_empty_retrieval(
     assert result.contexts == ()
     assert result.sources == ()
     client.answer_question.assert_not_awaited()
+    retrieve_context.assert_called_once()
+
+
+@patch('ai_tour_guide.app.agent.rag.workflow.retrieve_context', return_value=())
+def test_demo_answer_question_returns_a_prepared_answer_without_evidence(
+    retrieve_context: MagicMock,
+) -> None:
+    """Verify that agent changes cannot make the self-contained demo unusable."""
+    result = asyncio.run(
+        answer_question_async('What is kouign-amann?', llm_client=DemoLLMClient())
+    )
+
+    assert result.answer == (
+        'Kouign-amann is a rich, buttery Breton pastry known for its caramelised '
+        'sugar crust.'
+    )
+    assert result.contexts == ()
+    assert result.sources == ()
     retrieve_context.assert_called_once()
 
 

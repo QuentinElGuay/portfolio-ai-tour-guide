@@ -88,7 +88,7 @@ def _chat_message_values(message: ChatMessage) -> dict[str, object]:
         'content': message.content,
         'flow_step': message.flow_step,
         'input_id': message.input_id,
-        'rag_request_id': message.rag_request_id,
+        'request_id': message.request_id,
         'sources': message.sources,
         'trace': message.trace.model_dump(mode='json') if message.trace else None,
         'buttons': [button.model_dump(mode='json') for button in message.buttons],
@@ -134,16 +134,14 @@ async def _simulate(
                     delete(chat_feedback).where(
                         chat_feedback.c.message_id.in_(
                             select(chat_messages.c.message_id).where(
-                                chat_messages.c.rag_request_id.in_(
-                                    simulated_request_ids
-                                )
+                                chat_messages.c.request_id.in_(simulated_request_ids)
                             )
                         )
                     )
                 )
                 connection.execute(
                     delete(chat_messages).where(
-                        chat_messages.c.rag_request_id.in_(simulated_request_ids)
+                        chat_messages.c.request_id.in_(simulated_request_ids)
                     )
                 )
                 connection.execute(
@@ -250,7 +248,7 @@ async def _simulate(
                             session_id=session_id,
                             role=Role.ASSISTANT,
                             content=payload['generated']['answer'],
-                            rag_request_id=result.request_id,
+                            request_id=result.request_id,
                             sources=payload['sources'],
                         )
                         connection.execute(

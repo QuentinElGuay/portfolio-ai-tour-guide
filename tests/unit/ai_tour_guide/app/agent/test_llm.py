@@ -6,7 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import SecretStr
 
-from ai_tour_guide.app.agent.demo_questions import DEFAULT_DEMO_DATASET_PATH
+from ai_tour_guide.app.agent.demo_questions import (
+    DEFAULT_DEMO_DATASET_PATH,
+    DEMO_LIMITATION_MESSAGE,
+)
 from ai_tour_guide.app.agent.llm.clients import (
     GeminiClient,
     GenerationError,
@@ -160,6 +163,7 @@ def test_gemini_client_extracts_search_tool_calls() -> None:
 
 def test_default_llm_client_is_openai_when_openai_is_configured(monkeypatch) -> None:
     """Verify that default llm client is openai when openai is configured."""
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.OPENAI.value)
     monkeypatch.setenv('AGENT_LLM_API_KEY', 'test-token')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'test-model')
 
@@ -186,6 +190,7 @@ def test_gemini_llm_client_is_selected_when_gemini_is_configured() -> None:
 def test_llm_client_requires_api_key() -> None:
     """Verify that llm client requires api key."""
     settings = AgentsSettings(
+        llm_provider=LLMProvider.OPENAI,
         api_key=SecretStr(' '),
         model='test-model',
     )
@@ -267,7 +272,31 @@ def test_demo_client_uses_fallback_for_an_unprepared_question(tmp_path) -> None:
         )
     )
 
-    assert 'demo backend with limited knowledge' in result.answer
+    assert result.answer.startswith(DEMO_LIMITATION_MESSAGE)
+    assert result.citations == ()
+
+
+def test_demo_client_uses_the_shared_notice_without_retrieved_evidence() -> None:
+    """Verify that the no-evidence path preserves the demo disclosure and suggestion."""
+    result = asyncio.run(
+        DemoLLMClient().answer_without_context('Where should I eat crepes?')
+    )
+
+    assert result.answer.startswith(DEMO_LIMITATION_MESSAGE)
+    assert '\n\nTry asking: “' in result.answer
+    assert result.citations == ()
+
+
+def test_demo_client_answers_a_prepared_question_without_retrieved_evidence() -> None:
+    """Verify that demo mode remains useful before the knowledge base is ingested."""
+    result = asyncio.run(
+        DemoLLMClient().answer_without_context('What is kouign-amann?')
+    )
+
+    assert result.answer == (
+        'Kouign-amann is a rich, buttery Breton pastry known for its caramelised '
+        'sugar crust.'
+    )
     assert result.citations == ()
 
 
@@ -299,7 +328,7 @@ def test_demo_client_falls_back_when_prepared_evidence_is_not_retrieved(
         )
     )
 
-    assert 'demo backend with limited knowledge' in result.answer
+    assert result.answer.startswith(DEMO_LIMITATION_MESSAGE)
 
 
 def test_demo_provider_does_not_require_an_api_key(tmp_path) -> None:
@@ -344,7 +373,7 @@ def test_demo_provider_returns_a_friendly_supported_question(tmp_path) -> None:
         )
     )
 
-    assert 'demo backend with limited knowledge of Brittany' in result.answer
+    assert result.answer.startswith(DEMO_LIMITATION_MESSAGE)
     assert 'What can I do in Brittany?' in result.answer
     assert result.citations == ()
 
@@ -412,7 +441,7 @@ def test_demo_provider_suggests_a_close_question_with_did_you_mean(tmp_path) -> 
         )
     )
 
-    assert 'do not have a prepared answer' in result.answer
+    assert result.answer.startswith(DEMO_LIMITATION_MESSAGE)
     assert 'Did you mean: “What can I do in Brittany?”' in result.answer
     assert result.citations == ()
 

@@ -10,10 +10,30 @@ from ai_tour_guide.app.agent.conversation import (
     OuterConversationState,
     build_conversation_graph,
     build_outer_conversation_graph,
+    welcome_message_for_provider,
 )
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
+from ai_tour_guide.app.agent.llm.settings import LLMProvider
 from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGResult
+from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import SearchMode
+
+
+def test_conversation_greeting_matches_the_selected_provider() -> None:
+    """Verify that conversation startup owns the demo disclosure."""
+    assert (
+        welcome_message_for_provider(
+            LLMProvider.BAGUETTE_LLM, knowledge_base_is_empty=True
+        )
+        == DEMO_WELCOME_MESSAGE
+    )
+    assert EMPTY_KNOWLEDGE_BASE_NOTICE in welcome_message_for_provider(
+        LLMProvider.OPENAI, knowledge_base_is_empty=True
+    )
+    assert EMPTY_KNOWLEDGE_BASE_NOTICE not in welcome_message_for_provider(
+        LLMProvider.OPENAI, knowledge_base_is_empty=False
+    )
 
 
 @patch(

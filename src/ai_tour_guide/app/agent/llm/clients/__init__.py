@@ -31,6 +31,15 @@ class LLMClient(Protocol):
 
 AgentLLMClient = LLMClient
 
+
+class NoContextFallbackClient:
+    """Provide a deterministic answer when retrieval returns no evidence."""
+
+    async def answer_without_context(self, question: str) -> GeneratedAnswer:
+        """Return a user-facing fallback for an unsupported question."""
+        raise NotImplementedError
+
+
 from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
 from ai_tour_guide.app.agent.llm.clients.gemini import (
     GeminiClient,
@@ -48,6 +57,7 @@ __all__ = [
     'GeminiClient',
     'GenerationError',
     'LLMClient',
+    'NoContextFallbackClient',
     'OpenAIClient',
     '_parse_answer',
     'create_gemini_client',

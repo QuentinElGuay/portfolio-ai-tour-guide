@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -34,6 +34,7 @@ class ChatHistoryItem(TypedDict):
 
     role: str
     content: object
+    options: NotRequired[list[dict[str, str]]]
 
 
 class ConversationButton(BaseModel):
@@ -142,7 +143,7 @@ class ChatMessage(BaseModel):
     flow_step: str | None = None
     input_id: str | None = None
     message_id: UUID = Field(default_factory=uuid4)
-    rag_request_id: UUID | None = None
+    request_id: UUID | None = None
     sources: list[dict[str, object]] = Field(default_factory=list)
     trace: ConversationTrace | None = None
     buttons: list[ConversationButton] = Field(default_factory=list)

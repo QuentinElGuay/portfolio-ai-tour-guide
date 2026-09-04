@@ -388,7 +388,7 @@ chat_messages = Table(
     Column('content', Text, nullable=False),
     Column('flow_step', Text),
     Column('input_id', Text),
-    Column('rag_request_id', UUID(as_uuid=True)),
+    Column('request_id', UUID(as_uuid=True)),
     Column('sources', JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     Column('trace', JSONB),
     Column('buttons', JSONB, nullable=False, server_default=text("'[]'::jsonb")),

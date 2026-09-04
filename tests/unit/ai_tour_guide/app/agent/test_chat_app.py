@@ -1,19 +1,29 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+import os
+import subprocess
+import sys
+from collections.abc import Callable
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import gradio as gr
+import pytest
 
+from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.chat.app import (
     BACKEND_ERROR_MESSAGE,
     CHAT_CSS,
-    DEMO_WELCOME_MESSAGE,
     EMOTICONS_ENABLED,
     FEEDBACK_ACKNOWLEDGEMENT,
     _italicize_french_expressions,
     _render_response,
+    chat_css,
     create_app,
+    is_demo_mode,
+    main,
     placeholder_request_id,
     select_feedback,
+    start_client_chat,
     submit_feedback,
     update_feedback_values,
 )
@@ -28,6 +38,34 @@ def _like_data(index: object, liked: object) -> gr.LikeData:
     return data
 
 
+def _registered_function(app: gr.Blocks, name: str) -> Callable[..., Any]:
+    """Return a registered Gradio callback whose presence is required by the test."""
+    block_function = next(
+        (function for function in app.fns.values() if function.name == name),
+        None,
+    )
+    assert block_function is not None
+    assert block_function.fn is not None
+    return block_function.fn
+
+
+@patch('ai_tour_guide.app.chat.app.create_app')
+@patch('ai_tour_guide.app.chat.app.create_backend', return_value=DemoBackend())
+def test_main_hides_gradio_footer(
+    create_backend: MagicMock,
+    create_app: MagicMock,
+) -> None:
+    """Hide Gradio footer controls that are irrelevant to this app."""
+    app = MagicMock()
+    create_app.return_value = app
+
+    main()
+
+    create_backend.assert_called_once_with()
+    app.launch.assert_called_once()
+    assert app.launch.call_args.kwargs['footer_links'] == []
+
+
 def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     """Verify that create app configures chatbot feedback and like event."""
     app = create_app(DemoBackend())
@@ -38,19 +76,21 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
         if isinstance(component, gr.Chatbot)
     )
 
-    assert chatbot.elem_id == 'rag-chat'
+    assert chatbot.elem_id == 'chat'
     assert app.config['title'] == 'Bon Voyage'
     llm_labels = [
         component
         for component in app.blocks.values()
-        if isinstance(component, gr.Markdown)
-        and 'baguette-llm - mini-croissant-1.0' in str(component.value)
+        if isinstance(component, gr.Markdown) and component.elem_classes == ['llm-info']
     ]
     assert len(llm_labels) == 1
+    assert llm_labels[0].value == ''
     assert chatbot.height == 'calc(100vh - 250px)'
-    assert chatbot.value[0]['role'] == 'assistant'
-    assert chatbot.value[0]['content'][0]['text'] == DEMO_WELCOME_MESSAGE
-    assert len(chatbot.value) == 1
+    assert chatbot.value == []
+    assert chatbot.placeholder == (
+        '<h2>Starting your conversation with Petit Guide…</h2>'
+        '<p>Please wait a moment.</p>'
+    )
     avatar_images = chatbot.avatar_images
     assert avatar_images is not None
     user_avatar = avatar_images[0]
@@ -60,20 +100,26 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
     assert user_avatar['path'].endswith('/user.png')
     assert bot_avatar['path'].endswith('/bot.png')
     assert chatbot.feedback_options == ('Like', 'Dislike')
+    textbox = next(
+        component
+        for component in app.blocks.values()
+        if isinstance(component, gr.Textbox)
+    )
+    assert list(app.blocks).index(chatbot._id) < list(app.blocks).index(textbox._id)
     assert '.message-buttons-left button[aria-label="Liked"]' in CHAT_CSS
     assert '.message-buttons-left button[aria-label="Disliked"]' in CHAT_CSS
-    assert '#rag-chat .avatar-container' in CHAT_CSS
+    assert '#chat .avatar-container' in CHAT_CSS
     assert 'height: 80px' in CHAT_CSS
-    assert '#rag-chat .message.bot' in CHAT_CSS
+    assert '#chat .message.bot' in CHAT_CSS
     assert 'margin-left: 0.5rem !important' in CHAT_CSS
     assert 'padding: 0.25rem 0.5rem !important' in CHAT_CSS
     assert 'max-height: none' in CHAT_CSS
-    assert '#rag-chat .panel-wrap' in CHAT_CSS
+    assert '#chat .panel-wrap' in CHAT_CSS
     assert 'overflow-y: visible' in CHAT_CSS
-    assert '#rag-chat .bubble-wrap' in CHAT_CSS
+    assert '#chat .bubble-wrap' in CHAT_CSS
     assert 'height: 100%' in CHAT_CSS
-    assert '#rag-chat [role="log"]' in CHAT_CSS
-    assert 'content: "Petit Guide"' in CHAT_CSS
+    assert '#chat [role="log"]' in CHAT_CSS
+    assert 'content: "__assistant_label__"' in CHAT_CSS
     assert 'content: "You"' in CHAT_CSS
     assert FEEDBACK_ACKNOWLEDGEMENT == 'Thanks for your feedback!'
     dependencies = app.config.get('dependencies', [])
@@ -84,32 +130,101 @@ def test_create_app_configures_chatbot_feedback_and_like_event() -> None:
         for dependency in dependencies
     )
     assert any(
-        dependency['api_name'] == '_submit_fn'
-        and dependency['show_progress'] == 'minimal'
+        dependency['api_name'] == 'respond' and dependency['show_progress'] == 'minimal'
+        for dependency in dependencies
+    )
+    assert any(
+        dependency['api_name'] == 'initialize_client'
+        and dependency['show_progress'] == 'hidden'
+        and len(dependency['outputs']) == 3
         for dependency in dependencies
     )
 
 
-def test_create_app_explains_demo_limitations() -> None:
-    """Verify that demo mode is disclosed in the initial welcome message."""
-    app = create_app(DemoBackend())
-    chatbot = next(
-        component
-        for component in app.blocks.values()
-        if isinstance(component, gr.Chatbot)
+def test_start_client_chat_creates_an_independent_demo_session() -> None:
+    """Verify that every Gradio client receives its own backend session."""
+    backend = DemoBackend()
+    first_state, first_history, first_llm_label = asyncio.run(
+        start_client_chat(backend)
+    )
+    second_state, second_history, second_llm_label = asyncio.run(
+        start_client_chat(backend)
     )
 
-    welcome = chatbot.value[0]['content'][0]['text']
-    assert welcome == DEMO_WELCOME_MESSAGE
-    assert 'Bon Voyage' in welcome
-    assert 'Brittany questions' in welcome
-    assert chatbot.value[0]['options'] == [
-        {'value': 'Tell me about you', 'label': 'Tell me about you'},
+    assert first_state['session_id'] != second_state['session_id']
+    assert first_state['step_id'] == second_state['step_id'] == 'welcome'
+    assert first_history[0]['content'] == DEMO_WELCOME_MESSAGE
+    assert first_history[0].get('options') == [
+        {'label': 'Tell me about you', 'value': 'Tell me about you'},
         {
-            'value': 'What destinations are covered?',
             'label': 'What destinations are covered?',
+            'value': 'What destinations are covered?',
         },
     ]
+    assert second_history == first_history
+    assert (
+        first_llm_label
+        == second_llm_label
+        == ('Model: `baguette-llm - mini-croissant-1.0`')
+    )
+
+
+def test_first_option_keeps_the_backend_welcome_in_history() -> None:
+    """Keep the welcome and render the user option before the backend response."""
+    app = create_app(DemoBackend())
+    initialize_client = _registered_function(app, 'initialize_client')
+    respond = _registered_function(app, 'respond')
+    add_user_message = _registered_function(app, 'add_user_message')
+    request_ids, history, _ = asyncio.run(initialize_client())
+
+    _, history_with_user, pending_message = add_user_message(
+        'Tell me about you', history
+    )
+    _, updated_history, _ = asyncio.run(
+        respond(pending_message, history_with_user, request_ids)
+    )
+
+    assert history_with_user[0]['content'] == DEMO_WELCOME_MESSAGE
+    assert history_with_user[1] == {
+        'role': 'user',
+        'content': 'Tell me about you',
+    }
+    assert updated_history[:2] == history_with_user
+    assert 'Petit Guide' in str(updated_history[2]['content'])
+
+
+def test_chat_css_uses_a_demo_label_only_for_the_demo_backend() -> None:
+    """Verify that demo mode is shown in the assistant label."""
+    assert 'content: "Petit Guide (demo mode)"' in chat_css(demo_mode=True)
+    assert 'content: "Petit Guide"' in chat_css(demo_mode=False)
+
+
+def test_is_demo_mode_uses_the_configured_llm_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'baguette-llm')
+    assert is_demo_mode() is True
+
+    monkeypatch.setenv('AGENT_LLM_PROVIDER', 'openai')
+    assert is_demo_mode() is False
+
+
+def test_chat_app_import_does_not_require_embedding_settings(tmp_path) -> None:
+    """Keep the lightweight chat process independent of RAG configuration."""
+    environment = dict(os.environ)
+    environment.pop('EMBEDDING_DIMENSIONS', None)
+    environment.pop('EMBEDDING_MODEL_NAME', None)
+
+    result = subprocess.run(
+        [sys.executable, '-c', 'import ai_tour_guide.app.chat.app'],
+        check=False,
+        capture_output=True,
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_placeholder_request_ids_are_unique_per_assistant_message() -> None:
