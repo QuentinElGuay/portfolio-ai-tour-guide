@@ -138,19 +138,30 @@ local installation.
 _This is a quick start aiming for an immediate setup. For the full tutorial, see the
 [project tutorial](docs/README.md)._
 
-### Run the app
+### App configuration
 
 With Docker, Docker Compose, and GNU Make installed, clone the project and change into
-its directory, or open it in a GitHub Codespace. Then run:
+its directory, or open it in a GitHub Codespace.
+
+> [!WARNING]
+> As of September 8, 2026, we observed a possible Docker networking problem in GitHub
+> Codespaces that prevented database initialization or document ingestion. The same
+> commands worked locally, but recreating a Codespace did not reliably resolve the
+> issue.
+
+Start by creating a local environment file and choosing the LLM provider for the
+application. First, create a `.env` file from the provided `.env.template` file:
 
 ```bash
 cp .env.template .env
 ```
 
-Before running the next commands, replace the LLM settings in your `.env` file. Accepted
-`AGENT_LLM_PROVIDER` values are `openai`, `gemini`, and `baguette-llm`. The built-in
-`baguette-llm` is a deterministic demo provider, not a real LLM, and does not require an
-API key.
+Replace the LLM settings in your `.env` file. Accepted `AGENT_LLM_PROVIDER` values are
+`openai`, `gemini`, and `baguette-llm`.
+
+> [!NOTE]
+> The built-in `baguette-llm` is a deterministic demo provider, not a real LLM, and does
+> not require an API key.
 
 OpenAI example:
 
@@ -160,34 +171,36 @@ AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-The next commands may take a few minutes on the first execution to download Docker
-images and the embedding model.
+### Knowledge-base ingestion
 
-Initialize the database schema, then ingest the knowledge base:
+With the application configured, prepare the knowledge base before starting the
+services.
+
+Initialize the database schema, then ingest the knowledge base. These commands may take
+a few minutes on the first execution to download Docker images and the embedding model:
 
 ```bash
 make db-init
 make ingest
 ```
 
-`make ingest` is the fast command-line shortcut to ingest data into your knowledge base.
-In a production environment, the recommended method would be to use **Airflow** to
-orchestrate the ingestion workflow. The use of Airflow is detailed in the
-[tutorial](docs/README.md).
+> [!NOTE]
+> `make ingest` is the fast command-line shortcut to ingest data into your knowledge
+> base. For the recommended orchestrated workflow, use Airflow.
+>
+> The use of Airflow is detailed in the [tutorial](docs/README.md).
 
-Finally run:
+### App execution
+
+Once the knowledge base is ready, start the agent API and chat interface:
 
 ```bash
 make app
 ```
 
 `make app` starts the agent service and the chat interface to communicate with it. Once
-they are running, you can access:
-
-- the chat app at [http://localhost:7860](http://localhost:7860);
-- the chat API at [http://localhost:8000](http://localhost:8000);
-- the interactive API documentation at
-  [http://localhost:8000/docs](http://localhost:8000/docs).
+they are running, you can access the chat app at
+[http://localhost:7860](http://localhost:7860)
 
 ## Common commands
 
@@ -214,15 +227,16 @@ detail.
 ## Airflow ingestion
 
 Airflow is the recommended ingestion workflow for orchestrating document processing.
-Follow the [tutorial](docs/README.md#ingestion-with-airflow) for setup, DAG triggering,
-retries, and re-ingestion options. For a faster local setup, use `make db-init` followed
-by `make ingest` as described in the [quick start](#quick-start).
+Follow the [tutorial](docs/README.md#231-ingest-guides-with-airflow) for setup, DAG
+triggering, retries, and re-ingestion options. For a faster local setup, use
+`make db-init` followed by `make ingest` as described in the
+[quick start](#quick-start).
 
 ## Evaluation
 
 The project evaluates retrieval and the RAG pipeline with a 105-case golden dataset and
 stores evaluation data in an isolated `evaluation` schema. The available search, RAG,
-and judge workflows are documented in the [tutorial](docs/README.md#evaluation), with
+and judge workflows are documented in the [tutorial](docs/README.md#6-evaluation), with
 the latest reports retained in the evaluation notebooks.
 
 | Evaluation | Run                    | Purpose                                                                          |
@@ -243,6 +257,8 @@ the latest reports retained in the evaluation notebooks.
   its operational cautions.
 - [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
   and monitoring.
+- [Troubleshooting](docs/README.md#5-troubleshooting): common setup and Docker fixes
+  issues.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
@@ -272,8 +288,9 @@ A complete submission should demonstrate the following features:
   - [`source_files.json`](source_files.json) identifies the public source guides, and
     the [quick start](#quick-start) documents the Docker-based local workflow.
 - ✅ Automated ingestion from source documents into a searchable knowledge base.
-  - The ingestion CLI and [Airflow workflow](docs/README.md#ingestion-with-airflow)
-    download, parse, chunk, embed, and store the guides in PostgreSQL with pgvector.
+  - The ingestion CLI and
+    [Airflow workflow](docs/README.md#231-ingest-guides-with-airflow) download, parse,
+    chunk, embed, and store the guides in PostgreSQL with pgvector.
 - ✅ A RAG flow that retrieves relevant context from the knowledge base before an LLM
   generates an answer.
   - The [agent guide](src/ai_tour_guide/app/agent/README.md) documents the retrieval and
@@ -293,8 +310,8 @@ A complete submission should demonstrate the following features:
     and FastAPI endpoints.
 - ✅ Monitoring through user feedback and dashboards that make application behaviour
   visible.
-  - The chat records feedback, while the [tutorial](docs/README.md#monitoring) documents
-    the Metabase dashboards for usage, quality, latency, and cost.
+  - The chat records feedback, while the [tutorial](docs/README.md#7-monitoring)
+    documents the Metabase dashboards for usage, quality, latency, and cost.
 - ✅ Containerised services, pinned dependency versions, and clear setup instructions for
   a reproducible local run.
   - Docker Compose defines the application services, `pyproject.toml` pins dependencies,

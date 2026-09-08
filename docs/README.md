@@ -7,18 +7,50 @@ available project command.
 
 ## Table of contents
 
-- [Progressive setup](#progressive-setup)
-  - [1. Deterministic demo](#1-deterministic-demo)
-  - [2. Search-engine mode](#2-search-engine-mode)
-  - [3. LLM agent mode](#3-llm-agent-mode)
-- [Ingestion with Airflow](#ingestion-with-airflow)
-- [Ingestion with the command line](#ingestion-with-the-command-line)
-- [Chat app](#chat-app)
-- [Evaluation](#evaluation)
-- [Monitoring](#monitoring)
-  - [Traffic simulation](#traffic-simulation)
+- [1. Prerequisites](#1-prerequisites)
+- [2. Progressive setup](#2-progressive-setup)
+  - [2.1 Start from a clean knowledge base](#21-start-from-a-clean-knowledge-base)
+  - [2.2 Deterministic demo](#22-deterministic-demo)
+  - [2.3 Search-engine mode](#23-search-engine-mode)
+    - [2.3.1 Ingest guides with Airflow](#231-ingest-guides-with-airflow)
+  - [2.4 LLM agent mode](#24-llm-agent-mode)
+- [3. Ingestion with the command line](#3-ingestion-with-the-command-line)
+- [4. Chat app](#4-chat-app)
+- [6. Evaluation](#6-evaluation)
+- [7. Monitoring](#7-monitoring)
+  - [7.1 Traffic simulation](#71-traffic-simulation)
 
-## Progressive setup
+## 1. Prerequisites
+
+For the Docker-based tutorial, install:
+
+- [Git](https://git-scm.com/downloads)
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose
+- [GNU Make](https://www.gnu.org/software/make/)
+
+To run Python commands directly on your host, also install Python 3.14 or newer and
+[uv](https://docs.astral.sh/uv/).
+
+> [!NOTE]
+> GitHub Codespaces already provides the development environment, so no local
+> installation is required there.
+
+> [!WARNING]
+> As of September 8, 2026, we observed a possible Docker networking problem in GitHub
+> Codespaces that prevented database initialization or document ingestion. The same
+> commands worked locally, but recreating a Codespace did not reliably resolve the
+> issue.
+
+Verify the required tools before continuing:
+
+```bash
+git --version
+docker --version
+docker compose version
+make --version
+```
+
+## 2. Progressive setup
 
 Create a local environment file from the template:
 
@@ -26,12 +58,36 @@ Create a local environment file from the template:
 cp .env.template .env
 ```
 
-The template enables both the LLM and retrieval by default. The steps below deliberately
-switch between configurations so you can see how each layer changes the experience.
+The template enables both the LLM and retrieval by default.
 
-### 1. Deterministic demo
+```dotenv
+APP_ENABLE_LLM=1
+APP_ENABLE_RETRIEVAL=1
+```
 
-Set both capability flags to `0` in `.env`:
+The steps below deliberately switch between configurations so you can see how each layer
+changes the experience.
+
+### 2.1 Start from a clean knowledge base
+
+If you already followed the quick start, stop the running services and reset the default
+application schema before starting the tutorial from the beginning:
+
+```bash
+make stop
+make db-reset
+```
+
+> [!WARNING]
+> `make db-reset` permanently deletes the application documents, chunks, and indexes in
+> the selected schema. It resets the default `public` schema but preserves the separate
+> Metabase database. Do not run it if you need to keep your current knowledge base.
+
+### 2.2 Deterministic demo
+
+This mode starts the limited no-cost demo chat that works without an API key or ingested
+documents. It answers a prepared set of questions deterministically. Set both capability
+flags to `0` in `.env`:
 
 ```dotenv
 APP_ENABLE_LLM=0
@@ -44,69 +100,36 @@ Start the application:
 make app
 ```
 
-This starts the no-cost demo chat without an API key or ingested documents. It answers a
-prepared set of questions deterministically.
+Try a question such as:
 
-### 2. Search-engine mode
+```text
+What should I visit in Brittany?
+```
 
-Enable retrieval while keeping the LLM disabled:
+The response comes from the prepared demo dataset, without document retrieval or an LLM.
+
+### 2.3 Search-engine mode
+
+This mode enables retrieval from a `knowledge base` while keeping the LLM disabled.
+Before changing modes, stop the running app with `make stop`.
+
+```bash
+make stop
+```
+
+Set `APP_ENABLE_RETRIEVAL` to `1` while keeping `APP_ENABLE_LLM` to `0` in the `.env`
+file:
 
 ```dotenv
 APP_ENABLE_LLM=0
 APP_ENABLE_RETRIEVAL=1
 ```
 
-Ingest the guides through Airflow by following the
-[Airflow ingestion](#ingestion-with-airflow) steps below, then restart the app:
-
-```bash
-make app
-```
-
-The application now behaves like a search engine: it retrieves relevant passages and
-formats them directly, without generating an answer with an LLM.
-
-### 3. LLM agent mode
-
-Configure a supported provider and API key in `.env`, then enable both capabilities:
-
-```dotenv
-AGENT_LLM_PROVIDER=openai
-AGENT_LLM_API_KEY=your-api-key
-AGENT_LLM_MODEL=gpt-4.1-mini
-APP_ENABLE_LLM=1
-APP_ENABLE_RETRIEVAL=1
-```
-
-Restart the app with `make app`. The agent uses retrieved passages to ground its LLM
-answers and returns validated source pages.
-
-Once it is running, you can access:
-
-- the chat app at [http://localhost:7860](http://localhost:7860);
-- the chat API at [http://localhost:8000](http://localhost:8000);
-- the interactive API documentation at
-  [http://localhost:8000/docs](http://localhost:8000/docs).
-
-Supported live LLM providers and recommended models:
-
-- ChatGPT (OpenAI): `gpt-4.1-mini`
-- Gemini (Google): `gemini-3.5-flash-lite`
-
-The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
-contains development defaults for these values; replace them before sharing the services
-or using them in production.
-
-## Ingestion with Airflow
+#### 2.3.1 Ingest guides with Airflow
 
 > [!WARNING]
 > Airflow 3 requires a 4-core machine type in GitHub Codespaces. On smaller machines,
-> use the command-line workflow instead:
->
-> ```bash
-> make db-init
-> make ingest
-> ```
+> use the [command-line workflow](#ingestion-with-the-command-line) instead.
 
 Airflow is the recommended ingestion workflow because it makes the source-file inputs,
 per-document tasks, retries, and re-ingestion controls visible and reproducible. Start
@@ -153,11 +176,66 @@ documents. The first run may also need to download the embedding model.
 
 ![All the tasks are marked as success](images/tutorial/03_airflow_dag_run.png "Successful DAG")
 
-## Ingestion with the command line
+The guides are now indexed in the same knowledge base used by the application. Start the
+search-engine mode:
+
+```bash
+make app
+```
+
+The application now behaves like a search engine: it retrieves relevant passages and
+formats them directly, without generating an answer with an LLM. This is similar in
+spirit to an [Alexa skill](https://developer.amazon.com/en-US/alexa): the assistant
+recognizes a supported request, invokes a focused capability, and formats the result
+instead of generating an unconstrained answer. For example, it could handle a request to
+play a specific song or artist. Here, the focused capability is retrieving travel
+information from the knowledge base. Try a question such as:
+
+```text
+What should I see in Occitanie?
+```
+
+### 2.4 LLM agent mode
+
+Configure a supported provider and API key in `.env`, then enable both capabilities:
+
+```dotenv
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
+APP_ENABLE_LLM=1
+APP_ENABLE_RETRIEVAL=1
+```
+
+Stop and restart the app with `make stop` followed by `make app` so the new provider and
+capability settings are loaded. The agent uses retrieved passages to ground its LLM
+answers and returns validated source pages. Try a question such as:
+
+```text
+What are the main places to visit in Normandy?
+```
+
+Once it is running, you can access:
+
+- the chat app at [http://localhost:7860](http://localhost:7860);
+- the chat API at [http://localhost:8000](http://localhost:8000);
+- the interactive API documentation at
+  [http://localhost:8000/docs](http://localhost:8000/docs).
+
+Supported live LLM providers and recommended models:
+
+- ChatGPT (OpenAI): `gpt-4.1-mini`
+- Gemini (Google): `gemini-3.5-flash-lite`
+
+The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
+contains development defaults for these values; replace them before sharing the services
+or using them in production.
+
+## 3. Ingestion with the command line
 
 `make ingest` is the fast setup shortcut when you do not need Airflow's orchestration or
-web interface. It initializes the application schema and then ingests every document
-definition in `source_files.json`:
+web interface. Run these commands to initialize the application schema and then ingest
+every document definition in `source_files.json`:
 
 ```bash
 make db-init
@@ -189,7 +267,7 @@ The direct CLI also supports `--skip-existing` and `--force`; these options are 
 exclusive. See the [ingestion guide](../src/ai_tour_guide/ingestion/README.md) for the
 full command reference and document-definition format.
 
-## Chat app
+## 4. Chat app
 
 After ingestion, start the Bon Voyage chat app:
 
@@ -225,7 +303,7 @@ Use the Like and Dislike controls to record feedback about an answer.
 
 ![Positive feedback using the Like button](images/tutorial/06_chat_app_feedback.png "Positive feedback")
 
-## Evaluation
+## 6. Evaluation
 
 The evaluation workflow measures retrieval and answer quality against the repository's
 golden dataset. It loads the evaluation corpus into a separate `evaluation` schema, so
@@ -258,7 +336,7 @@ Evaluation is intended for comparing the current pipeline and configuration, not
 populating the production knowledge base. The latest reports and baseline results are
 described in the [project README](../README.md#evaluation).
 
-## Monitoring
+## 7. Monitoring
 
 The project includes a Metabase dashboard for exploring persisted RAG requests, answer
 feedback, quality metrics, and model usage costs.
@@ -299,7 +377,7 @@ overview of the `Search`, `RAG`, and `LLM Judge` evaluations.
 
 ![Evaluation dashboard with search-related charts](images/tutorial/08_dashboard_evaluation.png "Search Evaluation dashboard.")
 
-### Traffic simulation
+### 7.1 Traffic simulation
 
 To populate the dashboards with example operational traffic, run:
 
