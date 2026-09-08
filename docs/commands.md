@@ -35,8 +35,10 @@ starting the app.
 
 ### `make ask QUESTION='...'`
 
-Answer one question in the terminal with the app RAG pipeline. The app container is
-created for the request and removed afterwards.
+Answer one question in the terminal using the dynamically selected application mode. The
+app container is created for the request and removed afterwards. The same capability
+flags used by the API determine whether this uses LLM + RAG, LLM conversation,
+deterministic retrieval, or prepared questions.
 
 ```bash
 make ask QUESTION='What are the main places to visit in Brittany?'
@@ -304,24 +306,26 @@ containers, and volumes. This deletes local PostgreSQL, Airflow, and Metabase da
 
 ## Shared options
 
-| Option             | Default                          | Used by                               | Meaning                                                                       |
-| ------------------ | -------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `SCHEMA`           | `public`                         | Database and export commands          | Application PostgreSQL schema.                                                |
-| `K`                | `5`                              | Search, chat, and evaluation          | Number of retrieved or ranked chunks.                                         |
-| `DEBUG`            | `0`                              | Docker Compose, ingestion, dashboard  | Enables Compose diagnostics or retains ingestion artifacts.                   |
-| `FORCE`            | `0`                              | Ingestion, dashboard restore          | Replaces existing documents or overwrites Metabase, depending on the command. |
-| `QUESTION`         | Empty                            | `ask`, `text_search`, `vector_search` | Required question for one-off answer or search commands.                      |
-| `SOURCE_FILES`     | `source_files.json`              | `ingest`                              | Input document-definition JSON file.                                          |
-| `ANNOTATOR_ARGS`   | Empty                            | `annotate-dataset`                    | Extra options passed to the dataset annotator.                                |
-| `SIMULATE_ARGS`    | Empty                            | `simulate-rag`                        | Extra options passed to the traffic simulator.                                |
-| `VERBOSE`          | `0`                              | `ask`                                 | Prints the serialized RAG trace when set to `1`.                              |
-| `CORPUS_ROOT`      | `fixtures/corpus`                | Corpus and evaluation commands        | Corpus JSONL directory.                                                       |
-| `EVALUATION`       | `all`                            | `evaluate`                            | Selects `search`, `rag`, `judge`, or `all` evaluation behavior.               |
-| `JUDGE_PROVIDER`   | `openai`                         | Evaluation judge                      | Provider used for LLM-judge scoring.                                          |
-| `EXPORT_DIR`       | `tmp`                            | `export-csv`                          | CSV output directory.                                                         |
-| `CSV_LIMIT`        | `1000`                           | `export-csv`                          | Maximum rows per exported table.                                              |
-| `DASHBOARD_BACKUP` | `fixtures/metabase/metabase.sql` | Dashboard backup commands             | Metabase database-backup path.                                                |
-| `METABASE_DB_NAME` | `metabase`                       | Dashboard backup commands             | Metabase application database name.                                           |
+| Option                 | Default                          | Used by                               | Meaning                                                                       |
+| ---------------------- | -------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `SCHEMA`               | `public`                         | Database and export commands          | Application PostgreSQL schema.                                                |
+| `K`                    | `5`                              | Search, chat, and evaluation          | Number of retrieved or ranked chunks.                                         |
+| `DEBUG`                | `0`                              | Docker Compose, ingestion, dashboard  | Enables Compose diagnostics or retains ingestion artifacts.                   |
+| `FORCE`                | `0`                              | Ingestion, dashboard restore          | Replaces existing documents or overwrites Metabase, depending on the command. |
+| `QUESTION`             | Empty                            | `ask`, `text_search`, `vector_search` | Required question for one-off answer or search commands.                      |
+| `APP_ENABLE_LLM`       | `1`                              | Application and chat                  | Allows LLM execution; `0` downgrades to deterministic execution.              |
+| `APP_ENABLE_RETRIEVAL` | `1`                              | Application and chat                  | Allows RAG/retrieval; `0` downgrades to conversational or prepared mode.      |
+| `SOURCE_FILES`         | `source_files.json`              | `ingest`                              | Input document-definition JSON file.                                          |
+| `ANNOTATOR_ARGS`       | Empty                            | `annotate-dataset`                    | Extra options passed to the dataset annotator.                                |
+| `SIMULATE_ARGS`        | Empty                            | `simulate-rag`                        | Extra options passed to the traffic simulator.                                |
+| `VERBOSE`              | `0`                              | `ask`                                 | Prints the serialized RAG trace when set to `1`.                              |
+| `CORPUS_ROOT`          | `fixtures/corpus`                | Corpus and evaluation commands        | Corpus JSONL directory.                                                       |
+| `EVALUATION`           | `all`                            | `evaluate`                            | Selects `search`, `rag`, `judge`, or `all` evaluation behavior.               |
+| `JUDGE_PROVIDER`       | `openai`                         | Evaluation judge                      | Provider used for LLM-judge scoring.                                          |
+| `EXPORT_DIR`           | `tmp`                            | `export-csv`                          | CSV output directory.                                                         |
+| `CSV_LIMIT`            | `1000`                           | `export-csv`                          | Maximum rows per exported table.                                              |
+| `DASHBOARD_BACKUP`     | `fixtures/metabase/metabase.sql` | Dashboard backup commands             | Metabase database-backup path.                                                |
+| `METABASE_DB_NAME`     | `metabase`                       | Dashboard backup commands             | Metabase application database name.                                           |
 
 Most options are passed as `NAME=value`, for example:
 

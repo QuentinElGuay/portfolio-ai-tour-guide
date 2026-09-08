@@ -21,14 +21,14 @@ Return to the [project overview](../../../README.md).
 1. The client starts a backend-owned session through `POST /chat/start`.
 2. `ConversationGraph` checkpoints the session and validates each `input_id` against the
    current public `step_id`.
-3. Free-text turns use `DeterministicTravelAgent` for prepared demo answers or the live
-   RAG workflow for source-grounded answers; guided actions are resolved
-   deterministically by the outer conversation flow.
-4. The turn-level workflow selects an approved retrieval action, searches the knowledge
-   base, evaluates evidence, and may reformulate once before refusing.
-5. The configured `LLMClient` generates an answer and document/page citations.
-6. The agent validates citations against retrieved provenance, then returns only
-   validated source references and safe operational trace metadata to clients.
+3. Free-text turns use the dynamically selected deterministic or LLM agent; guided
+   actions are resolved deterministically by the outer conversation flow.
+4. When retrieval is enabled, the shared retrieval tool searches the knowledge base and
+   classifies evidence quality.
+5. The LLM workflow generates only from valuable retrieved context; low-confidence
+   retrieval returns a clear refusal. Deterministic retrieval displays formatted results
+   directly, including low-confidence results.
+6. The API and CLI return validated sources plus structured retrieval evidence.
 
 Supported live LLM providers and recommended models:
 
@@ -40,8 +40,8 @@ deterministic Brittany demo; it is not a general-purpose LLM. It retains its
 deterministic matching behavior and does not use the LangGraph workflow.
 
 The `baguette-llm` provider does not require an API key. OpenAI and Gemini require an
-API key; without one, the service raises a configuration error before querying the
-knowledge base.
+API key. If LLM execution is unavailable, the application automatically downgrades to
+deterministic execution.
 
 ## Run the services
 
@@ -52,23 +52,28 @@ the application:
 make db-init
 ```
 
-Ingestion is optional. With an empty knowledge base, the guided chat remains available,
-while travel questions return a clear no-sources response. Run `make ingest` or
-`make load-corpus` to enable source-grounded travel answers.
+Ingestion is optional. With an empty knowledge base, deterministic execution uses
+prepared questions and LLM execution remains limited to conversational or meta answers.
+Run `make ingest` or `make load-corpus` to enable source-grounded travel answers.
 
-The template defaults to the no-cost `baguette-llm` provider with the
-`mini-croissant-1.0` model. It uses only prepared Brittany questions, so it does not
-need an indexed knowledge base or embedding settings. It suggests a supported question
-when it cannot answer, accepts modest spelling or punctuation variations, and returns a
-targeted `Did you mean...?` suggestion for somewhat similar questions.
+The template enables both capabilities by default. Without a usable LLM API key, the
+application automatically falls back to deterministic retrieval and then prepared
+questions when the knowledge base is empty or unavailable.
 
-To use live answer generation with ChatGPT, switch to OpenAI and add your API key:
+To use live answer generation with ChatGPT, switch to OpenAI and add your API key. The
+two capability flags control execution dynamically:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
 AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
+APP_ENABLE_LLM=1
+APP_ENABLE_RETRIEVAL=1
 ```
+
+Set `APP_ENABLE_LLM=0` to force deterministic execution. Set `APP_ENABLE_RETRIEVAL=0` to
+prevent retrieval and limit an enabled LLM to conversation; with LLM disabled as well,
+the application uses prepared questions.
 
 To use Google Gemini, set `AGENT_LLM_PROVIDER=gemini`, add your API key, and use
 `AGENT_LLM_MODEL=gemini-3.5-flash-lite`.
@@ -185,14 +190,16 @@ make ingest
 
 ## Configuration
 
-| Variable             | Purpose                                | Template value                |
-| -------------------- | -------------------------------------- | ----------------------------- |
-| `AGENT_LLM_PROVIDER` | LLM provider for answer generation     | `baguette-llm`                |
-| `AGENT_LLM_API_KEY`  | Required for OpenAI or Gemini          | Not required for Baguette LLM |
-| `AGENT_LLM_MODEL`    | LLM model identifier                   | `mini-croissant-1.0`          |
-| `APP_PORT`           | Host port for the agent API            | `8000`                        |
-| `DB_*`               | Database connection used for retrieval | See `.env.template`           |
-| `EMBEDDING_*`        | Query embedding configuration          | See `.env.template`           |
+| Variable               | Purpose                                | Template value      |
+| ---------------------- | -------------------------------------- | ------------------- |
+| `AGENT_LLM_PROVIDER`   | LLM provider for answer generation     | `openai`            |
+| `AGENT_LLM_API_KEY`    | Required when LLM execution is enabled | Empty               |
+| `AGENT_LLM_MODEL`      | LLM model identifier                   | See `.env.template` |
+| `APP_ENABLE_LLM`       | Allow LLM execution                    | `1`                 |
+| `APP_ENABLE_RETRIEVAL` | Allow RAG/retrieval                    | `1`                 |
+| `APP_PORT`             | Host port for the agent API            | `8000`              |
+| `DB_*`                 | Database connection used for retrieval | See `.env.template` |
+| `EMBEDDING_*`          | Query embedding configuration          | See `.env.template` |
 
 `DB_SCHEMA` selects the PostgreSQL schema used for retrieval. It defaults to `public`;
 use the same value for schema initialization, ingestion, and the agent so RAG reads the

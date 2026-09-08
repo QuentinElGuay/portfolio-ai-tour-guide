@@ -1,6 +1,6 @@
 """Session-scoped conversation orchestration around the RAG agent."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Annotated, Literal, NotRequired, TypedDict
 from uuid import UUID, uuid4
 
@@ -94,6 +94,7 @@ def build_outer_conversation_graph(
         *,
         request_id: UUID | None = None,
         sources: list[dict[str, object]] | None = None,
+        evidence: list[dict[str, object]] | None = None,
         trace: ConversationTrace | None = None,
     ) -> dict[str, object]:
         return {
@@ -107,6 +108,7 @@ def build_outer_conversation_graph(
             ],
             'request_id': str(request_id) if request_id is not None else None,
             'sources': sources or [],
+            'evidence': evidence or [],
             'trace': trace.model_dump(mode='json') if trace is not None else None,
         }
 
@@ -171,6 +173,7 @@ def build_outer_conversation_graph(
         *,
         request_id: UUID | None = None,
         sources: list[dict[str, object]] | None = None,
+        evidence: list[dict[str, object]] | None = None,
         trace: ConversationTrace | None = None,
     ) -> dict[str, object]:
         request = request_for(state)
@@ -190,6 +193,7 @@ def build_outer_conversation_graph(
                 message,
                 request_id=request_id,
                 sources=sources,
+                evidence=evidence,
                 trace=trace,
             ),
         }
@@ -222,11 +226,18 @@ def build_outer_conversation_graph(
         result = await answer_turn(request.text or '', str(request.session_id), current)
         if on_result is not None:
             on_result(result)
+        raw_evidence = result.metadata.get('evidence', ())
+        evidence = (
+            [dict(item) for item in raw_evidence if isinstance(item, Mapping)]
+            if isinstance(raw_evidence, list | tuple)
+            else []
+        )
         return completed_response(
             state,
             result.answer,
             request_id=result.request_id,
             sources=[dict(source) for source in result.sources],
+            evidence=evidence,
             trace=trace_for(result),
         )
 

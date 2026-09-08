@@ -29,7 +29,10 @@ async def test_llm_travel_agent_adapts_the_existing_rag_pipeline(
         retrieval_metadata={'tool_queries': ['Brittany']},
     )
 
-    result = await LLMTravelAgent(MagicMock()).answer(
+    knowledge_base_available = MagicMock(return_value=True)
+    result = await LLMTravelAgent(
+        MagicMock(), knowledge_base_available=knowledge_base_available
+    ).answer(
         'What should I visit?',
         TravelTurnContext(session_id='session', flow_step=FlowStep.MAIN_MENU),
     )
@@ -38,3 +41,6 @@ async def test_llm_travel_agent_adapts_the_existing_rag_pipeline(
     assert result.status is TravelAgentStatus.REFUSED
     assert result.trace.tool_inputs == ('Brittany',)
     answer_question_async.assert_awaited_once()
+    call = answer_question_async.await_args
+    assert call is not None
+    assert call.kwargs['knowledge_base_available'] is knowledge_base_available

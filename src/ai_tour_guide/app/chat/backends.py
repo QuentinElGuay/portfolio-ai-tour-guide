@@ -210,7 +210,9 @@ class HttpChatService(ChatService):
             input_id=input_id,
             text=text,
         )
-        response = await self._post('/message', request.model_dump(mode='json'))
+        response = await self._post(
+            '/message', request.model_dump(mode='json', exclude_none=True)
+        )
         if self._demo_response_delay is not None:
             await _wait_for_demo_response(self._demo_response_delay)
         return response

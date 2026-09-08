@@ -83,7 +83,12 @@ def test_ask_command_prints_answer_and_compact_sources(
             }
         ],
     }
-    answer_question.assert_called_once_with('What?', mode=DEFAULT_SEARCH_MODE, k=5)
+    call = answer_question.call_args
+    assert call is not None
+    assert call.args == ('What?',)
+    assert call.kwargs['mode'] is DEFAULT_SEARCH_MODE
+    assert call.kwargs['k'] == 5
+    assert call.kwargs['retrieval_enabled'] is True
     store_rag_result.assert_called_once_with(
         answer_question.return_value.request_id, answer_question.return_value.to_dict()
     )

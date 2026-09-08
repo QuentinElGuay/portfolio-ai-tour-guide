@@ -8,9 +8,9 @@ available project command.
 ## Table of contents
 
 - [Progressive setup](#progressive-setup)
-  - [1. Demo mode](#1-demo-mode)
-  - [2. Live provider with an empty knowledge base](#2-live-provider-with-an-empty-knowledge-base)
-  - [3. Source-grounded travel assistant](#3-source-grounded-travel-assistant)
+  - [1. Deterministic demo](#1-deterministic-demo)
+  - [2. Search-engine mode](#2-search-engine-mode)
+  - [3. LLM agent mode](#3-llm-agent-mode)
 - [Ingestion with Airflow](#ingestion-with-airflow)
 - [Ingestion with the command line](#ingestion-with-the-command-line)
 - [Chat app](#chat-app)
@@ -26,19 +26,60 @@ Create a local environment file from the template:
 cp .env.template .env
 ```
 
-### 1. Demo mode
+The template enables both the LLM and retrieval by default. The steps below deliberately
+switch between configurations so you can see how each layer changes the experience.
 
-The template configures the _Bon Voyage_ travel assistant for demo mode. The demo uses a
-no-cost, limited, deterministic assistant and does not require an LLM API key or
-ingested documents. It answers a prepared set of Brittany questions and suggests a
-supported one when it cannot answer. The chat remains available even when the knowledge
-base is empty, making this the fastest way to explore the application.
+### 1. Deterministic demo
 
-Start it:
+Set both capability flags to `0` in `.env`:
+
+```dotenv
+APP_ENABLE_LLM=0
+APP_ENABLE_RETRIEVAL=0
+```
+
+Start the application:
 
 ```bash
 make app
 ```
+
+This starts the no-cost demo chat without an API key or ingested documents. It answers a
+prepared set of questions deterministically.
+
+### 2. Search-engine mode
+
+Enable retrieval while keeping the LLM disabled:
+
+```dotenv
+APP_ENABLE_LLM=0
+APP_ENABLE_RETRIEVAL=1
+```
+
+Ingest the guides through Airflow by following the
+[Airflow ingestion](#ingestion-with-airflow) steps below, then restart the app:
+
+```bash
+make app
+```
+
+The application now behaves like a search engine: it retrieves relevant passages and
+formats them directly, without generating an answer with an LLM.
+
+### 3. LLM agent mode
+
+Configure a supported provider and API key in `.env`, then enable both capabilities:
+
+```dotenv
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
+APP_ENABLE_LLM=1
+APP_ENABLE_RETRIEVAL=1
+```
+
+Restart the app with `make app`. The agent uses retrieved passages to ground its LLM
+answers and returns validated source pages.
 
 Once it is running, you can access:
 
@@ -47,41 +88,10 @@ Once it is running, you can access:
 - the interactive API documentation at
   [http://localhost:8000/docs](http://localhost:8000/docs).
 
-### 2. Live provider with an empty knowledge base
-
-You can configure a live provider before ingesting any guides. Replace the provider,
-model, and API key in `.env`, then restart the app. For example, to use Gemini:
-
-```dotenv
-AGENT_LLM_PROVIDER=gemini
-AGENT_LLM_API_KEY=your-gemini-api-key
-AGENT_LLM_MODEL=gemini-3.5-flash-lite
-```
-
-```bash
-make app
-```
-
-The assistant starts normally and explains that the language model is ready but no
-travel guides have been ingested. Guided and identity questions remain available;
-source-grounded travel answers become available after ingestion.
-
 Supported live LLM providers and recommended models:
 
-- OpenAI (ChatGPT): `gpt-4.1-mini`
-- Google Gemini: `gemini-3.5-flash-lite`
-
-### 3. Source-grounded travel assistant
-
-Ingest the document corpus to complete the application:
-
-```bash
-make ingest
-```
-
-Alternatively, use `make airflow` and trigger the `ingest_documents` DAG. Once the
-guides are ingested, the configured LLM answers travel questions from retrieved passages
-and returns validated source pages.
+- ChatGPT (OpenAI): `gpt-4.1-mini`
+- Gemini (Google): `gemini-3.5-flash-lite`
 
 The tutorial also uses the Airflow and Metabase credentials from `.env`. The template
 contains development defaults for these values; replace them before sharing the services
@@ -98,7 +108,9 @@ or using them in production.
 > make ingest
 > ```
 
-Start the Airflow environment:
+Airflow is the recommended ingestion workflow because it makes the source-file inputs,
+per-document tasks, retries, and re-ingestion controls visible and reproducible. Start
+the Airflow environment:
 
 ```bash
 make airflow
@@ -143,9 +155,9 @@ documents. The first run may also need to download the embedding model.
 
 ## Ingestion with the command line
 
-Use the command line when you do not need Airflow's orchestration or web interface. The
-Docker Compose shortcuts initialize the application schema and then ingest every
-document definition in `source_files.json`:
+`make ingest` is the fast setup shortcut when you do not need Airflow's orchestration or
+web interface. It initializes the application schema and then ingests every document
+definition in `source_files.json`:
 
 ```bash
 make db-init
@@ -179,9 +191,7 @@ full command reference and document-definition format.
 
 ## Chat app
 
-After initializing the database, start the Bon Voyage chat app. Ingestion is optional
-for the guided demo; ingest documents first when you want source-grounded travel
-answers:
+After ingestion, start the Bon Voyage chat app:
 
 ```bash
 make app

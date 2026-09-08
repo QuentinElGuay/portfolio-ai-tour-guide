@@ -1,5 +1,7 @@
 """Travel-agent adapter for the established LLM-backed RAG pipeline."""
 
+from collections.abc import Callable
+
 from sqlalchemy import Engine
 
 from ai_tour_guide.app.agent.travel.contracts import (
@@ -10,6 +12,7 @@ from ai_tour_guide.app.agent.travel.contracts import (
 )
 from ai_tour_guide.app.llm.clients import LLMClient
 from ai_tour_guide.app.services.rag.pipeline import answer_question_async
+from ai_tour_guide.knowledge_base.retrieval.catalog import has_indexed_documents
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
 
@@ -22,10 +25,18 @@ class LLMTravelAgent:
         *,
         engine: Engine | None = None,
         strategy: SearchStrategy | None = None,
+        knowledge_base_available: Callable[[], bool] | None = None,
+        retrieval_enabled: bool = True,
     ) -> None:
         self._llm_client = llm_client
         self._engine = engine
         self._strategy = strategy
+        self._knowledge_base_available = (
+            knowledge_base_available
+            if knowledge_base_available is not None
+            else lambda: has_indexed_documents(engine)
+        )
+        self._retrieval_enabled = retrieval_enabled
 
     async def answer(
         self, question: str, context: TravelTurnContext
@@ -37,6 +48,8 @@ class LLMTravelAgent:
             llm_client=self._llm_client,
             engine=self._engine,
             strategy=self._strategy,
+            knowledge_base_available=self._knowledge_base_available,
+            retrieval_enabled=self._retrieval_enabled,
         )
         queries = tuple(
             query
@@ -50,6 +63,8 @@ class LLMTravelAgent:
                 if result.error is not None
                 else TravelAgentStatus.ANSWERED
                 if result.contexts
+                or result.retrieval_metadata.get('retrieval_status')
+                in {'disabled', 'not_requested'}
                 else TravelAgentStatus.REFUSED
             ),
             request_id=result.request_id,
@@ -64,7 +79,10 @@ class LLMTravelAgent:
                 tool_inputs=queries,
                 evidence_sufficient=bool(result.contexts),
             ),
-            metadata={'provider': result.llm_metadata.get('provider', '')},
+            metadata={
+                'provider': result.llm_metadata.get('provider', ''),
+                'evidence': result.to_dict().get('contexts', []),
+            },
             persistence_payload=result.to_dict(),
             error_message=result.error.category.value if result.error else None,
         )

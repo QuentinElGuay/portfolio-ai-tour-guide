@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from time import perf_counter
 from uuid import UUID, uuid4
 
@@ -17,6 +17,7 @@ from ai_tour_guide.app.agent.flow import (
 )
 from ai_tour_guide.app.agent.responses import (
     INSUFFICIENT_CONTEXT_ANSWER,
+    LOW_CONFIDENCE_RETRIEVAL_ANSWER,
 )
 from ai_tour_guide.app.chat.navigation import normalize_option_id
 from ai_tour_guide.app.llm.clients import (
@@ -66,6 +67,7 @@ def _interaction_metadata(
         'option_id': state.get('option_id'),
         'flow_step': state.get('flow_step', flow_step.value),
         'input_type': state.get('input_type', 'free_text'),
+        'retrieval_status': state.get('retrieval_status', 'not_requested'),
     }
 
 
@@ -93,6 +95,8 @@ async def answer_question_async(
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
     request_id: UUID | None = None,
+    knowledge_base_available: Callable[[], bool] | None = None,
+    retrieval_enabled: bool = True,
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
@@ -111,6 +115,8 @@ async def answer_question_async(
         strategy=strategy,
         request_id=selected_request_id,
         started=started,
+        knowledge_base_available=knowledge_base_available,
+        retrieval_enabled=retrieval_enabled,
     )
 
 
@@ -126,6 +132,8 @@ async def _answer_with_agent(
     strategy: SearchStrategy | None,
     request_id: UUID,
     started: float,
+    knowledge_base_available: Callable[[], bool] | None,
+    retrieval_enabled: bool,
 ) -> RAGResult:
     """Adapt the bounded LangGraph state to the stable RAG result contract."""
     retrieval_started = perf_counter()
@@ -137,6 +145,8 @@ async def _answer_with_agent(
             flow_step=flow_step,
             engine=engine,
             strategy=strategy,
+            knowledge_base_available=knowledge_base_available,
+            retrieval_enabled=retrieval_enabled,
         )
     except (GenerationError, OSError, SQLAlchemyError) as exc:
         return RAGResult(
@@ -194,6 +204,19 @@ async def _answer_with_agent(
             llm_metadata=generated.llm_metadata,
             raw_provider_response=generated.raw_provider_response,
         )
+    if state.get('low_confidence_retrieval'):
+        return RAGResult(
+            question=question,
+            request_id=request_id,
+            mode=mode,
+            k=k,
+            messages=(),
+            generated=GeneratedAnswer(LOW_CONFIDENCE_RETRIEVAL_ANSWER),
+            contexts=(),
+            retrieval_latency_ms=retrieval_latency,
+            total_latency_ms=_elapsed_ms(started),
+            retrieval_metadata=_interaction_metadata(state, mode, flow_step),
+        )
     if not contexts:
         return RAGResult(
             question=question,
@@ -248,6 +271,7 @@ def answer_question(
     settings: AgentsSettings | None = None,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
+    retrieval_enabled: bool = True,
 ) -> RAGResult:
     """Synchronously answer a question for CLI and synchronous callers."""
     selected_settings = settings or AgentsSettings()
@@ -265,6 +289,7 @@ def answer_question(
             engine=engine,
             strategy=strategy,
             request_id=request_id,
+            retrieval_enabled=retrieval_enabled,
         )
     )
 

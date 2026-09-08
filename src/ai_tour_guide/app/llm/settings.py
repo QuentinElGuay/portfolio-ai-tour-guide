@@ -34,6 +34,16 @@ class AgentsSettings(BaseSettings):
         default=LLMProvider.OPENAI,
         validation_alias='AGENT_LLM_PROVIDER',
     )
+    enable_llm: bool = Field(
+        default=True,
+        validation_alias='APP_ENABLE_LLM',
+        description='Whether LLM-backed agents are allowed',
+    )
+    enable_retrieval: bool = Field(
+        default=True,
+        validation_alias='APP_ENABLE_RETRIEVAL',
+        description='Whether knowledge-base retrieval is allowed',
+    )
     api_key: SecretStr = Field(
         default=SecretStr(''),
         validation_alias='AGENT_LLM_API_KEY',

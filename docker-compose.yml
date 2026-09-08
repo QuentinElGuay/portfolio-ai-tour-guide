@@ -1,6 +1,8 @@
 name: ai-tour-guide
 
 x-app-environment: &app-environment
+  APP_ENABLE_LLM: "${APP_ENABLE_LLM:-1}"
+  APP_ENABLE_RETRIEVAL: "${APP_ENABLE_RETRIEVAL:-1}"
   DB_HOST: database
   DB_PORT: "5432"
   DB_NAME: "${DB_NAME:?DB_NAME is required}"

@@ -9,6 +9,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from ai_tour_guide.app.agent.configuration import (
+    AgentType,
+    ProductConfigurationError,
+    ProductLayer,
+    resolve_product_configuration,
+)
 from ai_tour_guide.app.agent.conversation import (
     ConversationGraphError,
     OuterConversationState,
@@ -36,7 +42,7 @@ from ai_tour_guide.app.chat.models import (
 )
 from ai_tour_guide.app.chat.persistence import store_chat_message, store_feedback
 from ai_tour_guide.app.llm.factory import create_llm_client
-from ai_tour_guide.app.llm.settings import AgentsSettings, LLMProvider
+from ai_tour_guide.app.llm.settings import AgentsSettings
 from ai_tour_guide.app.services.rag.persistence import store_rag_result
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
@@ -96,19 +102,29 @@ def _chat_error(status_code: int, code: ChatErrorCode, message: str) -> HTTPExce
 
 
 async def _answer_turn(
-    question: str, session_id: str, flow_step: FlowStep
+    question: str,
+    session_id: str,
+    flow_step: FlowStep,
 ) -> TravelTurnResult:
-    """Dispatch a turn to either the demo or retrieval-backed agent."""
+    """Dispatch a turn through the effective configured agent."""
     settings = AgentsSettings()
-    if settings.llm_provider is LLMProvider.BAGUETTE_LLM:
-        deterministic_agent = create_deterministic_travel_agent(settings)
+    try:
+        configuration = resolve_product_configuration(settings)
+    except ProductConfigurationError as exc:
+        raise RuntimeError(str(exc)) from exc
+    if configuration.agent_type is AgentType.DETERMINISTIC:
+        deterministic_agent = create_deterministic_travel_agent(
+            settings,
+            retrieval_enabled=configuration.product_layer is ProductLayer.RETRIEVAL,
+        )
         response = await deterministic_agent.answer(
             question, TravelTurnContext(session_id=session_id, flow_step=flow_step)
         )
         return response
-    return await LLMTravelAgent(create_llm_client(settings)).answer(
-        question, TravelTurnContext(session_id=session_id, flow_step=flow_step)
-    )
+    return await LLMTravelAgent(
+        create_llm_client(settings),
+        retrieval_enabled=configuration.product_layer not in {ProductLayer.BASELINE},
+    ).answer(question, TravelTurnContext(session_id=session_id, flow_step=flow_step))
 
 
 @app.post('/chat/start', response_model=ConversationResponse)
@@ -122,7 +138,7 @@ async def start_chat() -> ConversationResponse:
         welcome_message=_welcome_message(
             knowledge_base_is_empty=(
                 False
-                if settings.llm_provider is LLMProvider.BAGUETTE_LLM
+                if not _uses_llm_agent(settings)
                 else _ensure_knowledge_base_ready()
             )
         ),
@@ -185,10 +201,18 @@ def _ensure_knowledge_base_ready() -> bool:
     return False
 
 
+def _uses_llm_agent(settings: AgentsSettings) -> bool:
+    """Return whether the adaptive configuration will call an LLM."""
+    try:
+        return resolve_product_configuration(settings).agent_type is AgentType.LLM
+    except ProductConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @app.get('/health')
 async def health() -> dict[str, str]:
     """Report that the HTTP process and its knowledge base are ready."""
-    if AgentsSettings().llm_provider is not LLMProvider.BAGUETTE_LLM:
+    if _uses_llm_agent(AgentsSettings()):
         _ensure_knowledge_base_ready()
     return {'status': 'ok'}
 
@@ -202,9 +226,18 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
         nonlocal result
         result = value
 
+    async def answer_turn(
+        question: str, session_id: str, flow_step: FlowStep
+    ) -> TravelTurnResult:
+        return await _answer_turn(
+            question,
+            session_id,
+            flow_step,
+        )
+
     graph = build_outer_conversation_graph(
         checkpointer=_conversation_checkpointer,
-        answer_turn=_answer_turn,
+        answer_turn=answer_turn,
         on_result=retain,
         welcome_message=_welcome_message(knowledge_base_is_empty=False),
     )

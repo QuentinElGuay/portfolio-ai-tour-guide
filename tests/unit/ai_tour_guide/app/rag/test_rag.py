@@ -5,7 +5,10 @@ from uuid import UUID
 import pytest
 
 from ai_tour_guide.app.agent.prompts import build_catalog_system_prompt
-from ai_tour_guide.app.agent.responses import INSUFFICIENT_CONTEXT_ANSWER
+from ai_tour_guide.app.agent.responses import (
+    INSUFFICIENT_CONTEXT_ANSWER,
+    LOW_CONFIDENCE_RETRIEVAL_ANSWER,
+)
 from ai_tour_guide.app.chat.models import Role
 from ai_tour_guide.app.services.rag.models import (
     CitationValidationResult,
@@ -27,6 +30,11 @@ from ai_tour_guide.app.services.rag.workflow import (
 )
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
+from ai_tour_guide.knowledge_base.retrieval.tool import (
+    RetrievalStatus,
+    TourismSearchQuery,
+    TourismSearchResult,
+)
 from ai_tour_guide.knowledge_base.search.models import (
     ScoreKind,
     SearchMetadata,
@@ -73,14 +81,18 @@ def _search_result(chunk: DocumentChunkRow, *, rank: int) -> SearchResult:
 
 
 @patch('ai_tour_guide.app.services.rag.pipeline.validate_citations')
-@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.workflow.search_tourism_knowledge_base')
 def test_answer_question_retrieves_context_and_returns_sources(
-    retrieve_context: MagicMock,
+    search_tourism_knowledge_base: MagicMock,
     validate_citations: MagicMock,
 ) -> None:
     """Verify that answering a question retrieves context, sends it to the LLM, and preserves its sources."""
     context = MagicMock()
-    retrieve_context.return_value = (context,)
+    search_tourism_knowledge_base.return_value = TourismSearchResult(
+        status=RetrievalStatus.SUCCESS,
+        query=TourismSearchQuery('Question'),
+        contexts=(context,),
+    )
     source = SourceReference(
         'https://example.test/guide', None, 'Guide', None, None, None, (3,)
     )
@@ -91,10 +103,9 @@ def test_answer_question_retrieves_context_and_returns_sources(
 
     result = asyncio.run(answer_question_async('Question', llm_client=client))
 
-    retrieve_context.assert_called_once()
-    assert retrieve_context.call_args.kwargs['search_mode'].value == 'hybrid'
-    assert retrieve_context.call_args.args[0] == 'Question'
-    assert retrieve_context.call_args.kwargs['k'] == 5
+    search_tourism_knowledge_base.assert_called_once_with(
+        'Question', engine=None, strategy=None
+    )
     client.answer_question.assert_awaited_once()
     assert result.answer == 'Answer.'
     assert isinstance(result.request_id, UUID)
@@ -123,11 +134,15 @@ def test_answer_question_assigns_and_propagates_request_id(
     assert result is expected
 
 
-@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context', return_value=())
+@patch('ai_tour_guide.app.services.rag.workflow.search_tourism_knowledge_base')
 def test_answer_question_handles_empty_retrieval(
-    retrieve_context: MagicMock,
+    search_tourism_knowledge_base: MagicMock,
 ) -> None:
     """Verify that an unanswered retrieval returns the insufficient-context response without sources."""
+    search_tourism_knowledge_base.return_value = TourismSearchResult(
+        status=RetrievalStatus.EMPTY,
+        query=TourismSearchQuery('Question'),
+    )
     client = MagicMock()
     client.choose_search_query = AsyncMock(side_effect=('Question', None))
     client.answer_question = AsyncMock()
@@ -138,13 +153,13 @@ def test_answer_question_handles_empty_retrieval(
     assert result.contexts == ()
     assert result.sources == ()
     client.answer_question.assert_not_awaited()
-    retrieve_context.assert_called_once()
+    search_tourism_knowledge_base.assert_called_once()
 
 
 @patch('ai_tour_guide.app.services.rag.workflow.list_indexed_destinations')
-@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.workflow.search_tourism_knowledge_base')
 def test_answer_question_reads_destination_catalog_without_rag(
-    retrieve_context: MagicMock,
+    search_tourism_knowledge_base: MagicMock,
     list_indexed_destinations: MagicMock,
 ) -> None:
     """Verify that catalog questions read indexed titles without retrieval."""
@@ -157,7 +172,7 @@ def test_answer_question_reads_destination_catalog_without_rag(
         answer_question_async('What destinations are covered?', llm_client=client)
     )
 
-    retrieve_context.assert_not_called()
+    search_tourism_knowledge_base.assert_not_called()
     list_indexed_destinations.assert_called_once_with(None)
     client.choose_search_query.assert_not_awaited()
     client.answer_question.assert_not_awaited()
@@ -168,9 +183,9 @@ def test_answer_question_reads_destination_catalog_without_rag(
     assert result.sources == ()
 
 
-@patch('ai_tour_guide.app.services.rag.workflow.retrieve_context')
+@patch('ai_tour_guide.app.services.rag.workflow.search_tourism_knowledge_base')
 def test_configured_identity_question_uses_fixed_answer(
-    retrieve_context: MagicMock,
+    search_tourism_knowledge_base: MagicMock,
 ) -> None:
     """Verify that a configured identity question does not depend on the LLM."""
     client = MagicMock()
@@ -179,10 +194,54 @@ def test_configured_identity_question_uses_fixed_answer(
 
     result = asyncio.run(answer_question_async('Tell me about you', llm_client=client))
 
-    retrieve_context.assert_not_called()
+    search_tourism_knowledge_base.assert_not_called()
     client.choose_search_query.assert_not_awaited()
     client.answer_question.assert_not_awaited()
     assert result.answer.startswith('Hi, I’m **Petit Guide**')
+
+
+@patch('ai_tour_guide.app.services.rag.workflow.search_tourism_knowledge_base')
+def test_answer_question_refuses_low_confidence_retrieval(
+    search_tourism_knowledge_base: MagicMock,
+) -> None:
+    """Verify low-score results never reach answer generation."""
+    search_tourism_knowledge_base.return_value = TourismSearchResult(
+        status=RetrievalStatus.LOW_CONFIDENCE,
+        query=TourismSearchQuery('Question'),
+    )
+    client = MagicMock()
+    client.choose_search_query = AsyncMock(return_value='Question')
+    client.answer_question = AsyncMock()
+
+    result = asyncio.run(answer_question_async('Question', llm_client=client))
+
+    assert result.answer == LOW_CONFIDENCE_RETRIEVAL_ANSWER
+    assert result.contexts == ()
+    assert result.retrieval_metadata['retrieval_status'] == 'low_confidence'
+    client.answer_question.assert_not_awaited()
+
+
+def test_answer_question_uses_meta_conversation_when_the_kb_is_empty() -> None:
+    """Verify an LLM agent does not invoke retrieval without indexed documents."""
+    client = MagicMock()
+    client.choose_search_query = AsyncMock()
+    client.answer_question = AsyncMock(
+        return_value=GeneratedAnswer('I am Petit Guide.')
+    )
+
+    result = asyncio.run(
+        answer_question_async(
+            'What can you do?',
+            llm_client=client,
+            knowledge_base_available=lambda: False,
+        )
+    )
+
+    assert result.answer == 'I am Petit Guide.'
+    assert result.contexts == ()
+    assert result.retrieval_metadata['retrieval_status'] == 'not_requested'
+    client.choose_search_query.assert_not_awaited()
+    client.answer_question.assert_awaited_once()
 
 
 def test_meta_messages_describe_petit_guide_and_bon_voyage() -> None:

@@ -3,6 +3,10 @@
 INSUFFICIENT_CONTEXT_ANSWER = (
     'The available sources do not contain enough information to answer that question.'
 )
+LOW_CONFIDENCE_RETRIEVAL_ANSWER = (
+    'I could not find reliable enough information in the available travel guides to '
+    'answer that question.'
+)
 EMPTY_KNOWLEDGE_BASE_NOTICE = (
     'The language model is configured, but no travel guides have been ingested yet. '
     'Run `make ingest` or use Airflow to add source-grounded travel answers.'
@@ -17,5 +21,6 @@ __all__ = [
     'GENERATION_ERROR_ANSWER',
     'INSUFFICIENT_CONTEXT_ANSWER',
     'LLM_CONFIGURATION_REQUIRED_ANSWER',
+    'LOW_CONFIDENCE_RETRIEVAL_ANSWER',
     'NO_BACKEND_AVAILABLE_ANSWER',
 ]

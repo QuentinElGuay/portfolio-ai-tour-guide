@@ -1,6 +1,7 @@
 """Bounded LangGraph workflow for source-grounded live answers."""
 
 import re
+from collections.abc import Callable
 from typing import Literal, NotRequired, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
@@ -35,9 +36,11 @@ from ai_tour_guide.app.services.rag.prompting import (
     is_destination_catalog_question,
 )
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
-from ai_tour_guide.knowledge_base.retrieval.context import retrieve_context
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
-from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE
+from ai_tour_guide.knowledge_base.retrieval.tool import (
+    RetrievalStatus,
+    search_tourism_knowledge_base,
+)
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 
 MAX_SEARCH_CALLS = 2
@@ -55,6 +58,8 @@ class AgentState(TypedDict):
     messages: NotRequired[tuple[Message, ...]]
     generated: NotRequired[GeneratedAnswer]
     retrieval_error: NotRequired[Exception]
+    retrieval_status: NotRequired[str]
+    low_confidence_retrieval: NotRequired[bool]
     identity_answer: NotRequired[str]
     next_option_ids: NotRequired[tuple[str, ...]]
 
@@ -99,6 +104,8 @@ def build_agent_graph(
     def route_after_decision(
         state: AgentState,
     ) -> Literal['search', 'generate', 'fallback', 'insufficient']:
+        if state.get('low_confidence_retrieval'):
+            return 'insufficient'
         if state['next_query'] is not None and len(state['queries']) < MAX_SEARCH_CALLS:
             return 'search'
         if state['contexts'] or not state['queries']:
@@ -114,25 +121,34 @@ def build_agent_graph(
         if query is None:
             return {}
         try:
-            contexts = retrieve_context(
+            result = search_tourism_knowledge_base(
                 query,
-                search_mode=DEFAULT_SEARCH_MODE,
-                k=SEARCH_K,
                 engine=engine,
                 strategy=strategy,
             )
         except (OSError, SQLAlchemyError) as exc:
             return {'retrieval_error': exc}
+        if result.status is RetrievalStatus.ERROR:
+            message = result.error.message if result.error is not None else ''
+            return {'retrieval_error': RuntimeError(message)}
         return {
             'queries': [*state['queries'], query],
-            'contexts': (*state['contexts'], *contexts),
+            'contexts': (*state['contexts'], *result.contexts),
             'next_query': None,
+            'retrieval_status': result.status.value,
+            'low_confidence_retrieval': (
+                result.status is RetrievalStatus.LOW_CONFIDENCE
+            ),
         }
 
     def route_after_search(
         state: AgentState,
     ) -> Literal['decide', 'insufficient']:
-        return 'insufficient' if 'retrieval_error' in state else 'decide'
+        return (
+            'insufficient'
+            if 'retrieval_error' in state or state.get('low_confidence_retrieval')
+            else 'decide'
+        )
 
     async def generate(state: AgentState) -> dict[str, object]:
         messages = (
@@ -183,6 +199,8 @@ async def run_agent_workflow(
     flow_step: FlowStep = DEFAULT_FLOW_STEP,
     engine: Engine | None = None,
     strategy: SearchStrategy | None = None,
+    knowledge_base_available: Callable[[], bool] | None = None,
+    retrieval_enabled: bool = True,
 ) -> AgentState:
     """Run the bounded graph and return its complete execution state."""
     option_id = normalize_option_id(option_id)
@@ -219,6 +237,35 @@ async def run_agent_workflow(
                 if destination_names
                 else 'No destinations are currently indexed.'
             ),
+        }
+
+    if not retrieval_enabled:
+        messages = _build_meta_messages(question)
+        return {
+            'question': question,
+            'option_id': option_id,
+            'flow_step': flow_step_for_option(option_id, flow_step).value,
+            'input_type': input_type_for_option(option_id),
+            'queries': [],
+            'contexts': (),
+            'next_query': None,
+            'messages': messages,
+            'generated': await llm_client.answer_question(messages),
+            'retrieval_status': 'disabled',
+        }
+
+    if knowledge_base_available is not None and not knowledge_base_available():
+        messages = _build_meta_messages(question)
+        return {
+            'question': question,
+            'option_id': option_id,
+            'flow_step': flow_step_for_option(option_id, flow_step).value,
+            'input_type': input_type_for_option(option_id),
+            'queries': [],
+            'contexts': (),
+            'next_query': None,
+            'messages': messages,
+            'generated': await llm_client.answer_question(messages),
         }
 
     graph = build_agent_graph(llm_client, engine=engine, strategy=strategy)

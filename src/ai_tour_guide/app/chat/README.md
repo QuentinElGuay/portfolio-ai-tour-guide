@@ -17,8 +17,7 @@ Return to the [project overview](../../../../README.md) or the
 
 ## Run with Docker
 
-After initializing the database, set `AGENT_LLM_API_KEY` in `.env` when using OpenAI and
-run:
+After initializing the database, configure the capability flags and run:
 
 ```bash
 make app
@@ -29,8 +28,9 @@ Open `http://localhost:7860`. Docker Compose starts:
 - the app API at `http://localhost:8000`, with database and OpenAI access;
 - the Gradio interface at `http://localhost:7860`, configured to call the agent.
 
-Ingestion is optional for the guided chat. If the database has no documents, the API
-still starts and travel questions explain that source-grounded answers are unavailable.
+Ingestion is optional for the guided chat. If the database has no documents,
+deterministic execution uses prepared questions and LLM execution remains limited to
+conversational or meta answers.
 
 ## Run locally
 
@@ -44,10 +44,11 @@ uv run uvicorn ai_tour_guide.app.api:app --host 127.0.0.1 --port 8000
 uv run python -m ai_tour_guide.app.chat.app
 ```
 
-The defaults in `.env.template` configure the chat to call `http://localhost:8000/chat`.
-`CHAT_API_URL`, `CHAT_HOST`, `CHAT_PORT`, and `CHAT_TITLE` can be changed for another
-environment. When the `baguette-llm` provider is active, the chat adds a randomized demo
-response delay between `CHAT_DEMO_RESPONSE_DELAY_MIN_SECONDS` and
+The defaults in `.env.template` configure the chat to call `http://localhost:8000/chat`
+with both LLM and retrieval capabilities enabled. `CHAT_API_URL`, `CHAT_HOST`,
+`CHAT_PORT`, and `CHAT_TITLE` can be changed for another environment. When the
+`baguette-llm` provider is active, the chat adds a randomized demo response delay
+between `CHAT_DEMO_RESPONSE_DELAY_MIN_SECONDS` and
 `CHAT_DEMO_RESPONSE_DELAY_MAX_SECONDS` (2–3 seconds by default).
 
 The assistant can answer which destinations it covers from the titles of the currently
@@ -55,8 +56,8 @@ indexed guides. It uses retrieved passages for all destination details and other
 questions, so this catalog never substitutes for source-grounded advice.
 
 `CHAT_API_URL` is required when starting the chat service. The application does not use
-a local fallback in production. The app service raises a configuration error when no
-OpenAI API key is configured.
+a local fallback in production. The API dynamically downgrades according to
+`APP_ENABLE_LLM` and `APP_ENABLE_RETRIEVAL`.
 
 `create_app()` uses `DemoChatService` only when no service is injected. This keeps UI
 tests and local interface development independent of the agent API; the demo response

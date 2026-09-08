@@ -15,4 +15,12 @@ def list_indexed_destinations(engine: Engine | None = None) -> tuple[str, ...]:
         return tuple(session.scalars(statement).all())
 
 
-__all__ = ['list_indexed_destinations']
+def has_indexed_documents(engine: Engine | None = None) -> bool:
+    """Return whether the active knowledge base contains at least one document."""
+    statement = select(DocumentRow.document_id).limit(1)
+
+    with database_engine(engine) as db_engine, Session(db_engine) as session:
+        return session.scalar(statement) is not None
+
+
+__all__ = ['has_indexed_documents', 'list_indexed_destinations']

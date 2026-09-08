@@ -98,6 +98,10 @@ def test_demo_turn_does_not_use_retrieval(
 ) -> None:
     monkeypatch.setenv('AGENT_LLM_PROVIDER', LLMProvider.BAGUETTE_LLM.value)
     monkeypatch.setenv('AGENT_LLM_MODEL', 'mini-croissant-1.0')
+    monkeypatch.setattr(
+        'ai_tour_guide.app.agent.travel.deterministic.has_indexed_documents',
+        lambda engine=None: False,
+    )
     result = asyncio.run(
         _answer_turn('What is kouign-amann?', 'session', FlowStep.MAIN_MENU)
     )
@@ -186,6 +190,7 @@ def test_chat_message_serializes_the_backend_response(
         ],
         'request_id': str(result.request_id),
         'sources': [],
+        'evidence': [],
         'trace': {
             'intent': 'travel_question',
             'actions': [],
@@ -215,6 +220,7 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
         'buttons',
         'request_id',
         'sources',
+        'evidence',
         'trace',
         'llm',
     }
@@ -225,6 +231,7 @@ def test_chat_start_http_boundary_returns_contract_fields() -> None:
     ]
     assert payload['request_id'] is None
     assert payload['sources'] == []
+    assert payload['evidence'] == []
     assert payload['llm']['provider'] == 'openai'
 
 
