@@ -258,8 +258,8 @@ def test_render_response_adds_special_emoticon_after_answer() -> None:
 
 def test_italicize_french_expressions() -> None:
     """Verify that approved French expressions are rendered in italics."""
-    assert _italicize_french_expressions('Voilà! En route!') == '*Voilà*! *En route*!'
-    assert _italicize_french_expressions('*Voilà*!') == '*Voilà*!'
+    assert _italicize_french_expressions('Voilà! En route!') == '*Voilà!* *En route!*'
+    assert _italicize_french_expressions('*Voilà!*') == '*Voilà!*'
 
 
 def test_italicize_all_registered_french_expressions() -> None:
