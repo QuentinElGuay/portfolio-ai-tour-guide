@@ -12,10 +12,15 @@ from ai_tour_guide.app.agent.conversation import (
     build_outer_conversation_graph,
     welcome_message_for_provider,
 )
-from ai_tour_guide.app.agent.demo_questions import DEMO_WELCOME_MESSAGE
-from ai_tour_guide.app.agent.llm.settings import LLMProvider
-from ai_tour_guide.app.agent.rag.models import GeneratedAnswer, RAGResult
+from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
+from ai_tour_guide.app.agent.travel.contracts import (
+    TravelAgentStatus,
+    TravelTurnResult,
+)
+from ai_tour_guide.app.llm.settings import LLMProvider
+from ai_tour_guide.app.services.demo.questions import DEMO_WELCOME_MESSAGE
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer, RAGResult
 from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import SearchMode
 
@@ -89,15 +94,12 @@ def test_conversation_graph_returns_the_rag_result(
 
 def test_outer_conversation_graph_checkpoints_step_and_response() -> None:
     async def answer_turn(
-        question: str, session_id: str, flow_step: object
-    ) -> RAGResult:
+        question: str, session_id: str, flow_step: FlowStep
+    ) -> TravelTurnResult:
         del session_id, flow_step
-        return RAGResult(
-            question=question,
-            mode=SearchMode.HYBRID,
-            k=5,
-            messages=(),
-            generated=GeneratedAnswer('Grounded answer.'),
+        return TravelTurnResult(
+            answer='Grounded answer.',
+            status=TravelAgentStatus.ANSWERED,
         )
 
     graph = build_outer_conversation_graph(

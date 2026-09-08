@@ -11,14 +11,14 @@ from uuid import uuid4
 
 from sqlalchemy import delete, insert, select, update
 
-from ai_tour_guide.app.agent.llm.clients.demo import DemoLLMClient
-from ai_tour_guide.app.agent.rag.persistence import (
+from ai_tour_guide.app.agent.responses import GENERATION_ERROR_ANSWER
+from ai_tour_guide.app.chat.models import ChatMessage, Role
+from ai_tour_guide.app.services.rag.models import GeneratedAnswer
+from ai_tour_guide.app.services.rag.persistence import (
     _usage_event_values,
     store_rag_result,
 )
-from ai_tour_guide.app.agent.rag.pipeline import answer_question_async
-from ai_tour_guide.app.agent.responses import GENERATION_ERROR_ANSWER
-from ai_tour_guide.app.chat.models import ChatMessage, Role
+from ai_tour_guide.app.services.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.corpus import DEFAULT_CORPUS_ROOT, corpus_context
 from ai_tour_guide.knowledge_base.database.connection import database_engine
 from ai_tour_guide.knowledge_base.database.tables.public import (
@@ -46,7 +46,25 @@ class SimulationSummary:
     errors: int
 
 
-_pipeline_logger = logging.getLogger('ai_tour_guide.app.agent.rag.pipeline')
+class SimulatedLLMClient:
+    """Minimal deterministic LLM client used only for synthetic RAG telemetry."""
+
+    async def answer_question(self, messages: object) -> GeneratedAnswer:
+        del messages
+        return GeneratedAnswer('Synthetic grounded answer.')
+
+    async def choose_search_query(
+        self,
+        question: str,
+        *,
+        previous_queries: object,
+        has_context: bool,
+    ) -> str | None:
+        del has_context
+        return None if previous_queries else question
+
+
+_pipeline_logger = logging.getLogger('ai_tour_guide.app.services.rag.pipeline')
 
 
 def _simulated_timestamp(
@@ -114,7 +132,7 @@ async def _simulate(
     rng = random.Random(seed)
     now = datetime.now(UTC)
     strategy = create_search_strategy(mode)
-    client = DemoLLMClient()
+    client = SimulatedLLMClient()
     total_requests = 0
     usage_events = 0
     feedback_events = 0

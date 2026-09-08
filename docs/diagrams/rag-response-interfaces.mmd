@@ -26,7 +26,7 @@ flowchart TD
     RAG --> CLI[CLI ask]
     RAG --> API[API adapter]
     API --> JSON[AskResponse JSON\nanswer + validated sources only]
-    JSON --> HTTP[HttpChatBackend.ask]
+    JSON --> HTTP[HttpChatService.send_message]
     HTTP --> DICT[Validated JSON dictionary]
     DICT --> UI[Gradio chat rendering]
 

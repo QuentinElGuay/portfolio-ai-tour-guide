@@ -17,9 +17,6 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-  - [1. Demo mode](#1-demo-mode)
-  - [2. Live provider with an empty knowledge base](#2-live-provider-with-an-empty-knowledge-base)
-  - [3. Source-grounded travel assistant](#3-source-grounded-travel-assistant)
 - [Common commands](#common-commands)
 - [Airflow ingestion](#airflow-ingestion)
 - [Evaluation](#evaluation)
@@ -91,10 +88,10 @@ Unsupported questions include:
 
 The project is divided into two workflows. The ingestion workflow processes the guides
 into searchable passages (_chunks_), creates vector embeddings, and stores them in
-PostgreSQL with pgvector. The RAG workflow retrieves the chunks most likely to provide
-relevant context, then passes them to a generic LLM provided by a commercial third-party
-provider to generate an answer. The chat interface sends questions to the agent API,
-which coordinates retrieval and answer generation.
+PostgreSQL with pgvector. The application dynamically selects the strongest available
+execution mode: LLM plus RAG, LLM conversational mode, deterministic retrieval, or
+prepared deterministic questions. The chat interface and CLI share this capability
+resolution.
 
 ```mermaid
 flowchart LR
@@ -121,28 +118,12 @@ flowchart LR
 
 ## Project structure
 
-- `src/ai_tour_guide/` — Main Python package.
-  - `domain/` — Shared document, section, and chunk models.
-  - `embedding/` — Embedding providers, settings, and interfaces.
-  - `ingestion/` — Document input, PDF parsing, chunking, serialization, and ingestion
-    commands.
-  - `knowledge_base/` — Database schema, corpus loading, indexing, and retrieval.
-  - `app/` — FastAPI application, CLI, and chat interface.
-    - `agent/` — LangGraph travel-agent workflow, RAG pipeline, LLM clients, and demo
-      data.
-    - `chat/` — Gradio interface and chat backend adapters.
-- `evaluation/` — RAG evaluation and judge workflows.
-- `fixtures/` — Corpus and dashboard data used for local development.
-- `tests/` — Unit and smoke tests.
-- `scripts/` — Development and maintenance scripts.
-- `tools/` — Project utilities and data tooling.
-- `airflow/` — Airflow DAGs and configuration.
-- `docker/` — Container build definitions.
-- `pyproject.toml` — Project metadata, dependencies, scripts, and tool configuration.
-- `.env.template` — Example environment configuration for local development.
-- `docker-compose.yml` — Local service definitions.
-- `Makefile` — Common development, ingestion, evaluation, and operations commands.
-- `docs/` — Architecture, command reference, and setup documentation.
+The main application lives in `src/ai_tour_guide/`, with ingestion, knowledge-base,
+agent, LLM, and chat components. The repository also contains `evaluation/` workflows,
+`airflow/` DAGs, `tests/`, `fixtures/`, `scripts/`, and `tools/`. Docker and local
+development configuration is defined in `docker/`, `docker-compose.yml`, `Makefile`,
+`.env.template`, and `pyproject.toml`. See the [documentation](#documentation) for
+component-specific guides.
 
 ## Prerequisites
 
@@ -154,62 +135,72 @@ local installation.
 
 ## Quick start
 
-_This is a quick start. For the full tutorial, see the
+_This is a quick start aiming for an immediate setup. For the full tutorial, see the
 [project tutorial](docs/README.md)._
 
-### 1. Demo mode
+### App configuration
 
 With Docker, Docker Compose, and GNU Make installed, clone the project and change into
-its directory, or open it in a GitHub Codespace. Then run:
+its directory, or open it in a GitHub Codespace.
+
+> [!WARNING]
+> As of September 8, 2026, we observed a possible Docker networking problem in GitHub
+> Codespaces that prevented database initialization or document ingestion. The same
+> commands worked locally, but recreating a Codespace did not reliably resolve the
+> issue.
+
+Start by creating a local environment file and choosing the LLM provider for the
+application. First, create a `.env` file from the provided `.env.template` file:
 
 ```bash
 cp .env.template .env
-make app
 ```
 
-This starts the _Bon Voyage_ travel assistant in demo mode. The demo uses a no-cost,
-limited, deterministic assistant and does not require an LLM API key or ingested
-documents. It answers a prepared set of questions and suggests a supported one when it
-cannot answer. The chat remains available even when the knowledge base is empty, making
-this the fastest way to explore the application.
+Replace the LLM settings in your `.env` file. Accepted `AGENT_LLM_PROVIDER` values are
+`openai`, `gemini`, and `baguette-llm`.
 
-Once it is running, you can access:
+> [!NOTE]
+> The built-in `baguette-llm` is a deterministic demo provider, not a real LLM, and does
+> not require an API key.
 
-- the chat app at [http://localhost:7860](http://localhost:7860);
-- the chat API at [http://localhost:8000](http://localhost:8000);
-- the interactive API documentation at
-  [http://localhost:8000/docs](http://localhost:8000/docs).
-
-### 2. Live provider with an empty knowledge base
-
-You can configure a live provider before ingesting any guides. Replace the provider,
-model, and API key in `.env`, then restart the app:
+OpenAI example:
 
 ```dotenv
-AGENT_LLM_PROVIDER=gemini
-AGENT_LLM_API_KEY=your-gemini-api-key
-AGENT_LLM_MODEL=gemini-3.5-flash-lite
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-```bash
-make app
-```
+### Knowledge-base ingestion
 
-The assistant starts normally and explains that the language model is ready but no
-travel guides have been ingested. Guided and identity questions remain available;
-source-grounded travel answers become available after ingestion.
+With the application configured, prepare the knowledge base before starting the
+services.
 
-### 3. Source-grounded travel assistant
-
-Ingest the document corpus to complete the application:
+Initialize the database schema, then ingest the knowledge base. These commands may take
+a few minutes on the first execution to download Docker images and the embedding model:
 
 ```bash
+make db-init
 make ingest
 ```
 
-Alternatively, use `make airflow` and trigger the `ingest_documents` DAG. Once the
-guides are ingested, the configured LLM answers travel questions from retrieved passages
-and returns validated source pages.
+> [!NOTE]
+> `make ingest` is the fast command-line shortcut to ingest data into your knowledge
+> base. For the recommended orchestrated workflow, use Airflow.
+>
+> The use of Airflow is detailed in the [tutorial](docs/README.md).
+
+### App execution
+
+Once the knowledge base is ready, start the agent API and chat interface:
+
+```bash
+make app
+```
+
+`make app` starts the agent service and the chat interface to communicate with it. Once
+they are running, you can access the chat app at
+[http://localhost:7860](http://localhost:7860)
 
 ## Common commands
 
@@ -235,117 +226,24 @@ detail.
 
 ## Airflow ingestion
 
-> [!WARNING]
-> Airflow 3 requires a 4-core machine type in GitHub Codespaces. On smaller machines,
-> use the command-line workflow instead:
->
-> ```bash
-> make db-init
-> make ingest
-> ```
-
-Start the optional Airflow profile:
-
-```bash
-make airflow
-```
-
-> [!NOTE]
-> `make airflow` detects the `DOCKER GID` value automatically. If you prefer running
-> Airflow through a direct Docker Compose command, you need to first export the Docker
-> socket's group ID (or set it in your `.env` file):
->
-> ```bash
-> export DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)"
-> docker compose --profile airflow up --build -d --wait \
->   database airflow-webserver airflow-scheduler airflow-dag-processor
-> ```
-
-`make airflow` returns only after Airflow is ready: its API health check confirms the
-metadata database, scheduler, and DAG processor are healthy. Open the Airflow UI at
-[http://localhost:8080](http://localhost:8080), then sign in with
-`AIRFLOW_ADMIN_USERNAME` and `AIRFLOW_ADMIN_PASSWORD` from `.env`, then trigger the
-`ingest_documents` DAG with a configuration shaped as follows:
-
-```json
-{
-  "source_files": [
-    {
-      "source_url": "https://example.com/guide.pdf",
-      "title": "Example guide",
-      "collection": "Regional Guides",
-      "publisher": "Example publisher"
-    }
-  ]
-}
-```
-
-`source_files` is the same array format accepted by `source_files.json`. The DAG runs
-`initialize_database` before one mapped `run_ingestion` task per source file. Each task
-runs the complete ingestion CLI in the `ai-tour-guide-ingestion:local` image, so a
-failed document can be retried without rerunning the other submitted documents.
-
-Existing documents are skipped successfully by default. Set `force_reingestion` to
-`true` in the trigger configuration to remove the existing document and its chunks
-before inserting the replacement. For example:
-
-```json
-{
-  "source_files": [
-    {
-      "source_url": "https://example.com/guide.pdf",
-      "title": "Example guide"
-    }
-  ],
-  "force_reingestion": true
-}
-```
-
-The template supplies local-development Airflow credentials and encryption keys so this
-optional profile does not break existing `.env` files. Change the `AIRFLOW_*` secrets
-before sharing an Airflow instance.
-
-The Airflow scheduler mounts the host Docker socket and uses the host daemon to create
-the ingestion container on the `ai-tour-guide-network` network. This is intentionally
-not Docker-in-Docker: it avoids a nested daemon and lets the task resolve the Compose
-database as `database`. Access to the Docker socket is highly privileged; enable this
-profile only on trusted development hosts.
-
-Task logs are stored in the persistent `airflow_logs` volume, shared by the scheduler
-and API server. This keeps completed task logs available after either service restarts.
+Airflow is the recommended ingestion workflow for orchestrating document processing.
+Follow the [tutorial](docs/README.md#231-ingest-guides-with-airflow) for setup, DAG
+triggering, retries, and re-ingestion options. For a faster local setup, use
+`make db-init` followed by `make ingest` as described in the
+[quick start](#quick-start).
 
 ## Evaluation
 
-The project evaluates the current corpus and RAG pipeline with a 105-case golden
-dataset: 100 answerable questions and 5 unsupported questions. Each evaluation loads the
-bundled corpus into an isolated `evaluation` schema.
+The project evaluates retrieval and the RAG pipeline with a 105-case golden dataset and
+stores evaluation data in an isolated `evaluation` schema. The available search, RAG,
+and judge workflows are documented in the [tutorial](docs/README.md#6-evaluation), with
+the latest reports retained in the evaluation notebooks.
 
 | Evaluation | Run                    | Purpose                                                                          |
 | ---------- | ---------------------- | -------------------------------------------------------------------------------- |
 | Search     | `make evaluate-search` | Compare the current vector, full-text, and hybrid retrieval quality.             |
 | RAG        | `make evaluate-rag`    | Measure retrieval, citation, refusal, and latency metrics without the LLM judge. |
 | Judge      | `make evaluate-judge`  | Add LLM-judge answer-correctness scoring; this makes additional model calls.     |
-
-The corresponding notebooks retain the latest executed reports and conclusions:
-
-- [Search evaluation](evaluation/notebooks/search_evaluation.ipynb)
-- [RAG evaluation](evaluation/notebooks/rag_evaluation.ipynb)
-- [Judge evaluation](evaluation/notebooks/llm_judge_evaluation.ipynb)
-
-The latest retrieval comparison used the bundled corpus, `k=5`, and the configured
-`BAAI/bge-small-en-v1.5` embedding model. Hybrid search matched vector search's 98% hit
-rate and recall, while improving MRR slightly (0.9275 versus 0.9175); its mean search
-latency was 41 ms versus 34 ms. Full-text search was faster (8 ms) but achieved only 25%
-hit rate and recall. Hybrid search is therefore the application's default retrieval
-mode.
-
-The latest hybrid RAG run over all 105 cases achieved 99.0% source precision and recall,
-89.2% section precision, 96.2% section recall, and 96.2% citation validity, with no
-pipeline errors. The five unsupported cases exposed a remaining refusal gap: the model
-refused none of them, producing 95.2% refusal accuracy overall. The optional
-`gpt-4.1-mini` judge rated 97.1% of the 105 answers correct. These are current baseline
-results; prompt/model comparisons and broader robustness evaluations are deferred to
-follow-up work.
 
 ## Documentation
 
@@ -359,6 +257,8 @@ follow-up work.
   its operational cautions.
 - [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
   and monitoring.
+- [Troubleshooting](docs/README.md#5-troubleshooting): common setup and Docker fixes
+  issues.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
@@ -371,35 +271,8 @@ are not redistributed in this repository.
 
 ## Roadmap
 
-The complete plan, including milestones and deferred work, is maintained in
-[ROADMAP.md](ROADMAP.md).
-
-### Current release — v1.4.1: Multi-provider Petit Guide patch
-
-v1.4.1 is a patch release for v1.4.0’s Gemini and Petit Guide improvements:
-
-- Gemini supports structured, source-grounded answers and bounded search-tool usage.
-- Petit Guide has a consistent personality across conversational and retrieval prompts.
-- Configured identity and destination questions can be answered directly from
-  application data without an LLM call.
-- The chat and API expose the active LLM provider and model, with safer retries and
-  user-friendly unavailable-service errors.
-
-See the complete [v1.4.0 release notes](docs/releases/v1.4.0.md).
-
-The v1.4.1 patch also improves the Gradio chat experience:
-
-- Independent browser chat sessions and a reliable `/chat/start` welcome message.
-- Immediate user-message rendering while Petit Guide prepares a response.
-- Clearer demo-mode labelling and provider-neutral `request_id` chat persistence.
-
-See the complete [v1.4.1 release notes](docs/releases/v1.4.1.md).
-
-### Follow-up work
-
-Further hardening and experiments remain tracked in the [roadmap](ROADMAP.md), including
-runtime container tests, Airflow integration coverage, prompt comparisons, and optional
-cloud deployment.
+The complete plan, delivered milestones, release notes, and follow-up work are
+maintained in the [roadmap](ROADMAP.md) and [release notes](docs/releases/).
 
 ### Capstone success criteria
 
@@ -409,23 +282,50 @@ The project follows the
 A complete submission should demonstrate the following features:
 
 - ✅ A clearly defined problem, target users, supported questions, and limitations.
+  - The [question scope](#question-scope) defines the travel-planning use case, intended
+    questions, covered destinations, and explicit limitations.
 - ✅ An accessible source dataset and reproducible instructions for running the project.
+  - [`source_files.json`](source_files.json) identifies the public source guides, and
+    the [quick start](#quick-start) documents the Docker-based local workflow.
 - ✅ Automated ingestion from source documents into a searchable knowledge base.
+  - The ingestion CLI and
+    [Airflow workflow](docs/README.md#231-ingest-guides-with-airflow) download, parse,
+    chunk, embed, and store the guides in PostgreSQL with pgvector.
 - ✅ A RAG flow that retrieves relevant context from the knowledge base before an LLM
   generates an answer.
+  - The [agent guide](src/ai_tour_guide/app/agent/README.md) documents the retrieval and
+    generation flow, including grounded answers and validated citations.
 - ✅ Retrieval evaluation that compares multiple approaches and adopts the strongest
   configuration.
+  - The [search evaluation notebook](evaluation/notebooks/search_evaluation.ipynb)
+    compares vector, full-text, and hybrid search; hybrid search is the configured
+    default.
 - ⏳ LLM-answer evaluation that compares multiple prompt or generation approaches and
   selects the best one.
+  - The current judge workflow scores answer correctness, but prompt and generation
+    alternatives have not yet been compared systematically.
 - ✅ A usable interface for asking questions, such as the chat application and HTTP API.
+  - The [chat guide](src/ai_tour_guide/app/chat/README.md) and
+    [agent guide](src/ai_tour_guide/app/agent/README.md) document the Gradio interface
+    and FastAPI endpoints.
 - ✅ Monitoring through user feedback and dashboards that make application behaviour
   visible.
+  - The chat records feedback, while the [tutorial](docs/README.md#7-monitoring)
+    documents the Metabase dashboards for usage, quality, latency, and cost.
 - ✅ Containerised services, pinned dependency versions, and clear setup instructions for
   a reproducible local run.
+  - Docker Compose defines the application services, `pyproject.toml` pins dependencies,
+    and the [quick start](#quick-start) provides the local setup sequence.
 - ✅ Hybrid search evaluated against vector and full-text retrieval and selected as the
   application default.
+  - The retrieval comparison reports the trade-offs between all three modes and supports
+    hybrid search as the default configuration.
 - ⏳ Reranking and query rewriting remain optional follow-up experiments.
+  - Neither capability is part of the current runtime pipeline; both remain tracked as
+    optional [roadmap](ROADMAP.md) work.
 - ✅ Automated tests and CI/CD; cloud deployment remains an optional extension.
+  - Unit, smoke, and evaluation tests run in the repository's automated checks; cloud
+    deployment is intentionally outside the current local portfolio scope.
 
 #### Delivery status
 

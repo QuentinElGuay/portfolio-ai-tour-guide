@@ -38,7 +38,7 @@ class ChatHistoryItem(TypedDict):
 
 
 class ConversationButton(BaseModel):
-    """A backend-defined action that a generic client can render."""
+    """A chat-service action that a generic client can render."""
 
     model_config = ConfigDict(extra='forbid')
 
@@ -120,6 +120,7 @@ class ConversationResponse(BaseModel):
     buttons: list[ConversationButton] = Field(default_factory=list)
     request_id: UUID | None = None
     sources: list[dict[str, object]] = Field(default_factory=list)
+    evidence: list[dict[str, object]] = Field(default_factory=list)
     trace: ConversationTrace | None = None
     llm: LLMInfo | None = None
 

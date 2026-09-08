@@ -12,10 +12,10 @@ import gradio as gr
 from ai_tour_guide.app.agent.identity import FRENCH_EXPRESSIONS
 from ai_tour_guide.app.agent.source_formatting import format_pages
 from ai_tour_guide.app.chat.backends import (
-    ChatBackend,
-    DemoBackend,
-    HttpChatBackend,
-    create_backend,
+    ChatService,
+    DemoChatService,
+    HttpChatService,
+    create_chat_service,
 )
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 FEEDBACK_ACKNOWLEDGEMENT = 'Thanks for your feedback!'
 INVALID_SOURCE_ERROR = 'The chat response has an invalid source.'
-BACKEND_ERROR_MESSAGE = (
+CHAT_SERVICE_ERROR_MESSAGE = (
     "Oh là là! I'm having a little trouble reaching the travel service right now. "
     'Please try again in a short while.'
 )
@@ -202,7 +202,7 @@ def update_feedback_values(
 
 async def submit_feedback(
     selection: dict[str, object] | None,
-    backend: ChatBackend,
+    service: ChatService,
 ) -> None:
     """Submit a valid thumbs up or thumbs down selection."""
     if not isinstance(selection, dict):
@@ -217,14 +217,14 @@ async def submit_feedback(
         request_id,
         helpful,
     )
-    await backend.submit_feedback(request_id, helpful)
+    await service.submit_feedback(request_id, helpful)
 
 
 async def start_client_chat(
-    backend: ChatBackend,
+    service: ChatService,
 ) -> tuple[dict[object, object], list[ChatHistoryItem], str]:
     """Start and render an independent conversation for one Gradio client."""
-    response = await backend.start_chat()
+    response = await service.start_chat()
     request_ids: dict[object, object] = {
         'session_id': str(response.session_id),
         'step_id': str(response.step_id),
@@ -250,7 +250,7 @@ async def start_client_chat(
 
 
 def chat_css(*, demo_mode: bool) -> str:
-    """Return chat styling with the assistant label for the selected backend."""
+    """Return chat styling with the assistant label for the selected service."""
     assistant_label = 'Petit Guide (demo mode)' if demo_mode else 'Petit Guide'
     return CHAT_CSS.replace(ASSISTANT_LABEL_PLACEHOLDER, assistant_label)
 
@@ -260,21 +260,21 @@ def is_demo_mode() -> bool:
     return os.getenv('AGENT_LLM_PROVIDER') == 'baguette-llm'
 
 
-def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
-    """Create the UI with an injected backend or its development fallback."""
-    selected_backend = backend or DemoBackend()
+def create_app(service: ChatService | None = None) -> gr.Blocks:
+    """Create the UI with an injected chat service or its development fallback."""
+    selected_service = service or DemoChatService()
 
     async def initialize_client() -> tuple[
         dict[object, object], list[ChatHistoryItem], str
     ]:
         """Create a conversation when a browser client loads the interface."""
-        return await start_client_chat(selected_backend)
+        return await start_client_chat(selected_service)
 
     def add_user_message(
         message: str,
         history: list[ChatHistoryItem],
     ) -> tuple[str, list[ChatHistoryItem], str]:
-        """Render the user's message before the backend begins its response."""
+        """Render the user's message before the chat service begins its response."""
         return (
             '',
             [*history, {'role': Role.USER, 'content': message}],
@@ -310,7 +310,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
                 if selected_button is not None
                 else FREE_TEXT_INPUT_ID
             )
-            response = await selected_backend.send_message(
+            response = await selected_service.send_message(
                 cast(str, request_ids['session_id']),
                 cast(str, request_ids['step_id']),
                 input_id,
@@ -318,8 +318,8 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
             )
             reply = _render_conversation_response(response)
         except RuntimeError:
-            logger.exception('Chat backend request failed')
-            reply = BACKEND_ERROR_MESSAGE
+            logger.exception('Chat service request failed')
+            reply = CHAT_SERVICE_ERROR_MESSAGE
             request_id = placeholder_request_id(assistant_message_index)
         else:
             response_request_id = response.message_id
@@ -364,7 +364,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         history: list[ChatHistoryItem],
         data: gr.SelectData,
     ) -> tuple[str, list[ChatHistoryItem], str]:
-        """Render a selected backend option as a normal user message."""
+        """Render a selected chat-service option as a normal user message."""
         if not isinstance(data.value, str):
             return '', history, ''
         return add_user_message(data.value, history)
@@ -381,7 +381,7 @@ def create_app(backend: ChatBackend | None = None) -> gr.Blocks:
         selection = select_feedback(request_ids, data)
         if selection is None:
             return gr.update(), feedback_values
-        await submit_feedback(selection, selected_backend)
+        await submit_feedback(selection, selected_service)
         logger.info(
             'chat feedback selected: request_id=%s helpful=%s',
             selection['request_id'],
@@ -533,13 +533,13 @@ def main() -> None:
         level=logging.INFO,
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
-    backend = create_backend()
-    if isinstance(backend, HttpChatBackend):
+    service = create_chat_service()
+    if isinstance(service, HttpChatService):
         try:
-            asyncio.run(backend.check_ready())
+            asyncio.run(service.check_ready())
         except RuntimeError as exc:
             raise SystemExit(str(exc)) from exc
-    app = create_app(backend)
+    app = create_app(service)
     app.launch(
         server_name=os.getenv('CHAT_HOST', '127.0.0.1'),
         server_port=int(os.getenv('CHAT_PORT', '7860')),
