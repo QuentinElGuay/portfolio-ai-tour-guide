@@ -279,52 +279,52 @@ maintained in the [roadmap](ROADMAP.md) and [release notes](docs/releases/).
 The project follows the
 [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
 
-A complete submission should demonstrate the following features:
+### A complete submission should demonstrate the following features:
 
-- ✅ A clearly defined problem, target users, supported questions, and limitations.
-  - The [question scope](#question-scope) defines the travel-planning use case, intended
-    questions, covered destinations, and explicit limitations.
-- ✅ An accessible source dataset and reproducible instructions for running the project.
-  - [`source_files.json`](source_files.json) identifies the public source guides, and
+- A clearly defined problem, target users, supported questions, and limitations.
+  - ✅ The [question scope](#question-scope) defines the travel-planning use case,
+    intended questions, covered destinations, and explicit limitations.
+- An accessible source dataset and reproducible instructions for running the project.
+  - ✅ [`source_files.json`](source_files.json) identifies the public source guides, and
     the [quick start](#quick-start) documents the Docker-based local workflow.
-- ✅ Automated ingestion from source documents into a searchable knowledge base.
-  - The ingestion CLI and
+- Automated ingestion from source documents into a searchable knowledge base.
+  - ✅ The ingestion CLI and
     [Airflow workflow](docs/README.md#231-ingest-guides-with-airflow) download, parse,
     chunk, embed, and store the guides in PostgreSQL with pgvector.
-- ✅ A RAG flow that retrieves relevant context from the knowledge base before an LLM
+- A RAG flow that retrieves relevant context from the knowledge base before an LLM
   generates an answer.
-  - The [agent guide](src/ai_tour_guide/app/agent/README.md) documents the retrieval and
-    generation flow, including grounded answers and validated citations.
-- ✅ Retrieval evaluation that compares multiple approaches and adopts the strongest
+  - ✅ The [agent guide](src/ai_tour_guide/app/agent/README.md) documents the retrieval
+    and generation flow, including grounded answers and validated citations.
+- Retrieval evaluation that compares multiple approaches and adopts the strongest
   configuration.
-  - The [search evaluation notebook](evaluation/notebooks/search_evaluation.ipynb)
+  - ✅ The [search evaluation notebook](evaluation/notebooks/search_evaluation.ipynb)
     compares vector, full-text, and hybrid search; hybrid search is the configured
     default.
-- ⏳ LLM-answer evaluation that compares multiple prompt or generation approaches and
+- LLM-answer evaluation that compares multiple prompt or generation approaches and
   selects the best one.
-  - The current judge workflow scores answer correctness, but prompt and generation
+  - ⏳ The current judge workflow scores answer correctness, but prompt and generation
     alternatives have not yet been compared systematically.
-- ✅ A usable interface for asking questions, such as the chat application and HTTP API.
-  - The [chat guide](src/ai_tour_guide/app/chat/README.md) and
+- A usable interface for asking questions, such as the chat application and HTTP API.
+  - ✅ The [chat guide](src/ai_tour_guide/app/chat/README.md) and
     [agent guide](src/ai_tour_guide/app/agent/README.md) document the Gradio interface
     and FastAPI endpoints.
-- ✅ Monitoring through user feedback and dashboards that make application behaviour
+- Monitoring through user feedback and dashboards that make application behaviour
   visible.
-  - The chat records feedback, while the [tutorial](docs/README.md#7-monitoring)
+  - ✅ The chat records feedback, while the [tutorial](docs/README.md#7-monitoring)
     documents the Metabase dashboards for usage, quality, latency, and cost.
-- ✅ Containerised services, pinned dependency versions, and clear setup instructions for
-  a reproducible local run.
-  - Docker Compose defines the application services, `pyproject.toml` pins dependencies,
-    and the [quick start](#quick-start) provides the local setup sequence.
-- ✅ Hybrid search evaluated against vector and full-text retrieval and selected as the
+- Containerised services, pinned dependency versions, and clear setup instructions for a
+  reproducible local run.
+  - ✅ Docker Compose defines the application services, `pyproject.toml` pins
+    dependencies, and the [quick start](#quick-start) provides the local setup sequence.
+- Hybrid search evaluated against vector and full-text retrieval and selected as the
   application default.
-  - The retrieval comparison reports the trade-offs between all three modes and supports
-    hybrid search as the default configuration.
-- ⏳ Reranking and query rewriting remain optional follow-up experiments.
-  - Neither capability is part of the current runtime pipeline; both remain tracked as
+  - ✅ The retrieval comparison reports the trade-offs between all three modes and
+    supports hybrid search as the default configuration.
+- Reranking and query rewriting remain optional follow-up experiments.
+  - ⏳ Neither capability is part of the current runtime pipeline; both remain tracked as
     optional [roadmap](ROADMAP.md) work.
-- ✅ Automated tests and CI/CD; cloud deployment remains an optional extension.
-  - Unit, smoke, and evaluation tests run in the repository's automated checks; cloud
+- Automated tests and CI/CD; cloud deployment remains an optional extension.
+  - ✅ Unit, smoke, and evaluation tests run in the repository's automated checks; cloud
     deployment is intentionally outside the current local portfolio scope.
 
 #### Delivery status
