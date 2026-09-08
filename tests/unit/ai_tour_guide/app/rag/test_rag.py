@@ -9,7 +9,7 @@ from ai_tour_guide.app.agent.responses import (
     INSUFFICIENT_CONTEXT_ANSWER,
     LOW_CONFIDENCE_RETRIEVAL_ANSWER,
 )
-from ai_tour_guide.app.chat.models import Role
+from ai_tour_guide.app.chat.models import Message, Role
 from ai_tour_guide.app.services.rag.models import (
     CitationValidationResult,
     GeneratedAnswer,
@@ -285,7 +285,7 @@ def test_conversation_history_does_not_trigger_catalog_routing(
     )
     build_agent_graph.return_value = graph
     client = MagicMock()
-    history = (
+    history: tuple[Message, ...] = (
         {
             'role': Role.USER,
             'content': 'What is your favourite destination?',

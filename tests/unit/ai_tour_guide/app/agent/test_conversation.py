@@ -3,6 +3,7 @@ from typing import cast
 from unittest.mock import AsyncMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from ai_tour_guide.app.agent.conversation import (
@@ -154,33 +155,39 @@ def test_outer_conversation_keeps_history_separate_from_the_raw_question() -> No
         checkpointer=MemorySaver(), answer_turn=answer_turn
     )
     session_id = '12345678-1234-5678-1234-567812345678'
-    config = {'configurable': {'thread_id': session_id}}
+    config: RunnableConfig = {'configurable': {'thread_id': session_id}}
     asyncio.run(
         graph.ainvoke({'session_id': session_id, 'messages': []}, config=config)
     )
     asyncio.run(
         graph.ainvoke(
-            {
-                'latest_request': {
-                    'session_id': session_id,
-                    'expected_step_id': 'welcome',
-                    'input_id': FREE_TEXT_INPUT_ID,
-                    'text': 'What is your favourite destination?',
-                }
-            },
+            cast(
+                OuterConversationState,
+                {
+                    'latest_request': {
+                        'session_id': session_id,
+                        'expected_step_id': 'welcome',
+                        'input_id': FREE_TEXT_INPUT_ID,
+                        'text': 'What is your favourite destination?',
+                    }
+                },
+            ),
             config=config,
         )
     )
     asyncio.run(
         graph.ainvoke(
-            {
-                'latest_request': {
-                    'session_id': session_id,
-                    'expected_step_id': 'welcome',
-                    'input_id': FREE_TEXT_INPUT_ID,
-                    'text': 'What should I visit there?',
-                }
-            },
+            cast(
+                OuterConversationState,
+                {
+                    'latest_request': {
+                        'session_id': session_id,
+                        'expected_step_id': 'welcome',
+                        'input_id': FREE_TEXT_INPUT_ID,
+                        'text': 'What should I visit there?',
+                    }
+                },
+            ),
             config=config,
         )
     )

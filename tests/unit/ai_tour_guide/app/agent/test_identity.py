@@ -43,5 +43,5 @@ def test_petit_guide_identity_contains_facts_not_personality_traits() -> None:
 def test_french_expression_guidance_is_shared_with_the_chat_ui() -> None:
     """Keep the UI expression inventory aligned with prompt guidance."""
     assert FRENCH_EXPRESSIONS == tuple(FRENCH_EXPRESSION_GUIDANCE)
-    assert 'Voilà!' in FRENCH_EXPRESSIONS
-    assert 'Salut!' in FRENCH_EXPRESSIONS
+    assert 'Voilà' in FRENCH_EXPRESSIONS
+    assert 'Salut' in FRENCH_EXPRESSIONS

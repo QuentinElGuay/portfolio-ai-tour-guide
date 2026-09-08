@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import logging
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,7 +13,7 @@ from uuid import uuid4
 from sqlalchemy import delete, insert, select, update
 
 from ai_tour_guide.app.agent.responses import GENERATION_ERROR_ANSWER
-from ai_tour_guide.app.chat.models import ChatMessage, Role
+from ai_tour_guide.app.chat.models import ChatMessage, Message, Role
 from ai_tour_guide.app.services.rag.models import GeneratedAnswer
 from ai_tour_guide.app.services.rag.persistence import (
     _usage_event_values,
@@ -57,10 +58,11 @@ class SimulatedLLMClient:
         self,
         question: str,
         *,
-        previous_queries: object,
+        previous_queries: Sequence[str],
         has_context: bool,
+        conversation_history: Sequence[Message] = (),
     ) -> str | None:
-        del has_context
+        del has_context, conversation_history
         return None if previous_queries else question
 
 
