@@ -1,7 +1,5 @@
 # _Bon Voyage_ - AI travel assistant
 
-# _Bon Voyage_ - AI travel assistant
-
 [![CI](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
