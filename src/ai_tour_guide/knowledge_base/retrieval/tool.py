@@ -1,5 +1,6 @@
 """Shared, provider-neutral retrieval tool for tourism knowledge."""
 
+import logging
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
@@ -12,6 +13,8 @@ from ai_tour_guide.knowledge_base.retrieval.models import RetrievedContext
 from ai_tour_guide.knowledge_base.search import DEFAULT_SEARCH_MODE, SearchMode
 from ai_tour_guide.knowledge_base.search.models import ScoreKind, SearchResult
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +82,7 @@ class RetrievalQualitySettings:
     minimum_l2_relevance: float = -1.0
     minimum_inner_product: float = 0.0
     minimum_text_rank: float = 0.05
-    minimum_rrf: float = 0.02
+    minimum_rrf: float = 0.015
 
     def __post_init__(self) -> None:
         values = (
@@ -120,6 +123,7 @@ class TourismEvidence:
     publication_date: str | None
     pages: tuple[int, ...]
     document_id: int
+    chunk_id: str
     section_id: str
     section_path: tuple[str, ...]
     rank: int
@@ -138,6 +142,7 @@ class TourismEvidence:
             'publication_date': self.publication_date,
             'pages': list(self.pages),
             'document_id': self.document_id,
+            'chunk_id': self.chunk_id,
             'section_id': self.section_id,
             'section_path': list(self.section_path),
             'rank': self.rank,
@@ -200,6 +205,7 @@ def _evidence(context: RetrievedContext) -> TourismEvidence:
         ),
         pages=context.pages,
         document_id=document.document_id,
+        chunk_id=result.chunk.chunk_id,
         section_id=context.section_id,
         section_path=context.section_path,
         rank=result.search.rank,
@@ -211,6 +217,77 @@ def _evidence(context: RetrievedContext) -> TourismEvidence:
 def _is_valuable(evidence: TourismEvidence, settings: RetrievalQualitySettings) -> bool:
     """Return whether an evidence item's score is safe to supply to an LLM."""
     return evidence.score >= settings.minimum_score(evidence.score_kind)
+
+
+def _log_retrieved_chunks(
+    query: TourismSearchQuery, contexts: tuple[RetrievedContext, ...]
+) -> None:
+    """Log raw retrieved chunks only when application debug logging is enabled."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    for context in contexts:
+        logger.debug(
+            'retrieval.search_chunks query=%r document_id=%s title=%r '
+            'section_id=%s section_path=%s chunks=%r',
+            query.query,
+            context.source_document.document_id,
+            context.source_document.title,
+            context.section_id,
+            context.section_path,
+            [
+                {
+                    'chunk_id': chunk.chunk_id,
+                    'chunk_index': chunk.chunk_index,
+                    'page_start': chunk.page_start,
+                    'page_end': chunk.page_end,
+                    'text': chunk.text,
+                }
+                for chunk in context.context_chunks
+            ],
+        )
+
+
+def _log_search_result(
+    result: TourismSearchResult, quality_settings: RetrievalQualitySettings
+) -> TourismSearchResult:
+    """Log retrieval diagnostics without exposing indexed chunk text."""
+    evidence = result.all_evidence
+    logger.info(
+        'retrieval.search_completed query=%r mode=%s k=%s status=%s '
+        'candidate_context_count=%s accepted_context_count=%s '
+        'rejected_context_count=%s error_type=%s',
+        result.query.query,
+        result.query.mode.value,
+        result.query.k,
+        result.status.value,
+        len(evidence),
+        len(result.evidence),
+        len(result.low_confidence_evidence),
+        result.error.error_type if result.error is not None else None,
+    )
+    for item in evidence:
+        threshold = quality_settings.minimum_score(item.score_kind)
+        accepted = _is_valuable(item, quality_settings)
+        logger.info(
+            'retrieval.search_candidate query=%r accepted=%s '
+            'rejection_reason=%s rank=%s score=%s score_kind=%s '
+            'minimum_score=%s document_id=%s title=%r section_id=%s '
+            'chunk_id=%s section_path=%s pages=%s',
+            result.query.query,
+            accepted,
+            None if accepted else 'score_below_minimum',
+            item.rank,
+            item.score,
+            item.score_kind.value,
+            threshold,
+            item.document_id,
+            item.title,
+            item.section_id,
+            item.chunk_id,
+            item.section_path,
+            item.pages,
+        )
+    return result
 
 
 def search_tourism_knowledge_base(
@@ -233,17 +310,24 @@ def search_tourism_knowledge_base(
             strategy=strategy,
         )
     except (OSError, SQLAlchemyError, RuntimeError) as exc:
-        return TourismSearchResult(
-            status=RetrievalStatus.ERROR,
-            query=selected_query,
-            error=RetrievalToolError(type(exc).__name__, str(exc)),
+        return _log_search_result(
+            TourismSearchResult(
+                status=RetrievalStatus.ERROR,
+                query=selected_query,
+                error=RetrievalToolError(type(exc).__name__, str(exc)),
+            ),
+            quality_settings,
         )
 
+    _log_retrieved_chunks(selected_query, contexts)
     context_evidence = tuple((context, _evidence(context)) for context in contexts)
     if not context_evidence:
-        return TourismSearchResult(
-            status=RetrievalStatus.EMPTY,
-            query=selected_query,
+        return _log_search_result(
+            TourismSearchResult(
+                status=RetrievalStatus.EMPTY,
+                query=selected_query,
+            ),
+            quality_settings,
         )
 
     valuable_pairs = tuple(
@@ -256,17 +340,24 @@ def search_tourism_knowledge_base(
         for context, evidence in context_evidence
         if not _is_valuable(evidence, quality_settings)
     )
-    return TourismSearchResult(
-        status=(
-            RetrievalStatus.SUCCESS
-            if valuable_pairs
-            else RetrievalStatus.LOW_CONFIDENCE
+    return _log_search_result(
+        TourismSearchResult(
+            status=(
+                RetrievalStatus.SUCCESS
+                if valuable_pairs
+                else RetrievalStatus.LOW_CONFIDENCE
+            ),
+            query=selected_query,
+            evidence=tuple(evidence for _, evidence in valuable_pairs),
+            low_confidence_evidence=tuple(
+                evidence for _, evidence in low_confidence_pairs
+            ),
+            contexts=tuple(context for context, _ in valuable_pairs),
+            low_confidence_contexts=tuple(
+                context for context, _ in low_confidence_pairs
+            ),
         ),
-        query=selected_query,
-        evidence=tuple(evidence for _, evidence in valuable_pairs),
-        low_confidence_evidence=tuple(evidence for _, evidence in low_confidence_pairs),
-        contexts=tuple(context for context, _ in valuable_pairs),
-        low_confidence_contexts=tuple(context for context, _ in low_confidence_pairs),
+        quality_settings,
     )
 
 

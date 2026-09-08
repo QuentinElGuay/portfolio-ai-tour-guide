@@ -1,6 +1,7 @@
 name: ai-tour-guide
 
 x-app-environment: &app-environment
+  APP_DEBUG: "${APP_DEBUG:-false}"
   APP_ENABLE_LLM: "${APP_ENABLE_LLM:-1}"
   APP_ENABLE_RETRIEVAL: "${APP_ENABLE_RETRIEVAL:-1}"
   DB_HOST: database

@@ -7,6 +7,7 @@ from typing import Protocol
 from uuid import UUID
 
 from ai_tour_guide.app.agent.flow import FlowStep
+from ai_tour_guide.app.chat.models import Message
 
 
 class TravelAgentStatus(StrEnum):
@@ -23,6 +24,7 @@ class TravelTurnContext:
 
     session_id: str
     flow_step: FlowStep
+    conversation_history: tuple[Message, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

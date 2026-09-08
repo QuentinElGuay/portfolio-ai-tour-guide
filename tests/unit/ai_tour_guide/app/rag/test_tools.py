@@ -33,8 +33,13 @@ def _context(
     )
     chunk = MagicMock(
         document_id=7,
+        chunk_id='chunk-1',
+        chunk_index=0,
         section_id='transport',
         section_path=['Transport'],
+        page_start=4,
+        page_end=5,
+        text='Take the train from Rennes. The station is central.',
         document=document,
     )
     result = SearchResult(
@@ -47,6 +52,7 @@ def _context(
         section_path=('Transport',),
         text='Take the train from Rennes.\n\nThe station is central.',
         pages=(4, 5),
+        context_chunks=(chunk,),
         search_results=(result,),
     )
 
@@ -116,6 +122,49 @@ def test_search_tool_keeps_low_confidence_contexts_out_of_llm_evidence() -> None
     assert len(result.low_confidence_contexts) == 1
 
 
+def test_search_tool_logs_rejected_candidate_metadata(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level('INFO', logger='ai_tour_guide.knowledge_base.retrieval.tool')
+    with patch(
+        'ai_tour_guide.knowledge_base.retrieval.tool.retrieve_context',
+        return_value=(_context(score=0.4, score_kind=ScoreKind.COSINE_SIMILARITY),),
+    ):
+        search_tourism_knowledge_base('train')
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any('status=low_confidence' in message for message in messages)
+    candidate = next(
+        message for message in messages if 'retrieval.search_candidate' in message
+    )
+    assert 'accepted=False' in candidate
+    assert 'rejection_reason=score_below_minimum' in candidate
+    assert 'score=0.4' in candidate
+    assert 'score_kind=cosine_similarity' in candidate
+    assert 'minimum_score=0.65' in candidate
+    assert "title='Guide to Brittany'" in candidate
+    assert 'chunk_id=chunk-1' in candidate
+
+
+def test_search_tool_logs_full_chunks_at_debug_level(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level('DEBUG', logger='ai_tour_guide.knowledge_base.retrieval.tool')
+    with patch(
+        'ai_tour_guide.knowledge_base.retrieval.tool.retrieve_context',
+        return_value=(_context(),),
+    ):
+        search_tourism_knowledge_base('train')
+
+    chunks = next(
+        record.getMessage()
+        for record in caplog.records
+        if 'retrieval.search_chunks' in record.getMessage()
+    )
+    assert "'chunk_id': 'chunk-1'" in chunks
+    assert 'Take the train from Rennes.' in chunks
+
+
 def test_search_tool_applies_score_kind_specific_thresholds() -> None:
     low_text = _context(rank=1, score=0.04, score_kind=ScoreKind.TEXT_RANK)
     high_vector = _context(rank=2, score=0.7, score_kind=ScoreKind.COSINE_SIMILARITY)
@@ -135,6 +184,18 @@ def test_search_tool_applies_score_kind_specific_thresholds() -> None:
     assert [evidence.score for evidence in result.evidence] == [0.7]
     assert [evidence.score for evidence in result.low_confidence_evidence] == [0.04]
     assert [evidence.rank for evidence in result.all_evidence] == [1, 2]
+
+
+def test_search_tool_uses_rank_appropriate_default_rrf_cutoff() -> None:
+    context = _context(rank=5, score=1 / 65, score_kind=ScoreKind.RRF)
+    with patch(
+        'ai_tour_guide.knowledge_base.retrieval.tool.retrieve_context',
+        return_value=(context,),
+    ):
+        result = search_tourism_knowledge_base('train')
+
+    assert result.status is RetrievalStatus.SUCCESS
+    assert len(result.evidence) == 1
 
 
 def test_search_tool_uses_the_best_matched_chunk_for_a_logical_context() -> None:

@@ -24,6 +24,7 @@ from ai_tour_guide.app.chat.models import (
     Emotion,
     Role,
 )
+from ai_tour_guide.app.runtime import configure_application_logging
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +311,16 @@ def create_app(service: ChatService | None = None) -> gr.Blocks:
                 if selected_button is not None
                 else FREE_TEXT_INPUT_ID
             )
+            logger.info(
+                'chat.routing session_id=%s expected_step=%s message=%r '
+                'available_buttons=%r selected_button=%r input_id=%s',
+                request_ids.get('session_id'),
+                request_ids.get('step_id'),
+                message,
+                buttons,
+                selected_button,
+                input_id,
+            )
             response = await selected_service.send_message(
                 cast(str, request_ids['session_id']),
                 cast(str, request_ids['step_id']),
@@ -529,10 +540,7 @@ def _italicize_french_expressions(answer: str) -> str:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    )
+    configure_application_logging()
     service = create_chat_service()
     if isinstance(service, HttpChatService):
         try:

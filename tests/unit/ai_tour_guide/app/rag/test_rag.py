@@ -27,6 +27,7 @@ from ai_tour_guide.app.services.rag.prompting import (
 from ai_tour_guide.app.services.rag.workflow import (
     _build_meta_messages,
     build_agent_graph,
+    run_agent_workflow,
 )
 from ai_tour_guide.knowledge_base.database.models import DocumentChunkRow, DocumentRow
 from ai_tour_guide.knowledge_base.retrieval.context import build_retrieved_contexts
@@ -260,6 +261,55 @@ def test_destination_catalog_detection_rejects_detailed_questions() -> None:
     assert not is_destination_catalog_question(
         'What are the best places to visit in Normandy?'
     )
+
+
+@patch('ai_tour_guide.app.services.rag.workflow.build_agent_graph')
+@patch('ai_tour_guide.app.services.rag.workflow.list_indexed_destinations')
+def test_conversation_history_does_not_trigger_catalog_routing(
+    list_indexed_destinations: MagicMock,
+    build_agent_graph: MagicMock,
+) -> None:
+    """Evaluate catalog routing against the latest question, never prior turns."""
+    graph = MagicMock()
+    graph.ainvoke = AsyncMock(
+        return_value={
+            'question': 'What should I visit there?',
+            'conversation_history': (),
+            'option_id': None,
+            'flow_step': 'welcome',
+            'input_type': 'free_text',
+            'queries': [],
+            'contexts': (),
+            'next_query': None,
+        }
+    )
+    build_agent_graph.return_value = graph
+    client = MagicMock()
+    history = (
+        {
+            'role': Role.USER,
+            'content': 'What is your favourite destination?',
+        },
+        {
+            'role': Role.ASSISTANT,
+            'content': 'I have a soft spot for Brittany.',
+        },
+    )
+
+    asyncio.run(
+        run_agent_workflow(
+            'What should I visit there?',
+            client,
+            conversation_history=history,
+        )
+    )
+
+    list_indexed_destinations.assert_not_called()
+    build_agent_graph.assert_called_once_with(client, engine=None, strategy=None)
+    graph.ainvoke.assert_awaited_once()
+    state = graph.ainvoke.await_args.args[0]
+    assert state['question'] == 'What should I visit there?'
+    assert state['conversation_history'] == history
 
 
 def test_system_prompt_includes_current_destination_catalog() -> None:

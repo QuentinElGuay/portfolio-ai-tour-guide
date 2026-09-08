@@ -19,6 +19,7 @@ from ai_tour_guide.app.agent.responses import (
     INSUFFICIENT_CONTEXT_ANSWER,
     LOW_CONFIDENCE_RETRIEVAL_ANSWER,
 )
+from ai_tour_guide.app.chat.models import Message
 from ai_tour_guide.app.chat.navigation import normalize_option_id
 from ai_tour_guide.app.llm.clients import (
     GenerationError,
@@ -97,6 +98,7 @@ async def answer_question_async(
     request_id: UUID | None = None,
     knowledge_base_available: Callable[[], bool] | None = None,
     retrieval_enabled: bool = True,
+    conversation_history: tuple[Message, ...] = (),
 ) -> RAGResult:
     """Retrieve evidence, generate a cited answer, and retain its full trace."""
     started = perf_counter()
@@ -117,6 +119,7 @@ async def answer_question_async(
         started=started,
         knowledge_base_available=knowledge_base_available,
         retrieval_enabled=retrieval_enabled,
+        conversation_history=conversation_history,
     )
 
 
@@ -134,6 +137,7 @@ async def _answer_with_agent(
     started: float,
     knowledge_base_available: Callable[[], bool] | None,
     retrieval_enabled: bool,
+    conversation_history: tuple[Message, ...],
 ) -> RAGResult:
     """Adapt the bounded LangGraph state to the stable RAG result contract."""
     retrieval_started = perf_counter()
@@ -147,6 +151,7 @@ async def _answer_with_agent(
             strategy=strategy,
             knowledge_base_available=knowledge_base_available,
             retrieval_enabled=retrieval_enabled,
+            conversation_history=conversation_history,
         )
     except (GenerationError, OSError, SQLAlchemyError) as exc:
         return RAGResult(
@@ -249,7 +254,11 @@ async def _answer_with_agent(
         request_id=request_id,
         mode=mode,
         k=k,
-        messages=build_messages(question, contexts),
+        messages=build_messages(
+            question,
+            contexts,
+            conversation_history=conversation_history,
+        ),
         generated=generated,
         contexts=contexts,
         sources=validation.references,

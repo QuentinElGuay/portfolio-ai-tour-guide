@@ -14,6 +14,7 @@ from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
 from ai_tour_guide.app.agent.travel.contracts import (
     TravelAgentStatus,
+    TravelTurnContext,
     TravelTurnResult,
 )
 from ai_tour_guide.app.api import (
@@ -103,7 +104,10 @@ def test_demo_turn_does_not_use_retrieval(
         lambda engine=None: False,
     )
     result = asyncio.run(
-        _answer_turn('What is kouign-amann?', 'session', FlowStep.MAIN_MENU)
+        _answer_turn(
+            'What is kouign-amann?',
+            TravelTurnContext('session', FlowStep.MAIN_MENU),
+        )
     )
 
     assert result.answer.startswith('Kouign-amann is a rich, buttery Breton pastry')

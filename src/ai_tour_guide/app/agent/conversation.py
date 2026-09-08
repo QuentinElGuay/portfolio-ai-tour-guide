@@ -1,5 +1,6 @@
 """Session-scoped conversation orchestration around the RAG agent."""
 
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Annotated, Literal, NotRequired, TypedDict
 from uuid import UUID, uuid4
@@ -19,11 +20,13 @@ from ai_tour_guide.app.agent.flow import (
 )
 from ai_tour_guide.app.agent.identity import IDENTITY_ANSWERS, WELCOME_MESSAGE
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
-from ai_tour_guide.app.agent.travel.contracts import TravelTurnResult
+from ai_tour_guide.app.agent.travel.contracts import TravelTurnContext, TravelTurnResult
 from ai_tour_guide.app.chat.models import (
     FREE_TEXT_INPUT_ID,
     ChatMessageRequest,
     ConversationTrace,
+    Message,
+    Role,
 )
 from ai_tour_guide.app.llm.clients import AgentLLMClient
 from ai_tour_guide.app.llm.settings import LLMProvider
@@ -32,6 +35,8 @@ from ai_tour_guide.app.services.rag.models import RAGResult
 from ai_tour_guide.app.services.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationState(TypedDict):
@@ -78,7 +83,7 @@ def welcome_message_for_provider(
 def build_outer_conversation_graph(
     *,
     checkpointer: MemorySaver,
-    answer_turn: Callable[[str, str, FlowStep], Awaitable[TravelTurnResult]],
+    answer_turn: Callable[[str, TravelTurnContext], Awaitable[TravelTurnResult]],
     list_destination_names: Callable[[], tuple[str, ...]] | None = None,
     on_result: Callable[[TravelTurnResult], None] | None = None,
     welcome_message: str = WELCOME_MESSAGE,
@@ -126,6 +131,7 @@ def build_outer_conversation_graph(
         )
 
     async def initialize(state: OuterConversationState) -> dict[str, object]:
+        logger.info('conversation.initialized session_id=%s', state['session_id'])
         return {
             'initialized': True,
             'flow_step': FlowStep.WELCOME.value,
@@ -147,15 +153,40 @@ def build_outer_conversation_graph(
             )
         current = FlowStep(state.get('flow_step', FlowStep.WELCOME))
         if request.expected_step_id != current:
+            logger.warning(
+                'conversation.rejected_stale_step session_id=%s expected_step=%s '
+                'current_step=%s input_id=%s',
+                request.session_id,
+                request.expected_step_id,
+                current.value,
+                request.input_id,
+            )
             raise ConversationGraphError(
                 'stale_expected_step_id',
                 'The conversation step is stale; render the latest response first.',
             )
         next_step = transition_for(current, request.input_id, text=request.text)
         if next_step is None:
+            logger.warning(
+                'conversation.rejected_action session_id=%s current_step=%s '
+                'input_id=%s has_text=%s',
+                request.session_id,
+                current.value,
+                request.input_id,
+                request.text is not None,
+            )
             raise ConversationGraphError(
                 'invalid_action', 'That input is not valid at the current step.'
             )
+        logger.info(
+            'conversation.request_validated session_id=%s current_step=%s '
+            'next_step=%s input_id=%s has_text=%s',
+            request.session_id,
+            current.value,
+            next_step.value,
+            request.input_id,
+            request.text is not None,
+        )
         return {
             'current_step': current.value,
             'next_step': next_step.value,
@@ -181,6 +212,15 @@ def build_outer_conversation_graph(
         if next_step_value is None:
             raise ConversationGraphError('invalid_action', 'A next step is required.')
         next_step = FlowStep(next_step_value)
+        logger.info(
+            'conversation.response_completed session_id=%s next_step=%s '
+            'request_id=%s source_count=%s evidence_count=%s',
+            request.session_id,
+            next_step.value,
+            request_id,
+            len(sources or []),
+            len(evidence or []),
+        )
         return {
             'messages': [
                 HumanMessage(content=request.text or request.input_id),
@@ -200,12 +240,23 @@ def build_outer_conversation_graph(
 
     async def guided_action(state: OuterConversationState) -> dict[str, object]:
         request = request_for(state)
+        logger.info(
+            'conversation.route session_id=%s route=guided_action input_id=%s',
+            request.session_id,
+            request.input_id,
+        )
         return completed_response(
             state,
             IDENTITY_ANSWERS[FLOW_QUESTIONS[request.input_id]],
         )
 
     async def catalog(state: OuterConversationState) -> dict[str, object]:
+        request = request_for(state)
+        logger.info(
+            'conversation.route session_id=%s route=catalog input_id=%s',
+            request.session_id,
+            request.input_id,
+        )
         destination_names = resolve_destination_names()
         message = (
             'Our currently covered destinations are:\n'
@@ -223,7 +274,24 @@ def build_outer_conversation_graph(
                 'invalid_action', 'A current step is required.'
             )
         current = FlowStep(current_step)
-        result = await answer_turn(request.text or '', str(request.session_id), current)
+        history = _recent_conversation_history(state.get('messages', []))
+        question = request.text or ''
+        logger.info(
+            'conversation.route session_id=%s route=free_text input_id=%s '
+            'history_message_count=%s question=%r',
+            request.session_id,
+            request.input_id,
+            len(history),
+            question,
+        )
+        result = await answer_turn(
+            question,
+            TravelTurnContext(
+                session_id=str(request.session_id),
+                flow_step=current,
+                conversation_history=history,
+            ),
+        )
         if on_result is not None:
             on_result(result)
         raw_evidence = result.metadata.get('evidence', ())
@@ -251,10 +319,21 @@ def build_outer_conversation_graph(
     async def route_action(
         state: OuterConversationState,
     ) -> Literal['guided_action', 'catalog', 'free_text']:
-        input_id = request_for(state).input_id
-        if input_id == FREE_TEXT_INPUT_ID:
-            return 'free_text'
-        return 'catalog' if input_id == 'destinations' else 'guided_action'
+        request = request_for(state)
+        route = (
+            'free_text'
+            if request.input_id == FREE_TEXT_INPUT_ID
+            else 'catalog'
+            if request.input_id == 'destinations'
+            else 'guided_action'
+        )
+        logger.info(
+            'conversation.route_selected session_id=%s input_id=%s route=%s',
+            request.session_id,
+            request.input_id,
+            route,
+        )
+        return route
 
     graph = StateGraph(OuterConversationState)
     graph.add_node('initialize', initialize)
@@ -321,28 +400,31 @@ def build_conversation_graph(
 
 
 def _resolve_question(messages: list[BaseMessage]) -> str:
-    """Return the latest question, adding the prior question for follow-ups."""
-    questions = (
-        message.content
-        for message in reversed(messages)
-        if isinstance(message, HumanMessage) and isinstance(message.content, str)
+    """Return the latest raw user question without mixing in prior turns."""
+    question = next(
+        (
+            message.content
+            for message in reversed(messages)
+            if isinstance(message, HumanMessage) and isinstance(message.content, str)
+        ),
+        None,
     )
-    question = next(questions, None)
     if question is None:
         raise RuntimeError('The conversation does not contain a user question.')
-    previous_question = next(questions, None)
-    if previous_question is not None and _is_follow_up(question):
-        return (
-            f'{question}\n\nConversation context: the previous user question was '
-            f'{previous_question}'
-        )
     return question
 
 
-def _is_follow_up(question: str) -> bool:
-    """Return whether a question contains a pronoun suggesting prior context."""
-    words = set(question.casefold().replace('?', ' ').split())
-    return bool(words & {'there', 'it', 'that', 'this', 'they', 'them', 'those'})
+def _recent_conversation_history(messages: list[BaseMessage]) -> tuple[Message, ...]:
+    """Return the two most recent completed turns as LLM-only conversation context."""
+    history: list[Message] = []
+    for message in messages[-4:]:
+        if not isinstance(message.content, str):
+            continue
+        if isinstance(message, HumanMessage):
+            history.append(Message(role=Role.USER, content=message.content))
+        elif isinstance(message, AIMessage):
+            history.append(Message(role=Role.ASSISTANT, content=message.content))
+    return tuple(history)
 
 
 __all__ = [

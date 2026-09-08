@@ -21,7 +21,6 @@ from ai_tour_guide.app.agent.conversation import (
     build_outer_conversation_graph,
     welcome_message_for_provider,
 )
-from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.travel.contracts import (
     TravelTurnContext,
     TravelTurnResult,
@@ -43,11 +42,13 @@ from ai_tour_guide.app.chat.models import (
 from ai_tour_guide.app.chat.persistence import store_chat_message, store_feedback
 from ai_tour_guide.app.llm.factory import create_llm_client
 from ai_tour_guide.app.llm.settings import AgentsSettings
+from ai_tour_guide.app.runtime import configure_application_logging
 from ai_tour_guide.app.services.rag.persistence import store_rag_result
 from ai_tour_guide.knowledge_base.database.connection import create_database_engine
 from ai_tour_guide.knowledge_base.database.models import DocumentRow
 
 logger = logging.getLogger(__name__)
+configure_application_logging()
 
 
 app = FastAPI(
@@ -103,8 +104,7 @@ def _chat_error(status_code: int, code: ChatErrorCode, message: str) -> HTTPExce
 
 async def _answer_turn(
     question: str,
-    session_id: str,
-    flow_step: FlowStep,
+    context: TravelTurnContext,
 ) -> TravelTurnResult:
     """Dispatch a turn through the effective configured agent."""
     settings = AgentsSettings()
@@ -112,19 +112,40 @@ async def _answer_turn(
         configuration = resolve_product_configuration(settings)
     except ProductConfigurationError as exc:
         raise RuntimeError(str(exc)) from exc
+    logger.info(
+        'agent.configuration_resolved session_id=%s flow_step=%s agent_type=%s '
+        'product_layer=%s automatic_fallback=%s',
+        context.session_id,
+        context.flow_step.value,
+        configuration.agent_type.value,
+        configuration.product_layer.value,
+        configuration.automatic_fallback,
+    )
     if configuration.agent_type is AgentType.DETERMINISTIC:
         deterministic_agent = create_deterministic_travel_agent(
             settings,
             retrieval_enabled=configuration.product_layer is ProductLayer.RETRIEVAL,
         )
-        response = await deterministic_agent.answer(
-            question, TravelTurnContext(session_id=session_id, flow_step=flow_step)
+        response = await deterministic_agent.answer(question, context)
+        logger.info(
+            'agent.turn_completed session_id=%s agent_type=deterministic '
+            'status=%s retrieval_status=%s',
+            context.session_id,
+            response.status.value,
+            response.metadata.get('retrieval_status'),
         )
         return response
-    return await LLMTravelAgent(
+    response = await LLMTravelAgent(
         create_llm_client(settings),
         retrieval_enabled=configuration.product_layer not in {ProductLayer.BASELINE},
-    ).answer(question, TravelTurnContext(session_id=session_id, flow_step=flow_step))
+    ).answer(question, context)
+    logger.info(
+        'agent.turn_completed session_id=%s agent_type=llm status=%s request_id=%s',
+        context.session_id,
+        response.status.value,
+        response.request_id,
+    )
+    return response
 
 
 @app.post('/chat/start', response_model=ConversationResponse)
@@ -220,6 +241,13 @@ async def health() -> dict[str, str]:
 @app.post('/chat/message', response_model=ConversationResponse)
 async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
     """Resolve one request through the checkpointed outer conversation graph."""
+    logger.info(
+        'chat.request_received session_id=%s expected_step=%s input_id=%s text=%r',
+        request.session_id,
+        request.expected_step_id,
+        request.input_id,
+        request.text,
+    )
     result: TravelTurnResult | None = None
 
     def retain(value: TravelTurnResult) -> None:
@@ -227,13 +255,9 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
         result = value
 
     async def answer_turn(
-        question: str, session_id: str, flow_step: FlowStep
+        question: str, context: TravelTurnContext
     ) -> TravelTurnResult:
-        return await _answer_turn(
-            question,
-            session_id,
-            flow_step,
-        )
+        return await _answer_turn(question, context)
 
     graph = build_outer_conversation_graph(
         checkpointer=_conversation_checkpointer,
@@ -288,6 +312,15 @@ async def chat_message(request: ChatMessageRequest) -> ConversationResponse:
         response_payload['sources'] = []
     response = ConversationResponse.model_validate(response_payload).model_copy(
         update={'llm': _llm_info()}
+    )
+    logger.info(
+        'chat.response_ready session_id=%s step_id=%s request_id=%s '
+        'source_count=%s final_status=%s',
+        response.session_id,
+        response.step_id,
+        response.request_id,
+        len(response.sources),
+        response.trace.final_status if response.trace is not None else 'guided',
     )
     try:
         store_chat_message(

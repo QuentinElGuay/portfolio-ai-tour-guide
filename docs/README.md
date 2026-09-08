@@ -22,15 +22,6 @@ available project command.
 
 ## 1. Prerequisites
 
-For the Docker-based tutorial, install:
-
-- [Git](https://git-scm.com/downloads)
-- [Docker](https://docs.docker.com/get-docker/) with Docker Compose
-- [GNU Make](https://www.gnu.org/software/make/)
-
-To run Python commands directly on your host, also install Python 3.14 or newer and
-[uv](https://docs.astral.sh/uv/).
-
 > [!NOTE]
 > GitHub Codespaces already provides the development environment, so no local
 > installation is required there.
@@ -40,6 +31,41 @@ To run Python commands directly on your host, also install Python 3.14 or newer 
 > Codespaces that prevented database initialization or document ingestion. The same
 > commands worked locally, but recreating a Codespace did not reliably resolve the
 > issue.
+
+For the Docker-based tutorial, install:
+
+- [Git](https://git-scm.com/downloads)
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose
+- [GNU Make](https://www.gnu.org/software/make/)
+
+To run Python commands directly on your host, also install Python 3.14 or newer and
+[uv](https://docs.astral.sh/uv/).
+
+On Ubuntu or Debian, install the Docker-based prerequisites with:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git make curl
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker "$USER"
+newgrp docker
+```
+
+For macOS or Windows, install [Docker Desktop](https://docs.docker.com/desktop/) and
+install Git and GNU Make using the links above. On Linux or macOS, install `uv` with:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+On Windows, run the installer from PowerShell:
+
+```powershell
+ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Restart your terminal after installing `uv` so that its executable is available on your
+`PATH`.
 
 Verify the required tools before continuing:
 
@@ -100,7 +126,8 @@ Start the application:
 make app
 ```
 
-Try a question such as:
+Access the access the chat app at [http://localhost:7860](http://localhost:7860). Try a
+question such as:
 
 ```text
 What should I visit in Brittany?

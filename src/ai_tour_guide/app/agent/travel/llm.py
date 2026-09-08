@@ -1,5 +1,6 @@
 """Travel-agent adapter for the established LLM-backed RAG pipeline."""
 
+import logging
 from collections.abc import Callable
 
 from sqlalchemy import Engine
@@ -14,6 +15,8 @@ from ai_tour_guide.app.llm.clients import LLMClient
 from ai_tour_guide.app.services.rag.pipeline import answer_question_async
 from ai_tour_guide.knowledge_base.retrieval.catalog import has_indexed_documents
 from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
+
+logger = logging.getLogger(__name__)
 
 
 class LLMTravelAgent:
@@ -42,9 +45,18 @@ class LLMTravelAgent:
         self, question: str, context: TravelTurnContext
     ) -> TravelTurnResult:
         """Adapt the stable RAG result to the travel-agent contract."""
+        logger.info(
+            'llm_agent.started session_id=%s flow_step=%s retrieval_enabled=%s '
+            'question=%r',
+            context.session_id,
+            context.flow_step.value,
+            self._retrieval_enabled,
+            question,
+        )
         result = await answer_question_async(
             question,
             flow_step=context.flow_step,
+            conversation_history=context.conversation_history,
             llm_client=self._llm_client,
             engine=self._engine,
             strategy=self._strategy,
@@ -55,6 +67,16 @@ class LLMTravelAgent:
             query
             for query in result.retrieval_metadata.get('tool_queries', [])
             if isinstance(query, str)
+        )
+        logger.info(
+            'llm_agent.completed session_id=%s request_id=%s error=%s '
+            'context_count=%s query_count=%s retrieval_status=%s',
+            context.session_id,
+            result.request_id,
+            result.error.category.value if result.error is not None else None,
+            len(result.contexts),
+            len(queries),
+            result.retrieval_metadata.get('retrieval_status'),
         )
         return TravelTurnResult(
             answer=result.answer,

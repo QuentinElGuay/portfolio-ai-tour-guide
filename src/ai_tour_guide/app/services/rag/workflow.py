@@ -1,5 +1,6 @@
 """Bounded LangGraph workflow for source-grounded live answers."""
 
+import logging
 import re
 from collections.abc import Callable
 from typing import Literal, NotRequired, TypedDict, cast
@@ -33,6 +34,7 @@ from ai_tour_guide.app.llm.clients import (
 from ai_tour_guide.app.services.rag.models import GeneratedAnswer
 from ai_tour_guide.app.services.rag.prompting import (
     build_messages,
+    format_conversation_history,
     is_destination_catalog_question,
 )
 from ai_tour_guide.knowledge_base.retrieval.catalog import list_indexed_destinations
@@ -46,9 +48,12 @@ from ai_tour_guide.knowledge_base.search.strategies import SearchStrategy
 MAX_SEARCH_CALLS = 2
 SEARCH_K = 5
 
+logger = logging.getLogger(__name__)
+
 
 class AgentState(TypedDict):
     question: str
+    conversation_history: tuple[Message, ...]
     option_id: str | None
     flow_step: str
     input_type: str
@@ -77,6 +82,13 @@ def build_agent_graph(
             state['question'],
             previous_queries=tuple(state['queries']),
             has_context=bool(state['contexts']),
+            conversation_history=state['conversation_history'],
+        )
+        logger.info(
+            'rag.decision query=%r prior_query_count=%s has_context=%s',
+            query,
+            len(state['queries']),
+            bool(state['contexts']),
         )
         return {'next_query': query}
 
@@ -87,6 +99,13 @@ def build_agent_graph(
         )
         question = question_for_option_id(option_id) if option_id else state['question']
         identity_answer = _identity_answer_for(question or state['question'])
+        logger.info(
+            'rag.identify option_id=%s flow_step=%s input_type=%s identity_match=%s',
+            option_id,
+            flow_step.value,
+            input_type_for_option(option_id),
+            bool(identity_answer),
+        )
         return {
             'question': question or state['question'],
             'flow_step': flow_step.value,
@@ -105,16 +124,29 @@ def build_agent_graph(
         state: AgentState,
     ) -> Literal['search', 'generate', 'fallback', 'insufficient']:
         if state.get('low_confidence_retrieval'):
-            return 'insufficient'
-        if state['next_query'] is not None and len(state['queries']) < MAX_SEARCH_CALLS:
-            return 'search'
-        if state['contexts'] or not state['queries']:
-            return 'generate'
-        return (
-            'fallback'
-            if isinstance(llm_client, NoContextFallbackClient)
-            else 'insufficient'
+            route = 'insufficient'
+        elif (
+            state['next_query'] is not None and len(state['queries']) < MAX_SEARCH_CALLS
+        ):
+            route = 'search'
+        elif state['contexts'] or not state['queries']:
+            route = 'generate'
+        else:
+            route = (
+                'fallback'
+                if isinstance(llm_client, NoContextFallbackClient)
+                else 'insufficient'
+            )
+        logger.info(
+            'rag.route_after_decision route=%s query_count=%s context_count=%s '
+            'has_next_query=%s low_confidence=%s',
+            route,
+            len(state['queries']),
+            len(state['contexts']),
+            state['next_query'] is not None,
+            bool(state.get('low_confidence_retrieval')),
         )
+        return route
 
     def search(state: AgentState) -> dict[str, object]:
         query = state['next_query']
@@ -127,10 +159,22 @@ def build_agent_graph(
                 strategy=strategy,
             )
         except (OSError, SQLAlchemyError) as exc:
+            logger.warning(
+                'rag.search_failed query=%r error_type=%s', query, type(exc).__name__
+            )
             return {'retrieval_error': exc}
         if result.status is RetrievalStatus.ERROR:
             message = result.error.message if result.error is not None else ''
+            logger.warning(
+                'rag.search_failed query=%r error_type=retrieval_error', query
+            )
             return {'retrieval_error': RuntimeError(message)}
+        logger.info(
+            'rag.search_completed query=%r status=%s context_count=%s',
+            query,
+            result.status.value,
+            len(result.contexts),
+        )
         return {
             'queries': [*state['queries'], query],
             'contexts': (*state['contexts'], *result.contexts),
@@ -144,17 +188,33 @@ def build_agent_graph(
     def route_after_search(
         state: AgentState,
     ) -> Literal['decide', 'insufficient']:
-        return (
+        route = (
             'insufficient'
             if 'retrieval_error' in state or state.get('low_confidence_retrieval')
             else 'decide'
         )
+        logger.info(
+            'rag.route_after_search route=%s retrieval_error=%s low_confidence=%s',
+            route,
+            'retrieval_error' in state,
+            bool(state.get('low_confidence_retrieval')),
+        )
+        return route
 
     async def generate(state: AgentState) -> dict[str, object]:
         messages = (
-            build_messages(state['question'], state['contexts'])
+            build_messages(
+                state['question'],
+                state['contexts'],
+                conversation_history=state['conversation_history'],
+            )
             if state['contexts']
-            else _build_meta_messages(state['question'])
+            else _build_meta_messages(state['question'], state['conversation_history'])
+        )
+        logger.info(
+            'rag.generate context_count=%s prompt_mode=%s',
+            len(state['contexts']),
+            'grounded' if state['contexts'] else 'meta',
         )
         return {
             'messages': messages,
@@ -164,9 +224,18 @@ def build_agent_graph(
     async def fallback(state: AgentState) -> dict[str, object]:
         if not isinstance(llm_client, NoContextFallbackClient):
             return {}
+        logger.info('rag.fallback reason=no_context_fallback_client')
         return {'generated': await llm_client.answer_without_context(state['question'])}
 
     def insufficient(state: AgentState) -> dict[str, object]:
+        logger.info(
+            'rag.insufficient query_count=%s context_count=%s low_confidence=%s '
+            'retrieval_error=%s',
+            len(state['queries']),
+            len(state['contexts']),
+            bool(state.get('low_confidence_retrieval')),
+            'retrieval_error' in state,
+        )
         return {}
 
     graph = StateGraph(AgentState)
@@ -201,14 +270,27 @@ async def run_agent_workflow(
     strategy: SearchStrategy | None = None,
     knowledge_base_available: Callable[[], bool] | None = None,
     retrieval_enabled: bool = True,
+    conversation_history: tuple[Message, ...] = (),
 ) -> AgentState:
     """Run the bounded graph and return its complete execution state."""
     option_id = normalize_option_id(option_id)
+    history = tuple(conversation_history)
     identity_question = question_for_option_id(option_id) if option_id else None
     identity_answer = _identity_answer_for(identity_question or question)
+    logger.info(
+        'rag.workflow_started option_id=%s flow_step=%s retrieval_enabled=%s '
+        'history_message_count=%s question=%r',
+        option_id,
+        flow_step.value,
+        retrieval_enabled,
+        len(history),
+        question,
+    )
     if identity_answer:
+        logger.info('rag.workflow_short_circuit route=identity')
         return {
             'question': question,
+            'conversation_history': history,
             'option_id': option_id,
             'flow_step': flow_step_for_option(option_id, flow_step).value,
             'input_type': input_type_for_option(option_id),
@@ -221,9 +303,11 @@ async def run_agent_workflow(
             'next_option_ids': next_option_ids(option_id) if option_id else (),
         }
     if is_destination_catalog_question(question):
+        logger.info('rag.workflow_short_circuit route=destination_catalog')
         destination_names = list_indexed_destinations(engine)
         return {
             'question': question,
+            'conversation_history': history,
             'option_id': option_id,
             'flow_step': flow_step_for_option(option_id, flow_step).value,
             'input_type': input_type_for_option(option_id),
@@ -240,9 +324,11 @@ async def run_agent_workflow(
         }
 
     if not retrieval_enabled:
-        messages = _build_meta_messages(question)
+        logger.info('rag.workflow_short_circuit route=meta_retrieval_disabled')
+        messages = _build_meta_messages(question, history)
         return {
             'question': question,
+            'conversation_history': history,
             'option_id': option_id,
             'flow_step': flow_step_for_option(option_id, flow_step).value,
             'input_type': input_type_for_option(option_id),
@@ -255,9 +341,11 @@ async def run_agent_workflow(
         }
 
     if knowledge_base_available is not None and not knowledge_base_available():
-        messages = _build_meta_messages(question)
+        logger.info('rag.workflow_short_circuit route=meta_empty_knowledge_base')
+        messages = _build_meta_messages(question, history)
         return {
             'question': question,
+            'conversation_history': history,
             'option_id': option_id,
             'flow_step': flow_step_for_option(option_id, flow_step).value,
             'input_type': input_type_for_option(option_id),
@@ -274,6 +362,7 @@ async def run_agent_workflow(
         await graph.ainvoke(
             {
                 'question': question,
+                'conversation_history': history,
                 'option_id': option_id,
                 'flow_step': flow_step.value,
                 'input_type': input_type_for_option(option_id),
@@ -285,7 +374,9 @@ async def run_agent_workflow(
     )
 
 
-def _build_meta_messages(question: str) -> tuple[Message, ...]:
+def _build_meta_messages(
+    question: str, conversation_history: tuple[Message, ...] = ()
+) -> tuple[Message, ...]:
     return (
         Message(
             role=Role.SYSTEM,
@@ -298,7 +389,13 @@ def _build_meta_messages(question: str) -> tuple[Message, ...]:
                 '`emotion`; citations must be empty.'
             ),
         ),
-        Message(role=Role.USER, content=question),
+        Message(
+            role=Role.USER,
+            content=(
+                f'{format_conversation_history(conversation_history)}\n\n'
+                f'Current user question:\n{question}'
+            ),
+        ),
     )
 
 

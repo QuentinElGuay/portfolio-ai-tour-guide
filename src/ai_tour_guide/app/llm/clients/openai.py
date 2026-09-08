@@ -12,6 +12,7 @@ from ai_tour_guide.app.llm.rate_limit import AsyncRateLimiter
 from ai_tour_guide.app.llm.retry import retry_provider_call
 from ai_tour_guide.app.llm.settings import AgentsSettings
 from ai_tour_guide.app.services.rag.models import GeneratedAnswer, LLMCitation
+from ai_tour_guide.app.services.rag.prompting import format_conversation_history
 from ai_tour_guide.app.services.rag.tools import TOURISM_SEARCH_TOOL
 
 
@@ -129,6 +130,7 @@ class OpenAIClient:
         *,
         previous_queries: Sequence[str],
         has_context: bool,
+        conversation_history: Sequence[Message] = (),
     ) -> str | None:
         """Ask the model whether to call the sole knowledge-base search tool."""
         await self._rate_limiter.acquire()
@@ -146,11 +148,19 @@ class OpenAIClient:
                                 'the assistant and its capabilities. Never answer tourism facts '
                                 'from model knowledge. If a previous search was insufficient, you '
                                 'may call the tool once more with a reformulated query. '
+                                'Use the recent conversation only to resolve references, then '
+                                'make each search query standalone. '
                                 f'Previous queries: {list(previous_queries)!r}. '
                                 f'Retrieved context available: {has_context}.'
                             ),
                         },
-                        {'role': 'user', 'content': question},
+                        {
+                            'role': 'user',
+                            'content': (
+                                f'{format_conversation_history(conversation_history)}\n\n'
+                                f'Current user question:\n{question}'
+                            ),
+                        },
                     ],
                     tools=[
                         {

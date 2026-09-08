@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 
-from ai_tour_guide.app.agent.source_formatting import format_pages
 from ai_tour_guide.knowledge_base.retrieval.tool import TourismEvidence
 
 NO_RELEVANT_SECTIONS_ANSWER = (
@@ -12,7 +11,7 @@ NO_RELEVANT_SECTIONS_ANSWER = (
 
 
 def format_retrieval_evidence(evidence: Sequence[TourismEvidence]) -> str:
-    """Render logical search contexts as readable, source-first Markdown."""
+    """Render logical search contexts as readable Markdown with citations."""
     items = tuple(evidence)
     if not items:
         return NO_RELEVANT_SECTIONS_ANSWER
@@ -21,14 +20,19 @@ def format_retrieval_evidence(evidence: Sequence[TourismEvidence]) -> str:
     rendered = [f'🔎 {len(items)} relevant {result_label} found']
     for position, item in enumerate(items, start=1):
         section_title = item.section_path[-1] if item.section_path else item.title
-        source = item.title
+        source = f'{item.title} · {section_title}'
         if item.pages:
-            source = f'{source} · {format_pages(item.pages)}'
+            page_numbers = ', '.join(str(page) for page in item.pages)
+            source = f'{source} (p. {page_numbers})'
+        quoted_text = '\n\n'.join(
+            f'*“{paragraph.strip()}”*'
+            for paragraph in item.text.split('\n\n')
+            if paragraph.strip()
+        )
         rendered.extend(
             [
-                f'### {position}. {section_title}',
-                f'**{source}**',
-                item.text,
+                f'{position}. {source}',
+                quoted_text,
             ]
         )
     return '\n\n'.join(rendered)

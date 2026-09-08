@@ -315,6 +315,7 @@ containers, and volumes. This deletes local PostgreSQL, Airflow, and Metabase da
 | `QUESTION`             | Empty                            | `ask`, `text_search`, `vector_search` | Required question for one-off answer or search commands.                      |
 | `APP_ENABLE_LLM`       | `1`                              | Application and chat                  | Allows LLM execution; `0` downgrades to deterministic execution.              |
 | `APP_ENABLE_RETRIEVAL` | `1`                              | Application and chat                  | Allows RAG/retrieval; `0` downgrades to conversational or prepared mode.      |
+| `APP_DEBUG`            | `false`                          | Application                           | Enables debug logs, including full retrieved chunks.                          |
 | `SOURCE_FILES`         | `source_files.json`              | `ingest`                              | Input document-definition JSON file.                                          |
 | `ANNOTATOR_ARGS`       | Empty                            | `annotate-dataset`                    | Extra options passed to the dataset annotator.                                |
 | `SIMULATE_ARGS`        | Empty                            | `simulate-rag`                        | Extra options passed to the traffic simulator.                                |

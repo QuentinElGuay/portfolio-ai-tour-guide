@@ -12,12 +12,13 @@ from ai_tour_guide.app.agent.conversation import (
     build_outer_conversation_graph,
     welcome_message_for_provider,
 )
-from ai_tour_guide.app.agent.flow import FlowStep
 from ai_tour_guide.app.agent.responses import EMPTY_KNOWLEDGE_BASE_NOTICE
 from ai_tour_guide.app.agent.travel.contracts import (
     TravelAgentStatus,
+    TravelTurnContext,
     TravelTurnResult,
 )
+from ai_tour_guide.app.chat.models import FREE_TEXT_INPUT_ID, Role
 from ai_tour_guide.app.llm.settings import LLMProvider
 from ai_tour_guide.app.services.demo.questions import DEMO_WELCOME_MESSAGE
 from ai_tour_guide.app.services.rag.models import GeneratedAnswer, RAGResult
@@ -86,17 +87,14 @@ def test_conversation_graph_returns_the_rag_result(
         )
     )
 
-    assert answer_question_async.await_args_list[-1].args[0] == (
-        'What about it?\n\nConversation context: the previous user question was '
-        'Where should I go?'
-    )
+    assert answer_question_async.await_args_list[-1].args[0] == 'What about it?'
 
 
 def test_outer_conversation_graph_checkpoints_step_and_response() -> None:
     async def answer_turn(
-        question: str, session_id: str, flow_step: FlowStep
+        question: str, context: TravelTurnContext
     ) -> TravelTurnResult:
-        del session_id, flow_step
+        del question, context
         return TravelTurnResult(
             answer='Grounded answer.',
             status=TravelAgentStatus.ANSWERED,
@@ -138,3 +136,64 @@ def test_outer_conversation_graph_checkpoints_step_and_response() -> None:
     assert start['latest_response']['step_id'] == 'welcome'
     assert guided['latest_response']['step_id'] == 'identity'
     assert guided['latest_response']['message']
+
+
+def test_outer_conversation_keeps_history_separate_from_the_raw_question() -> None:
+    captured_contexts: list[tuple[str, TravelTurnContext]] = []
+
+    async def answer_turn(
+        question: str, context: TravelTurnContext
+    ) -> TravelTurnResult:
+        captured_contexts.append((question, context))
+        return TravelTurnResult(
+            answer='Brittany is my favourite destination.',
+            status=TravelAgentStatus.ANSWERED,
+        )
+
+    graph = build_outer_conversation_graph(
+        checkpointer=MemorySaver(), answer_turn=answer_turn
+    )
+    session_id = '12345678-1234-5678-1234-567812345678'
+    config = {'configurable': {'thread_id': session_id}}
+    asyncio.run(
+        graph.ainvoke({'session_id': session_id, 'messages': []}, config=config)
+    )
+    asyncio.run(
+        graph.ainvoke(
+            {
+                'latest_request': {
+                    'session_id': session_id,
+                    'expected_step_id': 'welcome',
+                    'input_id': FREE_TEXT_INPUT_ID,
+                    'text': 'What is your favourite destination?',
+                }
+            },
+            config=config,
+        )
+    )
+    asyncio.run(
+        graph.ainvoke(
+            {
+                'latest_request': {
+                    'session_id': session_id,
+                    'expected_step_id': 'welcome',
+                    'input_id': FREE_TEXT_INPUT_ID,
+                    'text': 'What should I visit there?',
+                }
+            },
+            config=config,
+        )
+    )
+
+    question, context = captured_contexts[-1]
+    assert question == 'What should I visit there?'
+    assert context.conversation_history == (
+        {
+            'role': Role.USER,
+            'content': 'What is your favourite destination?',
+        },
+        {
+            'role': Role.ASSISTANT,
+            'content': 'Brittany is my favourite destination.',
+        },
+    )

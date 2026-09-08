@@ -60,6 +60,7 @@ def _evidence(*, score: float = 0.9) -> TourismEvidence:
         publication_date=None,
         pages=(8, 9),
         document_id=1,
+        chunk_id='brittany-main-cities-1',
         section_id='main-cities',
         section_path=('Guide', 'Main Cities'),
         rank=1,
@@ -134,9 +135,9 @@ def test_deterministic_travel_agent_displays_retrieved_logical_contexts() -> Non
 
     assert result.answer == (
         '🔎 1 relevant section found\n\n'
-        '### 1. Main Cities\n\n'
-        '**Discover Brittany · pages 8 and 9**\n\n'
-        'Rennes is the capital of Brittany.\n\nBrest is a maritime city.'
+        '1. Discover Brittany · Main Cities (p. 8, 9)\n\n'
+        '*“Rennes is the capital of Brittany.”*\n\n'
+        '*“Brest is a maritime city.”*'
     )
     assert result.trace.actions == (
         'search_knowledge_base',

@@ -24,6 +24,7 @@ class LLMClient(Protocol):
         *,
         previous_queries: Sequence[str],
         has_context: bool,
+        conversation_history: Sequence[Message] = (),
     ) -> str | None:
         """Choose a retrieval query, or no query for a direct response."""
         ...
