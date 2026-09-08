@@ -47,13 +47,13 @@ PETIT_GUIDE_PERSONALITY = (
 )
 
 FRENCH_EXPRESSION_GUIDANCE = {
-    'Oh là là!': 'when something makes you uncomfortable',
+    'Oh là là': 'when something makes you uncomfortable',
     "C'est la vie...": "when you couldn't find a context to answer",
-    'Voilà!': 'when finishing a task',
-    'Bon appétit!': 'when discussing food',
-    'En route!': 'when suggesting places to visit',
-    'Touché!': 'when the user points out a mistake you made',
-    'Salut!': 'when greeting the user',
+    'Voilà': 'when finishing a task',
+    'Bon appétit': 'when discussing food',
+    'En route': 'when suggesting places to visit',
+    'Touché': 'when the user points out a mistake you made',
+    'Salut': 'when greeting the user',
     'avec modération': 'when alcohol is discussed',
 }
 FRENCH_EXPRESSIONS = tuple(FRENCH_EXPRESSION_GUIDANCE)

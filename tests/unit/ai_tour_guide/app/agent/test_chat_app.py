@@ -271,6 +271,20 @@ def test_italicize_all_registered_french_expressions() -> None:
     assert rendered == ' '.join(f'*{expression}*' for expression in FRENCH_EXPRESSIONS)
 
 
+def test_italicize_french_expressions_normalizes_accents_to_canonical_spelling() -> (
+    None
+):
+    rendered = _italicize_french_expressions('Oh la la! Voila, avec moderation.')
+
+    assert rendered == '*Oh là là!* *Voilà*, *avec modération*.'
+
+
+def test_italicize_french_expressions_preserves_existing_italics() -> None:
+    rendered = _italicize_french_expressions('*Oh la la*')
+
+    assert rendered == '*Oh là là*'
+
+
 def test_update_feedback_values_preserves_previous_ratings() -> None:
     """Verify that update feedback values preserves previous ratings."""
     history: list[ChatHistoryItem] = [

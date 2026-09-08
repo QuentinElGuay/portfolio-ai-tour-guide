@@ -3,6 +3,7 @@ import base64
 import logging
 import os
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -531,12 +532,40 @@ def _render_conversation_response(response: object) -> str:
 def _italicize_french_expressions(answer: str) -> str:
     """Italicize the approved French expressions used by the assistant."""
     for expression in FRENCH_EXPRESSIONS:
-        answer = re.sub(
-            rf'(?<!\*){re.escape(expression)}(?!\*)',
-            f'*{expression}*',
-            answer,
-        )
+        normalized_answer, source_indexes = _normalize_for_matching(answer)
+        normalized_expression, _ = _normalize_for_matching(expression)
+        matches = list(re.finditer(re.escape(normalized_expression), normalized_answer))
+        for match in reversed(matches):
+            start = source_indexes[match.start()]
+            end = source_indexes[match.end() - 1] + 1
+            punctuation_end = end
+            while punctuation_end < len(answer) and answer[punctuation_end] == '!':
+                punctuation_end += 1
+            already_italicized = (
+                start > 0
+                and answer[start - 1] == '*'
+                and punctuation_end < len(answer)
+                and answer[punctuation_end] == '*'
+            )
+            replacement = expression + answer[end:punctuation_end]
+            if not already_italicized:
+                replacement = f'*{replacement}*'
+            answer = answer[:start] + replacement + answer[punctuation_end:]
     return answer
+
+
+def _normalize_for_matching(value: str) -> tuple[str, list[int]]:
+    """Remove accents for matching while retaining indexes into the source text."""
+    normalized_characters: list[str] = []
+    source_indexes: list[int] = []
+    for index, character in enumerate(value):
+        normalized = unicodedata.normalize('NFKD', character).casefold()
+        for normalized_character in normalized:
+            if unicodedata.combining(normalized_character):
+                continue
+            normalized_characters.append(normalized_character)
+            source_indexes.append(index)
+    return ''.join(normalized_characters), source_indexes
 
 
 def main() -> None:
