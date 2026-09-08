@@ -152,9 +152,7 @@ Before running the next commands, replace the LLM settings in your `.env` file. 
 `baguette-llm` is a deterministic demo provider, not a real LLM, and does not require an
 API key.
 
-#### Configuration example:
-
-For OpenAI, use:
+OpenAI example:
 
 ```dotenv
 AGENT_LLM_PROVIDER=openai
