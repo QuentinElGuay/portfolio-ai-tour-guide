@@ -147,9 +147,20 @@ its directory, or open it in a GitHub Codespace. Then run:
 cp .env.template .env
 ```
 
-Before running the next commands, configure a supported LLM provider and API key in your
-`.env` file. For an example OpenAI configuration, see the
-[LLM agent setup in the tutorial](docs/README.md#3-llm-agent-mode).
+Before running the next commands, replace the LLM settings in your `.env` file. Accepted
+`AGENT_LLM_PROVIDER` values are `openai`, `gemini`, and `baguette-llm`. The built-in
+`baguette-llm` is a deterministic demo provider, not a real LLM, and does not require an
+API key.
+
+#### Configuration example:
+
+For OpenAI, use:
+
+```dotenv
+AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_KEY=your-api-key
+AGENT_LLM_MODEL=gpt-4.1-mini
+```
 
 The next commands may take a few minutes on the first execution to download Docker
 images and the embedding model.
