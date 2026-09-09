@@ -9,9 +9,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from tqdm import tqdm
 
-from ai_tour_guide.app.llm.clients import LLMProvider
 from ai_tour_guide.app.llm.factory import create_llm_client
-from ai_tour_guide.app.llm.settings import AgentsSettings
+from ai_tour_guide.app.llm.settings import AgentsSettings, LLMProvider
 from ai_tour_guide.app.services.rag.models import RAGResult
 from ai_tour_guide.app.services.rag.persistence import store_rag_result
 from ai_tour_guide.app.services.rag.pipeline import answer_question_async

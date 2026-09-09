@@ -37,7 +37,8 @@ _INSERT_EMBEDDING_MODELS = """
 
 _INSERT_DOCUMENTS = """
     INSERT INTO documents (
-        document_id, embedding_model_id, collection, version, title, source_url,
+        document_id, embedding_model_id, collection, version, title, destination,
+        source_url,
         publisher, publication_date, authors, subject, keywords, language,
         creator, producer, format, creation_date, modification_date,
         source_page_count, page_count, source_checksum, parser_version,
@@ -52,6 +53,7 @@ _INSERT_DOCUMENTS = """
         data::jsonb ->> 'collection',
         data::jsonb ->> 'version',
         data::jsonb ->> 'title',
+        COALESCE(data::jsonb ->> 'destination', data::jsonb ->> 'title'),
         data::jsonb ->> 'source_url',
         data::jsonb ->> 'publisher',
         (data::jsonb ->> 'publication_date')::date,

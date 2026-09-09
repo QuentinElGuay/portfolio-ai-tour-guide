@@ -7,6 +7,7 @@ import pytest
 from ai_tour_guide.knowledge_base.corpus.format import CORPUS_FILES
 from ai_tour_guide.knowledge_base.corpus.restore import (
     _INSERT_DOCUMENT_CHUNKS,
+    _INSERT_DOCUMENTS,
     clear_knowledge_base,
     load_corpus,
 )
@@ -51,6 +52,10 @@ def test_load_corpus_restores_section_metadata_and_embeddings(tmp_path) -> None:
         str(call.args[0]) for call in cursor.execute.call_args_list
     )
     assert _INSERT_DOCUMENT_CHUNKS.strip() in executed_sql
+    assert 'destination' in _INSERT_DOCUMENTS
+    assert "COALESCE(data::jsonb ->> 'destination', data::jsonb ->> 'title')" in (
+        _INSERT_DOCUMENTS
+    )
     assert 'section_id' in _INSERT_DOCUMENT_CHUNKS
     assert 'section_chunk_index' in _INSERT_DOCUMENT_CHUNKS
     assert '::vector' in _INSERT_DOCUMENT_CHUNKS

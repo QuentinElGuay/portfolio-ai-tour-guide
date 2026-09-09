@@ -35,6 +35,7 @@ _EXPORTS: dict[str, LiteralString] = {
             'collection', collection,
             'version', version,
             'title', title,
+            'destination', destination,
             'source_url', source_url,
             'publisher', publisher,
             'publication_date', publication_date,

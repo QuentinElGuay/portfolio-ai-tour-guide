@@ -13,18 +13,23 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 ## Table of contents
 
 - [Overview](#overview)
-- [Question scope](#question-scope)
-- [Architecture](#architecture)
-- [Tech stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Quick start](#quick-start)
-- [Common commands](#common-commands)
-- [Airflow ingestion](#airflow-ingestion)
-- [Evaluation](#evaluation)
+  - [Project goals](#project-goals)
+  - [Data source](#data-source)
+  - [Question scope](#question-scope)
+  - [Architecture](#architecture)
+  - [Tech stack](#tech-stack)
+  - [Project structure](#project-structure)
+- [Quickstart](#quickstart)
+  - [Prerequisites](#prerequisites)
+  - [Application setup](#application-setup)
+  - [Common commands](#common-commands)
+- [Workflows and operations](#workflows-and-operations)
+  - [Airflow ingestion](#airflow-ingestion)
+  - [Evaluation](#evaluation)
+  - [Dashboards](#dashboards)
 - [Documentation](#documentation)
-- [Data source](#data-source)
-- [Roadmap](#roadmap)
 - [Capstone success criteria](#capstone-success-criteria)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -53,7 +58,14 @@ The project also focuses on the practices that make RAG applications reliable:
 - Evaluating retrieval and answer quality
 - Adding guardrails for unsupported or overly specific questions
 
-## Question scope
+### Data source
+
+The project indexes the freely available French regional guides listed in
+[`source_files.json`](source_files.json), published by
+[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
+are not redistributed in this repository.
+
+### Question scope
 
 The project supports English questions about the French destinations covered by the
 indexed regional guides. Topics include geography and natural landscapes, climate,
@@ -85,7 +97,7 @@ Unsupported questions include:
 > English is the only supported language. This keeps the demonstration lightweight and
 > suitable for a smaller model.
 
-## Architecture
+### Architecture
 
 The project is divided into two workflows. The ingestion workflow processes the guides
 into searchable passages (_chunks_), creates vector embeddings, and stores them in
@@ -105,7 +117,7 @@ flowchart LR
     Agent --> Chat
 ```
 
-## Tech stack
+### Tech stack
 
 - **Language:** Python 3.14
 - **Agent API:** FastAPI and Uvicorn
@@ -117,16 +129,33 @@ flowchart LR
 - **Ingestion orchestration:** Apache Airflow
 - **Monitoring and evaluation:** Metabase
 
-## Project structure
+### Project structure
 
-The main application lives in `src/ai_tour_guide/`, with ingestion, knowledge-base,
-agent, LLM, and chat components. The repository also contains `evaluation/` workflows,
-`airflow/` DAGs, `tests/`, `fixtures/`, `scripts/`, and `tools/`. Docker and local
-development configuration is defined in `docker/`, `docker-compose.yml`, `Makefile`,
-`.env.template`, and `pyproject.toml`. See the [documentation](#documentation) for
-component-specific guides.
+The main application lives in `src/ai_tour_guide/`:
 
-## Prerequisites
+```text
+src/ai_tour_guide/
+├── app/                 FastAPI, LangGraph workflows, LLM clients, and chat UI
+├── domain/              Shared document and chunk models
+├── embedding/           Embedding providers and metadata
+├── ingestion/           CLI, PDF parsing, chunking, and ingestion artifacts
+└── knowledge_base/      PostgreSQL schema, corpus restore, and retrieval
+
+airflow/                 Airflow DAGs and orchestration helpers
+evaluation/              Search, RAG, judge runners, datasets, and notebooks
+fixtures/                Reproducible corpus and dashboard backups
+scripts/                 Database and corpus setup utilities
+tests/                   Unit, smoke, and integration-oriented tests
+tools/                   Operational and traffic-simulation utilities
+docker-compose.yml       Local application, database, Airflow, and Metabase services
+Makefile                 Common development and evaluation commands
+```
+
+See the [documentation](#documentation) for component-specific guides.
+
+## Quickstart
+
+### Prerequisites
 
 The recommended workflow requires _Git_, _Docker_ with _Docker Compose_, and _GNU Make_.
 
@@ -134,12 +163,12 @@ For direct Python commands, install _Python 3.14_ or newer and
 _[uv](https://docs.astral.sh/uv/)_. _GitHub Codespaces_ can run the project without
 local installation.
 
-## Quick start
+### Application setup
 
-_This is a quick start aiming for an immediate setup. For the full tutorial, see the
-[project tutorial](docs/README.md)._
+This short walkthrough gets the application running. For the full tutorial, see the
+[project tutorial](docs/README.md).
 
-### App configuration
+#### App configuration
 
 With Docker, Docker Compose, and GNU Make installed, clone the project and change into
 its directory, or open it in a GitHub Codespace.
@@ -172,7 +201,7 @@ AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-### Knowledge-base ingestion
+#### Knowledge-base ingestion
 
 With the application configured, prepare the knowledge base before starting the
 services.
@@ -191,7 +220,7 @@ make ingest
 >
 > The use of Airflow is detailed in the [tutorial](docs/README.md).
 
-### App execution
+#### App execution
 
 Once the knowledge base is ready, start the agent API and chat interface:
 
@@ -203,7 +232,12 @@ make app
 they are running, you can access the chat app at
 [http://localhost:7860](http://localhost:7860)
 
-## Common commands
+The [tutorial](docs/README.md),
+[ingestion guide](src/ai_tour_guide/ingestion/README.md), and
+[agent guide](src/ai_tour_guide/app/agent/README.md) cover the related workflows in
+detail.
+
+### Common commands
 
 These are the commands used most often during local development:
 
@@ -220,20 +254,18 @@ These are the commands used most often during local development:
 
 For every command, its options, and operational cautions, see the
 [Make command reference](docs/commands.md). `make help` remains the short terminal
-reference. The [tutorial](docs/README.md),
-[ingestion guide](src/ai_tour_guide/ingestion/README.md), and
-[agent guide](src/ai_tour_guide/app/agent/README.md) cover the related workflows in
-detail.
+reference.
 
-## Airflow ingestion
+## Workflows and operations
+
+### Airflow ingestion
 
 Airflow is the recommended ingestion workflow for orchestrating document processing.
 Follow the [tutorial](docs/README.md#231-ingest-guides-with-airflow) for setup, DAG
 triggering, retries, and re-ingestion options. For a faster local setup, use
-`make db-init` followed by `make ingest` as described in the
-[quick start](#quick-start).
+`make db-init` followed by `make ingest` as described in the [Quickstart](#quickstart).
 
-## Evaluation
+### Evaluation
 
 The project evaluates retrieval and the RAG pipeline with a 105-case golden dataset and
 stores evaluation data in an isolated `evaluation` schema. The available search, RAG,
@@ -245,6 +277,33 @@ the latest reports retained in the evaluation notebooks.
 | Search     | `make evaluate-search` | Compare the current vector, full-text, and hybrid retrieval quality.             |
 | RAG        | `make evaluate-rag`    | Measure retrieval, citation, refusal, and latency metrics without the LLM judge. |
 | Judge      | `make evaluate-judge`  | Add LLM-judge answer-correctness scoring; this makes additional model calls.     |
+
+### Dashboards
+
+Metabase provides operational and evaluation dashboards backed by the application and
+evaluation schemas. Start the dashboard services with:
+
+```bash
+make dashboard
+```
+
+Open [http://localhost:3000](http://localhost:3000) and sign in with the default
+development credentials:
+
+```text
+Email address: admin@example.com
+Password: pa$$word123
+```
+
+> [!WARNING]
+> These values come from `.env.template`; change them in `.env` for any shared or
+> production-like environment.
+
+The operational dashboard covers traffic, latency, errors, feedback, and LLM usage. The
+evaluation dashboard covers retrieval quality, RAG metrics, and judge results. Use
+`make simulate-rag` to populate the operational views with deterministic sample traffic.
+See the [tutorial monitoring guide](docs/README.md#7-monitoring) for dashboard access,
+restoration, and interpretation.
 
 ## Documentation
 
@@ -263,19 +322,7 @@ the latest reports retained in the evaluation notebooks.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
-## Data source
-
-The project indexes the freely available French regional guides listed in
-[`source_files.json`](source_files.json), published by
-[Ibanista](https://www.ibanista.com/). They are used for educational purposes only and
-are not redistributed in this repository.
-
-## Roadmap
-
-The complete plan, delivered milestones, release notes, and follow-up work are
-maintained in the [roadmap](ROADMAP.md) and [release notes](docs/releases/).
-
-### Capstone success criteria
+## Capstone success criteria
 
 The project follows the
 [LLM Zoomcamp capstone evaluation criteria](https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md#evaluation-criteria).
@@ -287,7 +334,7 @@ The project follows the
     intended questions, covered destinations, and explicit limitations.
 - An accessible source dataset and reproducible instructions for running the project.
   - ✅ [`source_files.json`](source_files.json) identifies the public source guides, and
-    the [quick start](#quick-start) documents the Docker-based local workflow.
+    the [Quickstart](#quickstart) documents the Docker-based local workflow.
 - Automated ingestion from source documents into a searchable knowledge base.
   - ✅ The ingestion CLI and
     [Airflow workflow](docs/README.md#231-ingest-guides-with-airflow) download, parse,
@@ -334,6 +381,11 @@ The project follows the
   items are polish or follow-up
 - **🔄 In progress** — work has started, but the milestone is not complete
 - **⏳ Planned** — work has not started yet
+
+## Roadmap
+
+The complete plan, delivered milestones, release notes, and follow-up work are
+maintained in the [roadmap](ROADMAP.md) and [release notes](docs/releases/).
 
 ## Contributing
 
