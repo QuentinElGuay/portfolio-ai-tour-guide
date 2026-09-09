@@ -3,7 +3,7 @@
 [![CI](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/QuentinElGuay/portfolio-ai-tour-guide)](https://github.com/QuentinElGuay/portfolio-ai-tour-guide/releases)
 
-_Salut! Je suis **Petit Guide**_, Bon Voyage’s AI travel assistant for French
+_Salut! Je suis_ **Petit Guide**, _Bon Voyage_’s AI travel assistant for French
 destinations covered by indexed regional tourism guides. My job is to help you prepare
 your visit in France by answering your questions using **Retrieval-Augmented Generation
 (RAG)** based on regional tourism guides.
