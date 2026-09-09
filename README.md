@@ -6,9 +6,8 @@
 _Salut! Je suis **Petit Guide**_, _Bon Voyage_’s **AI travel assistant** for the French
 destinations covered by our company.
 
-My job is to help you prepare
-your visit in France by answering your questions using **Retrieval-Augmented Generation
-(RAG)** based on regional tourism guides.
+My job is to help you prepare your visit in France by answering your questions using
+**Retrieval-Augmented Generation (RAG)** based on our PDF regional tourism guides.
 
 ![Petit Guide, the mascot](docs/images/petit_guide.png)
 
@@ -260,14 +259,14 @@ reference.
 
 ## Workflows and operations
 
-### Knowledge*base ingestion
+### Knowledge\*base ingestion
 
 Airflow is the recommended ingestion workflow for orchestrating document processing.
 Follow the [tutorial](docs/README.md#231-ingest-guides-with-airflow) for setup, DAG
 triggering, retries, and re-ingestion options.
 
-For a faster local setup, use `make db-init` followed by `make ingest` as described
-in the [Quickstart](#quickstart).
+For a faster local setup, use `make db-init` followed by `make ingest` as described in
+the [Quickstart](#quickstart).
 
 ### Evaluation
 

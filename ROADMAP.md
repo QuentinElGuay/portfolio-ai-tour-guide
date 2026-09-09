@@ -56,7 +56,12 @@ validation; exposes structured execution traces; persists provider-neutral chat
 messages; renames the Docker application service from `agent` to `app`; and improves the
 Gradio chat flow and identity suggestions.
 
-### v1.4.0 — Multi-provider Petit Guide
+### v1.3.1 — Progressive demo setup
+
+Made the guided demo usable without an ingested knowledge base and initialized the
+database from `make app`.
+
+### v1.4.0 — Multi-provider LLM
 
 Added Google Gemini alongside OpenAI for structured, source-grounded answers with
 bounded search-tool usage. The release also strengthened Petit Guide’s identity and
@@ -72,6 +77,19 @@ first-run experience. Each browser now receives its own backend session and
 mode is labelled in Petit Guide’s name; and HTTP-backed demo responses use a
 configurable short delay. The release also decoupled lightweight chat startup from
 embedding settings and migrated chat persistence from `rag_request_id` to `request_id`.
+
+### v1.5.0 — Unified travel-agent and retrieval workflows
+
+Unified retrieval across the CLI, chat API, deterministic search experience, and LLM
+agent. Added shared travel-turn contracts, deterministic and LLM travel agents,
+centralized vector/full-text/hybrid retrieval, confidence-aware low-evidence handling,
+configurable execution modes, and a clearer separation between travel-agent, LLM, and
+RAG services.
+
+### v1.5.1 — Evaluation and corpus reliability
+
+Fixed RAG evaluation startup imports and made corpus restore compatible with older
+exports while preserving document destinations.
 
 ## Future milestones
 
