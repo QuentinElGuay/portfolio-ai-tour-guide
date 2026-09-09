@@ -35,9 +35,9 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
 
 ## Overview
 
-Created as a capstone project for the
+This project was created as a capstone project for the
 [LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) by
-[DataTalks.Club](https://datatalks.club), this project turns French regional tourism
+[DataTalks.Club](https://datatalks.club) with the goal to turn French regional tourism
 guides into a question-answering experience that helps travellers plan their trips.
 
 ![Chat app answer with sources](docs/images/tutorial/05_chat_app_answers.png "Answers with sources")
