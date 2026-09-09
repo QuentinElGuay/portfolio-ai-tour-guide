@@ -258,12 +258,14 @@ reference.
 
 ## Workflows and operations
 
-### Airflow ingestion
+### Knowledge*base ingestion
 
 Airflow is the recommended ingestion workflow for orchestrating document processing.
 Follow the [tutorial](docs/README.md#231-ingest-guides-with-airflow) for setup, DAG
-triggering, retries, and re-ingestion options. For a faster local setup, use
-`make db-init` followed by `make ingest` as described in the [Quickstart](#quickstart).
+triggering, retries, and re-ingestion options.
+
+For a faster local setup, use `make db-init` followed by `make ingest` as described
+in the [Quickstart](#quickstart).
 
 ### Evaluation
 
