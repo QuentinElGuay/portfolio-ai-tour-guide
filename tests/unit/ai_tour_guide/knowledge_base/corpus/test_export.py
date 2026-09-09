@@ -33,6 +33,7 @@ def test_export_corpus_writes_all_logical_files(tmp_path) -> None:
     assert 'search_vector' not in _EXPORTS['document_chunks.jsonl']
     assert 'embedding' in _EXPORTS['document_chunks.jsonl']
     assert 'section_chunk_index' in _EXPORTS['document_chunks.jsonl']
+    assert "'destination', destination" in _EXPORTS['documents.jsonl']
 
 
 @patch('ai_tour_guide.knowledge_base.corpus.export.database_engine')
