@@ -24,7 +24,7 @@ your visit in France by answering your questions using **Retrieval-Augmented Gen
   - [Application setup](#application-setup)
   - [Common commands](#common-commands)
 - [Workflows and operations](#workflows-and-operations)
-  - [Airflow ingestion](#airflow-ingestion)
+  - [Knowledge base ingestion](#knowledge-base--ingestion)
   - [Evaluation](#evaluation)
   - [Dashboards](#dashboards)
 - [Documentation](#documentation)
@@ -201,7 +201,7 @@ AGENT_LLM_API_KEY=your-api-key
 AGENT_LLM_MODEL=gpt-4.1-mini
 ```
 
-#### Knowledge-base ingestion
+#### Knowledge base ingestion
 
 With the application configured, prepare the knowledge base before starting the
 services.
