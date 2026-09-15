@@ -16,6 +16,7 @@ available project command.
   - [2.4 LLM agent mode](#24-llm-agent-mode)
 - [3. Ingestion with the command line](#3-ingestion-with-the-command-line)
 - [4. Chat app](#4-chat-app)
+- [5. Troubleshooting](#5-troubleshooting)
 - [6. Evaluation](#6-evaluation)
 - [7. Monitoring](#7-monitoring)
   - [7.1 Traffic simulation](#71-traffic-simulation)
@@ -329,6 +330,63 @@ retrieved passages and display the source titles and page numbers below each ans
 Use the Like and Dislike controls to record feedback about an answer.
 
 ![Positive feedback using the Like button](images/tutorial/06_chat_app_feedback.png "Positive feedback")
+
+## 5. Troubleshooting
+
+### Docker networking errors in GitHub Codespaces
+
+When database initialization or document ingestion times out in GitHub Codespaces, the
+PostgreSQL container may still be running and healthy. Typical errors include:
+
+```text
+psycopg.errors.ConnectionTimeout: connection timeout expired
+
+sqlalchemy.exc.OperationalError:
+(psycopg.errors.ConnectionTimeout) connection timeout expired
+```
+
+Database initialization may also end with:
+
+```text
+container "..." exited with status code 1
+make: *** [Makefile:111: db-init] Error 1
+```
+
+Test connectivity from the `init-db` container:
+
+```bash
+docker compose --profile tools run --rm \
+  --entrypoint python \
+  init-db \
+  -c "import socket; s=socket.create_connection(('database',5432),5); print('SUCCESS', s.getpeername()); s.close()"
+```
+
+If it fails with `TimeoutError: timed out`, check the legacy firewall policy:
+
+```bash
+sudo iptables-legacy -L FORWARD -n -v
+```
+
+If `FORWARD` has policy `DROP`, apply the workaround:
+
+```bash
+sudo iptables-legacy -P FORWARD ACCEPT
+```
+
+Retry the failed command, for example:
+
+```bash
+make db-init
+```
+
+or:
+
+```bash
+docker compose --profile tools run --rm init-db
+```
+
+Use this workaround only in GitHub Codespaces/devcontainers; do not add it to Docker
+Compose or application startup logic.
 
 ## 6. Evaluation
 

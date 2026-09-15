@@ -175,10 +175,10 @@ With Docker, Docker Compose, and GNU Make installed, clone the project and chang
 its directory, or open it in a GitHub Codespace.
 
 > [!WARNING]
-> As of September 8, 2026, we observed a possible Docker networking problem in GitHub
-> Codespaces that prevented database initialization or document ingestion. The same
-> commands worked locally, but recreating a Codespace did not reliably resolve the
-> issue.
+> GitHub Codespaces may occasionally block Docker Compose container networking, causing
+> database initialization or document ingestion to time out even when PostgreSQL is
+> healthy. See the [full troubleshooting guide](docs/README.md#5-troubleshooting) if
+> this occurs.
 
 Start by creating a local environment file and choosing the LLM provider for the
 application. First, create a `.env` file from the provided `.env.template` file:
@@ -320,8 +320,7 @@ restoration, and interpretation.
   its operational cautions.
 - [Tutorial](docs/README.md): end-to-end walkthrough for ingestion, chat, evaluation,
   and monitoring.
-- [Troubleshooting](docs/README.md#5-troubleshooting): common setup and Docker fixes
-  issues.
+- [Troubleshooting](docs/README.md#5-troubleshooting): common setup and Docker issues.
 - [Roadmap](ROADMAP.md): delivered work and planned validation, evaluation, and
   monitoring.
 
