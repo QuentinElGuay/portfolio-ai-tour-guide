@@ -175,7 +175,7 @@ With Docker, Docker Compose, and GNU Make installed, clone the project and chang
 its directory, or open it in a GitHub Codespace.
 
 > [!WARNING]
-> GitHub Codespaces may occasionally block Docker Compose container networking, causing
+> GitHub Codespaces may block Docker Compose container networking, causing
 > database initialization or document ingestion to time out even when PostgreSQL is
 > healthy. See the [full troubleshooting guide](docs/README.md#5-troubleshooting) if
 > this occurs.
